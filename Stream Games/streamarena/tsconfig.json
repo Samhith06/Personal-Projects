@@ -1,0 +1,44 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/db"
+    },
+    {
+      "path": "packages/kick"
+    },
+    {
+      "path": "packages/catalog"
+    },
+    {
+      "path": "packages/games/bonus-hunt"
+    },
+    {
+      "path": "packages/games/slot-tournament"
+    },
+    {
+      "path": "packages/games/slot-bingo"
+    },
+    {
+      "path": "packages/games/team-battles"
+    },
+    {
+      "path": "packages/games/giveaways"
+    },
+    {
+      "path": "packages/platform"
+    },
+    {
+      "path": "apps/web"
+    },
+    {
+      "path": "apps/worker"
+    }
+  ]
+}

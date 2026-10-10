@@ -1,0 +1,1 @@
+ALTER TABLE `leaderboard_boards` ADD `custom_window` integer DEFAULT false NOT NULL;

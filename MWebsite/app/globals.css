@@ -1,0 +1,7462 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   MattySpins design system — 2026 revamp
+   Ported from the approved design prototype.
+
+   One theme, dark, deliberately. No light mode.
+     1. Cyan is the interface colour — links, focus, active state, "live".
+     2. Gold is money — coins, prizes, payouts. Never used for navigation.
+     3. Green means "you got something". Red means "you lost it".
+     4. `edge` is the default border. `edge-hot` marks a surface that matters.
+
+   Two systems live here on purpose. The `@theme` block exposes the palette to
+   Tailwind so utilities compose; the component layer below carries the
+   prototype's own classes so a page can be written the way it was designed
+   rather than translated into forty utilities.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Ground.
+     `ink` is deliberately NOT the ground here. Every bridged component writes
+     `text-ink` meaning "the brightest text", which is what it meant in the
+     retired palette — mapping it to the near-black ground rendered those pages
+     black-on-black. The new system's own CSS reads var(--ink) from :root
+     below, so the two never meet. */
+  --color-ground: #050507;
+  --color-ground-2: #08090d;
+  --color-panel: #0c0d12;
+  --color-panel-2: #12141b;
+  --color-panel-3: #171a23;
+
+  /* Borders */
+  --color-edge: #1e212b;
+  --color-edge-2: #2a2f3c;
+  --color-edge-hot: #1e4b5c;
+
+  /* Accents */
+  --color-blue: #22d3ff;
+  --color-blue-2: #0ea5c6;
+  --color-blue-deep: #0e7c99;
+  --color-gold: #ffd166;
+  --color-gold-2: #c79a3c;
+  --color-green: #3ddc97;
+  --color-red: #ff5c7a;
+  --color-warn: #ffb347;
+
+  /* Text */
+  --color-text: #f2f5f9;
+  --color-muted: #79828f;
+  --color-muted-2: #565e6b;
+
+  /* Discord blurple — the one place another brand's colour is allowed */
+  --color-discord: #5865f2;
+
+  --font-display: var(--font-chakra), "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+
+  --radius-card: 12px;
+  --radius-chip: 6px;
+
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+
+  /* ------------------------------------------------------------------------
+     Retired palette, remapped.
+
+     The legal documents, the round verifier and a few reference pages were
+     written against the previous token names and have not been redesigned —
+     their content is right and only their colours were retired. Rather than
+     leave them rendering dark-on-dark until each is rewritten, the old names
+     are kept here as aliases onto the new palette, so they inherit the new
+     theme untouched.
+
+     This is a bridge, not a second design system: nothing new should use
+     these, and they come out as each page is rebuilt.
+  ------------------------------------------------------------------------ */
+  --color-bg: #050507;
+  --color-surface: #0c0d12;
+  --color-surface-2: #12141b;
+  --color-line: #1e212b;
+  --color-line-2: #2a2f3c;
+
+  --color-ink: #f2f5f9;
+  --color-ink-2: #b6bec9;
+  --color-faint: #79828f;
+
+  --color-brand: #22d3ff;
+  --color-brand-dim: #0ea5c6;
+  --color-brand-ink: #03181f;
+  --color-brand-bg: #0e1b22;
+  --color-brand-line: #1e4b5c;
+
+  --color-gold-bg: #17130a;
+  --color-gold-line: #3b3117;
+
+  --color-online: #3ddc97;
+  --color-online-bg: #07201a;
+  --color-online-line: #14452f;
+
+  --color-danger: #ff5c7a;
+  --color-danger-bg: #1c0f0b;
+  --color-danger-line: #3b1d14;
+  --color-live: #ff3b5c;
+
+  --color-silver: #c6cfdd;
+  --color-bronze: #b07a4e;
+}
+
+/* The component layer reads these as plain custom properties, which keeps the
+   ported CSS identical to the prototype instead of a Tailwind translation. */
+:root {
+  color-scheme: dark;
+
+  --ink: #050507;
+  --ink-2: #08090d;
+  --panel: #0c0d12;
+  --panel-2: #12141b;
+  --panel-3: #171a23;
+  --edge: #1e212b;
+  --edge-2: #2a2f3c;
+  --edge-hot: #1e4b5c;
+  --blue: #22d3ff;
+  --blue-2: #0ea5c6;
+  --blue-deep: #0e7c99;
+  --gold: #ffd166;
+  --gold-2: #c79a3c;
+  --green: #3ddc97;
+  --red: #ff5c7a;
+  --warn: #ffb347;
+  --text: #f2f5f9;
+  --muted: #79828f;
+  --muted-2: #565e6b;
+
+  --display: var(--font-chakra), "Segoe UI", system-ui, sans-serif;
+  --body: var(--font-plex-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+
+  --r: 12px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  img {
+    max-width: 100%;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border: 0;
+    background: none;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--display);
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  /* Every figure on the site is tabular, so columns of numbers line up and a
+     ticking countdown does not jitter its own width. */
+  .mono {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Ambient background
+   Three fixed layers behind everything: a canvas particle field, coloured
+   glows that breathe, and a masked grid. All pointer-events:none.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bgcanvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.glows {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 560px at 8% -10%, rgba(34, 211, 255, 0.15), transparent 62%),
+    radial-gradient(760px 520px at 96% 2%, rgba(14, 124, 153, 0.16), transparent 60%),
+    radial-gradient(700px 700px at 50% 120%, rgba(34, 211, 255, 0.05), transparent 60%);
+  animation: breathe 14s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(120, 170, 190, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 170, 190, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  -webkit-mask-image: radial-gradient(circle at 50% 0%, #000, transparent 72%);
+  mask-image: radial-gradient(circle at 50% 0%, #000, transparent 72%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Layout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.shell {
+  position: relative;
+  z-index: 1;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.sitemain {
+  min-height: 70vh;
+  padding: 30px 0 60px;
+}
+
+.sec {
+  margin-bottom: 44px;
+}
+
+.sec-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.sec-head h1,
+.sec-head h2 {
+  font-size: 22px;
+}
+
+.sec-head .sh-sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 3px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--blue-deep);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Header
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+header.site {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(5, 5, 7, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--edge);
+}
+
+.hd {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  height: 62px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 25%, #123a55, #08131d 70%);
+  border: 1px solid var(--edge-hot);
+  box-shadow: 0 0 20px -6px rgba(34, 211, 255, 0.55);
+}
+
+.logo span {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.04em;
+}
+
+.logo .m {
+  color: var(--gold);
+}
+
+.logo .d {
+  color: #c9d3dc;
+}
+
+.brand .bt {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.brand .bt i {
+  font-style: normal;
+  color: var(--blue);
+}
+
+nav.mainnav {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  /* Six to eight links, depending on which stream games are live. Tightened in
+     steps below; past that the row scrolls rather than pushing the coin pill
+     and avatar off the page. */
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+nav.mainnav::-webkit-scrollbar {
+  display: none;
+}
+
+nav.mainnav .ns {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  nav.mainnav .nl {
+    display: none;
+  }
+  nav.mainnav .ns {
+    display: inline;
+  }
+  nav.mainnav a {
+    padding: 8px 9px;
+    font-size: 13px;
+  }
+  nav.mainnav a.on::after {
+    left: 9px;
+    right: 9px;
+  }
+}
+
+@media (max-width: 980px) {
+  .brand .bt {
+    display: none;
+  }
+  .hd {
+    gap: 12px;
+  }
+  .hd-right {
+    gap: 6px;
+  }
+  /* The staff button keeps its ◆; its title still says what it is. */
+  .hd-right .stf {
+    display: none;
+  }
+  nav.mainnav {
+    gap: 0;
+  }
+  nav.mainnav a {
+    padding: 8px 6px;
+    font-size: 12.5px;
+  }
+  nav.mainnav a.on::after {
+    left: 6px;
+    right: 6px;
+  }
+}
+
+nav.mainnav a {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    color 0.15s,
+    background 0.15s;
+  position: relative;
+}
+
+nav.mainnav a:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+nav.mainnav a.on {
+  color: var(--blue);
+  background: rgba(34, 211, 255, 0.07);
+}
+
+nav.mainnav a.on::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 1px;
+  height: 1px;
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue);
+}
+
+.hd-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.coinpill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.coinpill .cv {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.coinpill .mult {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--blue);
+  border-left: 1px solid var(--edge);
+  padding-left: 7px;
+}
+
+.coin {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #ffe49b, #d9a233);
+  color: #3a2a05;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 10px;
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.coin.lg {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--edge-2);
+  background: linear-gradient(150deg, #1d2b3a, #0d141c);
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--blue);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.avatar:hover {
+  border-color: var(--blue-deep);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Buttons
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 17px;
+  border-radius: 9px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  border: 1px solid var(--edge-2);
+  background: var(--panel-2);
+  color: var(--text);
+  transition: 0.16s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  border-color: var(--blue-deep);
+  background: var(--panel-3);
+}
+
+.btn.pri {
+  background: linear-gradient(180deg, #25c8f0, #0f9ec2);
+  border-color: #3fdcff;
+  color: #03181f;
+  box-shadow: 0 6px 22px -10px rgba(34, 211, 255, 0.9);
+}
+
+.btn.pri:hover {
+  filter: brightness(1.08);
+}
+
+.btn.gold {
+  background: linear-gradient(180deg, #ffdc8a, #d9a233);
+  border-color: #ffe9ae;
+  color: #2e2103;
+}
+
+.btn.gold:hover {
+  filter: brightness(1.06);
+}
+
+.btn.green {
+  background: linear-gradient(180deg, #4fe7a8, #22b57a);
+  border-color: #7bf3c2;
+  color: #04241a;
+}
+
+.btn.danger {
+  background: linear-gradient(180deg, #ff7d96, #d93a5c);
+  border-color: #ff9db0;
+  color: #2c060f;
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.btn.sm {
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+/* Discord is the only sign-in, so it gets its own brand button. */
+.btn.discord {
+  background: var(--color-discord);
+  border-color: #7983f5;
+  color: #fff;
+}
+
+.btn.discord:hover {
+  filter: brightness(1.08);
+  background: var(--color-discord);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Panels, tags, generic bits
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 18px;
+}
+
+.card.hov {
+  transition:
+    transform 0.18s,
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+
+.card.hov:hover {
+  transform: translateY(-2px);
+  border-color: var(--edge-hot);
+  box-shadow: 0 14px 34px -22px rgba(34, 211, 255, 0.8);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--edge-2);
+  color: var(--muted);
+}
+
+.tag.blue {
+  color: var(--blue);
+  border-color: var(--edge-hot);
+  background: rgba(34, 211, 255, 0.07);
+}
+
+.tag.gold {
+  color: var(--gold);
+  border-color: rgba(255, 209, 102, 0.3);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.tag.green {
+  color: var(--green);
+  border-color: rgba(61, 220, 151, 0.3);
+  background: rgba(61, 220, 151, 0.06);
+}
+
+.tag.red {
+  color: var(--red);
+  border-color: rgba(255, 92, 122, 0.3);
+  background: rgba(255, 92, 122, 0.06);
+}
+
+.tag.warn {
+  color: var(--warn);
+  border-color: rgba(255, 179, 71, 0.35);
+  background: rgba(255, 179, 71, 0.06);
+}
+
+/*
+ * Max win — a slot paying its own ceiling, which is the rarest thing on the
+ * wall and the only tag allowed to shout. It sits beside the gold multiplier,
+ * so it is deliberately not gold: two gold tags side by side read as one
+ * two-part label rather than as two facts.
+ */
+.tag.max {
+  color: #fff;
+  border-color: rgba(255, 59, 92, 0.55);
+  background: linear-gradient(180deg, #ff4d6d, #d81f45);
+  font-weight: 600;
+  box-shadow: 0 2px 12px -3px rgba(255, 59, 92, 0.8);
+}
+
+/* The tag row on a wall-of-fame card, over the thumbnail. */
+.cliptags {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 16px);
+}
+
+/*
+ * Over a thumbnail the ordinary tag has no ground of its own.
+ *
+ * Elsewhere a tag sits on the card's dark panel, so a 6% wash and a gold
+ * outline are plenty. On a slot frame the thing behind it is whatever the
+ * capture happened to hold — reels lit yellow, a white paytable, a bonus
+ * screen — and the multiplier, the single most interesting figure on the
+ * wall, disappears into it. So a tag on a thumbnail brings its own backing,
+ * the same near-black the duration pill already uses, and states the
+ * multiplier in a lighter gold at a weight that carries at 10px.
+ */
+.cliptags .tag {
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.9);
+}
+
+.cliptags .tag.gold {
+  color: #ffdd93;
+  border-color: rgba(255, 209, 102, 0.55);
+  background: rgba(0, 0, 0, 0.82);
+  font-weight: 700;
+}
+
+/* The max-win mark already carries its own solid fill — leave it alone. */
+.cliptags .tag.max {
+  background: linear-gradient(180deg, #ff4d6d, #d81f45);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 2px 12px -3px rgba(255, 59, 92, 0.8);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--edge);
+  margin: 20px 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Home — hero stage
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  margin: 18px 0 30px;
+}
+
+.stage {
+  position: relative;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--ink-2);
+  aspect-ratio: 16 / 9;
+}
+
+.stage.live {
+  border-color: var(--edge-hot);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 255, 0.08),
+    0 20px 70px -40px rgba(34, 211, 255, 0.9);
+}
+
+.stage iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.videoish {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(600px 320px at 30% 30%, rgba(34, 211, 255, 0.16), transparent 60%),
+    radial-gradient(500px 300px at 75% 70%, rgba(255, 209, 102, 0.1), transparent 60%),
+    linear-gradient(160deg, #0b1620, #05080c);
+}
+
+.videoish::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px);
+  opacity: 0.6;
+}
+
+.stage-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.livepill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(5, 5, 7, 0.72);
+  border: 1px solid rgba(255, 92, 122, 0.5);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: #fff;
+}
+
+.livedot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff3b5c;
+  box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.7);
+  animation: ping 2s infinite;
+}
+
+@keyframes ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(255, 59, 92, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 92, 0);
+  }
+}
+
+.offpill {
+  background: rgba(5, 5, 7, 0.72);
+  border-color: var(--edge-2);
+  color: var(--muted);
+}
+
+.viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(5, 5, 7, 0.72);
+  border: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.stage-bottom {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 2;
+}
+
+.stage-title {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+  text-shadow: 0 2px 10px #000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: 20px;
+  z-index: 2;
+}
+
+.countdown .cd-lab {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 14px;
+}
+
+.cd-clock {
+  display: flex;
+  gap: 10px;
+}
+
+.cd-u {
+  min-width: 66px;
+  background: rgba(8, 10, 14, 0.7);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 9px 6px;
+}
+
+.cd-u b {
+  display: block;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-u span {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.countdown .cd-sub {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.herorail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.railcard {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 15px;
+}
+
+.railcard h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.mini-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(30, 33, 43, 0.7);
+}
+
+.mini-row:last-child {
+  border-bottom: 0;
+}
+
+.rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--panel-3);
+  color: var(--muted);
+  flex: none;
+}
+
+.rank.r1 {
+  background: linear-gradient(160deg, #ffe49b, #c79a3c);
+  color: #2e2103;
+}
+
+.rank.r2 {
+  background: linear-gradient(160deg, #e6ecf2, #94a3b3);
+  color: #1a1f26;
+}
+
+.rank.r3 {
+  background: linear-gradient(160deg, #e8b98a, #a5713f);
+  color: #2a1a0c;
+}
+
+.mini-row .nm {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-row .vl {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Stat strip
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 38px;
+}
+
+.stat {
+  background: linear-gradient(180deg, var(--panel), var(--ink-2));
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 255, 0.5), transparent);
+}
+
+.stat .sl {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.stat .sv {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.stat .sv.g {
+  color: var(--gold);
+}
+
+.stat .sv.b {
+  color: var(--blue);
+}
+
+.stat .sm {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin-top: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Razed partner band
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.razed {
+  border: 1px solid var(--edge-hot);
+  border-radius: 16px;
+  padding: 26px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, rgba(34, 211, 255, 0.09), rgba(5, 5, 7, 0) 55%), var(--panel);
+}
+
+.razed::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34, 211, 255, 0.18), transparent 65%);
+}
+
+.razed-in {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 22px;
+  align-items: center;
+}
+
+.razed h2 {
+  font-size: 24px;
+  margin: 8px 0 8px;
+}
+
+.razed p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 56ch;
+  font-size: 14px;
+}
+
+.codebox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ink);
+  border: 1px dashed var(--edge-hot);
+  border-radius: 11px;
+  padding: 12px 14px;
+}
+
+.codebox .cl {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.codebox .cc {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+}
+
+.perks {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.perk {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.perk b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   About + socials
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.about {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 26px;
+  align-items: center;
+}
+
+.portrait {
+  aspect-ratio: 1;
+  border-radius: 16px;
+  border: 1px solid var(--edge);
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(150deg, #132434, #070a0e);
+  display: grid;
+  place-items: center;
+}
+
+.portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 20%, rgba(34, 211, 255, 0.16), transparent 60%);
+}
+
+.portrait .ph {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 0 16px;
+  z-index: 1;
+}
+
+.portrait img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.socials {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.soc {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  transition: 0.16s;
+}
+
+.soc:hover {
+  border-color: var(--edge-hot);
+  background: var(--panel-2);
+  transform: translateY(-2px);
+}
+
+.soc .ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 12px;
+  flex: none;
+  background: var(--panel-3);
+  color: var(--blue);
+}
+
+.soc .sn {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.2;
+}
+
+.soc .sh {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Clips
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Card grids use auto-*fill*, not auto-fit. auto-fit collapses the empty
+   tracks, which makes a section holding one clip render it a metre wide; with
+   auto-fill a lone card stays the size of a card and the row just has gaps. */
+.clips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.clip {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--panel);
+  transition: 0.16s;
+  display: block;
+}
+
+.clip:hover {
+  border-color: var(--edge-hot);
+  transform: translateY(-2px);
+}
+
+.clip .thumb {
+  aspect-ratio: 16 / 9;
+  position: relative;
+  background: linear-gradient(150deg, #0f1c28, #06090d);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.clip .thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.clip .thumb .pl {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--edge-hot);
+  display: grid;
+  place-items: center;
+  background: rgba(5, 5, 7, 0.6);
+  color: var(--blue);
+  font-size: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* The card is a button now that it opens a player rather than a new tab, so
+   the button's own chrome is stripped back to what the anchor had. */
+.clip {
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Shown when a clip has no thumbnail, or its URL fails to load. A dim mark on
+   the tile's own gradient reads as "no preview" — a broken image icon reads as
+   a broken site. */
+.clip .thumb .thumbfall {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  color: var(--edge-hot);
+  opacity: 0.5;
+}
+
+/* The player overlay. */
+.clipmodal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(3, 4, 6, 0.85);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.clipbox {
+  width: min(960px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--edge-hot);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.clipbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.clipbar .ct {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clipframe {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+/* Vertical clips get a portrait frame rather than pillarboxing into a wide
+   one, which is most of the screen wasted on a phone. */
+.clipframe.tall {
+  aspect-ratio: 9 / 16;
+  max-height: 78vh;
+  margin: 0 auto;
+  width: auto;
+}
+
+.clipframe iframe,
+.clipframe video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Kick clips are played here rather than embedded, so the frame owns the
+   object-fit that an iframe would have handled itself. */
+.clipframe video {
+  background: #000;
+  object-fit: contain;
+}
+
+/* Sits over the poster until the first frame plays. Pointer-events off so it
+   never eats a click meant for the controls underneath. */
+.clipwait {
+  position: absolute;
+  inset: auto 0 50% 0;
+  pointer-events: none;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+/* A clip with no playable stream says so and offers the link, rather than
+   leaving a black rectangle that looks broken. */
+.clipmiss {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.clip .thumb .dur {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.clip .ci {
+  padding: 11px 12px;
+}
+
+.clip .ct {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.3;
+  margin-bottom: 5px;
+}
+
+.clip .cm {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tables
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tw {
+  overflow-x: auto;
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--panel);
+}
+
+.tw table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+
+.tw th {
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--edge);
+  white-space: nowrap;
+}
+
+.tw td {
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(30, 33, 43, 0.55);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.tw tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tw tbody tr {
+  transition: background 0.14s;
+}
+
+.tw tbody tr:hover {
+  background: rgba(34, 211, 255, 0.03);
+}
+
+/* The signed-in viewer's own row, so they can find themselves in a long board. */
+.tw tbody tr.self {
+  background: rgba(34, 211, 255, 0.07);
+}
+
+.tw tbody tr.self td {
+  border-color: rgba(34, 211, 255, 0.18);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Admin tables — the member filter bar, and the clip list                      *
+ * -------------------------------------------------------------------------- */
+
+/*
+ * Search, filters and sort on one line, and the search box is the part that
+ * gives up its width first: on a phone every control ends up full width, in
+ * that order, which is also the order somebody reaches for them.
+ */
+.ufilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ufilters .uf-search {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.ufilters .uf-search input {
+  width: 100%;
+}
+
+.ufilters .uf-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ufilters .uf-pick > span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* A select sizes itself to its longest option unless it is told not to. */
+.ufilters .uf-pick select {
+  width: auto;
+  min-width: 130px;
+}
+
+/* The Apply button is a fallback for no-JavaScript; it still has to sit on the
+   baseline of the controls beside it rather than float above them. */
+.ufilters > .btn {
+  align-self: flex-end;
+}
+
+@media (max-width: 640px) {
+  .ufilters .uf-pick,
+  .ufilters .uf-pick select,
+  .ufilters > .btn {
+    width: 100%;
+  }
+}
+
+/*
+ * The clip list carries a name, three facts about the file and four buttons.
+ * Given a column each, the name wrapped every two words and the buttons were
+ * pushed off the edge of the screen. The facts belong under the name, and the
+ * buttons get whatever width they need.
+ */
+.tw.tclips table {
+  min-width: 720px;
+}
+
+.tw.tclips .clipcell {
+  min-width: 240px;
+}
+
+.clipmeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Sized to its buttons — `1%` is the usual way of asking a table cell for its
+   minimum width and leaving the rest to the columns that need it. */
+.tw td.acts {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.rowacts {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tw td.n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tw td.g {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Leaderboard — podium, header, archive
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.pod {
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 20px 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pod .medal {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.pod .pn {
+  font-family: var(--mono);
+  font-size: 14px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pod .pw {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pod .pp {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--gold);
+  margin-top: 11px;
+}
+
+.pod.first {
+  border-color: rgba(255, 209, 102, 0.4);
+  padding-top: 30px;
+  padding-bottom: 26px;
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0.09), var(--panel) 55%);
+  box-shadow: 0 20px 60px -40px rgba(255, 209, 102, 0.9);
+}
+
+.pod.first .medal {
+  background: linear-gradient(160deg, #ffe49b, #c79a3c);
+  color: #2e2103;
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+
+.pod.first .pp {
+  font-size: 30px;
+}
+
+.pod.second .medal {
+  background: linear-gradient(160deg, #e6ecf2, #94a3b3);
+  color: #1a1f26;
+}
+
+.pod.third .medal {
+  background: linear-gradient(160deg, #e8b98a, #a5713f);
+  color: #2a1a0c;
+}
+
+.lb-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--edge-hot);
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  background: linear-gradient(100deg, rgba(34, 211, 255, 0.07), transparent 60%), var(--panel);
+}
+
+.lb-head .pool {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
+  color: var(--gold);
+  line-height: 1.1;
+}
+
+/* Total wagered sits beside the prize pool at the same size, so it takes the
+   blue rather than the gold. Two gold figures side by side read as two pots,
+   and only one of them is money anybody is being paid. */
+.lb-head .pool.total {
+  color: var(--blue);
+}
+
+.cd-mini {
+  display: flex;
+  gap: 7px;
+}
+
+.cd-mini .u {
+  background: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 6px 9px;
+  text-align: center;
+  min-width: 50px;
+}
+
+.cd-mini b {
+  display: block;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-mini span {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.acc {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  margin-bottom: 9px;
+  overflow: hidden;
+}
+
+.acc > summary,
+.acc button.ah {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 17px;
+  text-align: left;
+  cursor: pointer;
+  list-style: none;
+}
+
+.acc > summary::-webkit-details-marker {
+  display: none;
+}
+
+.acc > summary:hover,
+.acc button.ah:hover {
+  background: var(--panel-2);
+}
+
+.acc .am {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.acc .ap {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.acc .abody {
+  border-top: 1px solid var(--edge);
+  padding: 6px 0;
+}
+
+.acc .chev {
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.acc[open] .chev,
+.acc.open .chev {
+  transform: rotate(180deg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Milestones
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ms-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 22px;
+  align-items: center;
+  border: 1px solid var(--edge-hot);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 24px;
+  background: linear-gradient(100deg, rgba(34, 211, 255, 0.07), transparent 60%), var(--panel);
+}
+
+.railbar {
+  height: 9px;
+  border-radius: 99px;
+  background: var(--panel-3);
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid var(--edge);
+}
+
+.railbar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--blue-deep), var(--blue));
+  box-shadow: 0 0 14px rgba(34, 211, 255, 0.6);
+}
+
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 16px 18px;
+  transition: 0.18s;
+}
+
+.tier .tn {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--panel-3);
+  color: var(--muted-2);
+  border: 1px solid var(--edge);
+}
+
+.tier .tt {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.tier .td {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tier .tr {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--gold);
+}
+
+.tier.locked {
+  opacity: 0.62;
+}
+
+.tier.claimable {
+  border-color: rgba(61, 220, 151, 0.45);
+  background: linear-gradient(100deg, rgba(61, 220, 151, 0.07), var(--panel) 60%);
+  box-shadow: 0 0 30px -18px rgba(61, 220, 151, 0.9);
+}
+
+.tier.claimable .tn {
+  background: linear-gradient(160deg, #4fe7a8, #22b57a);
+  color: #04241a;
+  border-color: #7bf3c2;
+}
+
+.tier.claimed .tn {
+  background: var(--panel-3);
+  color: var(--green);
+  border-color: rgba(61, 220, 151, 0.3);
+}
+
+.tier.claimed .tt {
+  color: var(--muted);
+}
+
+.tier.pending .tn {
+  background: var(--panel-3);
+  color: var(--warn);
+  border-color: rgba(255, 179, 71, 0.35);
+}
+
+.tier .tright {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Games — lobby
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.globby {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 13px;
+}
+
+.gcard {
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel);
+  transition: 0.18s;
+  text-align: left;
+  display: block;
+}
+
+.gcard:hover {
+  border-color: var(--edge-hot);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 44px -30px rgba(34, 211, 255, 0.9);
+}
+
+.gcard .art {
+  aspect-ratio: 16 / 10;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.gcard .art .sym {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 44px;
+  letter-spacing: -0.02em;
+  opacity: 0.92;
+  color: var(--blue);
+}
+
+.gcard .gi {
+  padding: 14px 15px;
+}
+
+.gcard .gt {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.gcard .gd {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.gcard .gw {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gold);
+  margin-top: 8px;
+}
+
+.art.dice {
+  background: linear-gradient(150deg, #0d2a35, #060a0e);
+}
+
+.art.limbo {
+  background: linear-gradient(150deg, #2a1030, #060a0e);
+}
+
+.art.wheel {
+  background: linear-gradient(150deg, #0f2a1e, #060a0e);
+}
+
+.art.keno {
+  background: linear-gradient(150deg, #2a220d, #060a0e);
+}
+
+.art.blackjack {
+  background: linear-gradient(150deg, #10202a, #060a0e);
+}
+
+.art.baccarat {
+  background: linear-gradient(150deg, #221a0d, #08070a);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Games — table
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gframe {
+  display: grid;
+  grid-template-columns: 280px 1fr 250px;
+  gap: 14px;
+}
+
+.gpanel {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  padding: 17px;
+}
+
+.gstage {
+  background: linear-gradient(170deg, var(--panel-2), var(--ink-2));
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 380px;
+  position: relative;
+  overflow: hidden;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.inp {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--edge-2);
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inp:focus {
+  outline: none;
+  border-color: var(--blue-deep);
+  box-shadow: 0 0 0 3px rgba(34, 211, 255, 0.1);
+}
+
+.inp.s {
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.betrow {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.betrow button {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--edge-2);
+  border-radius: 7px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  transition: 0.14s;
+}
+
+.betrow button:hover {
+  border-color: var(--blue-deep);
+  color: var(--blue);
+}
+
+.readout {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-top: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.readout span {
+  color: var(--muted);
+}
+
+.readout b {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.bighit {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(40px, 9vw, 74px);
+  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+}
+
+.bighit.win {
+  color: var(--gold);
+  text-shadow: 0 0 44px rgba(255, 209, 102, 0.55);
+}
+
+.bighit.lose {
+  color: var(--red);
+}
+
+.bighit.idle {
+  color: #2e3540;
+}
+
+.stagelab {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 209, 102, 0.3), transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.flash.go {
+  animation: flash 0.85s ease-out;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.hrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  border-left: 2px solid var(--edge-2);
+}
+
+.hrow.w {
+  border-left-color: var(--green);
+}
+
+.hrow.l {
+  border-left-color: var(--red);
+}
+
+.hrow .hp {
+  color: var(--muted);
+}
+
+.hrow .ha {
+  font-variant-numeric: tabular-nums;
+}
+
+.hrow.w .ha {
+  color: var(--green);
+}
+
+.hrow.l .ha {
+  color: var(--red);
+}
+
+/* Dice slider */
+.slider {
+  position: relative;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  margin: 26px 0 8px;
+}
+
+.strack {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+}
+
+.strack .lo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #1c7a5a, #3ddc97);
+}
+
+.strack .hi {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #5a1c2c, #ff5c7a);
+}
+
+.slider input[type="range"] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  height: 34px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #eaf6fa, #9fbac5);
+  border: 1px solid #fff;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+}
+
+.slider input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #eaf6fa, #9fbac5);
+  border: 1px solid #fff;
+  cursor: grab;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted-2);
+  margin-top: 4px;
+}
+
+.marker {
+  position: absolute;
+  top: -18px;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+/* Wheel */
+.wheelwrap {
+  display: grid;
+  place-items: center;
+  position: relative;
+  padding: 6px 0;
+}
+
+.wheelbox {
+  position: relative;
+  width: min(300px, 72vw);
+  aspect-ratio: 1;
+}
+
+.wheeldisc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--edge-2);
+  transition: transform 4.2s cubic-bezier(0.16, 0.86, 0.24, 1);
+}
+
+.wheelhub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  background: var(--ink-2);
+  border: 1px solid var(--edge-2);
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wheelptr {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 16px solid var(--blue);
+  filter: drop-shadow(0 0 6px rgba(34, 211, 255, 0.9));
+  z-index: 2;
+}
+
+/* Keno */
+/* The board is the game — it should fill the stage rather than sit as a small
+   square in the middle of it. Tiles stay square via aspect-ratio, so widening
+   the grid grows the numbers too. */
+.kgrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.kn {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  border: 1px solid var(--edge-2);
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: clamp(13px, 1.5vw, 17px);
+  font-weight: 500;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  transition: 0.13s;
+}
+
+.kn:hover {
+  border-color: var(--blue-deep);
+  color: var(--text);
+}
+
+.kn.pick {
+  background: linear-gradient(180deg, #25c8f0, #0f9ec2);
+  border-color: #3fdcff;
+  color: #03181f;
+  font-weight: 600;
+}
+
+.kn.hit {
+  background: linear-gradient(180deg, #ffdc8a, #d9a233);
+  border-color: #ffe9ae;
+  color: #2e2103;
+  font-weight: 600;
+  animation: pop 0.3s ease-out;
+}
+
+.kn.miss {
+  background: var(--panel-3);
+  border-color: var(--edge);
+  color: var(--muted-2);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.7);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Under the board now, so it gets the board's width and can be read at a
+   glance rather than squinted at in a sidebar. */
+.paytable {
+  margin-top: 18px;
+  border-top: 1px solid var(--edge);
+  padding-top: 14px;
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+}
+
+.pthead {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+
+.ptnote {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.ptrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.pt {
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  background: var(--panel-2);
+  padding: 7px 3px;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.pt b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pt span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pt.z {
+  opacity: 0.4;
+}
+
+.pt.z span {
+  color: var(--muted-2);
+}
+
+.pt.hot {
+  border-color: rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.pt.hot span {
+  color: var(--gold);
+}
+
+/* Provably fair drawer */
+.fair {
+  margin-top: 12px;
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.fair > summary,
+.fair > button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fair > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fair > summary:hover,
+.fair > button:hover {
+  background: var(--panel-2);
+}
+
+.fair .fb {
+  padding: 4px 15px 15px;
+  border-top: 1px solid var(--edge);
+}
+
+.fair[open] .chev {
+  transform: rotate(180deg);
+}
+
+.seed {
+  margin-top: 11px;
+}
+
+.seed .sl {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.seed .sv {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  word-break: break-all;
+  color: var(--text);
+  background: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+
+/* Winners ticker */
+.ticker {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  padding: 10px 14px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.ticker .tk {
+  display: flex;
+  gap: 26px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+  animation: slide 34s linear infinite;
+}
+
+.ticker .tk span {
+  color: var(--muted);
+}
+
+.ticker .tk b {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Opt-in / sign-in gate */
+.gate {
+  max-width: 620px;
+  margin: 40px auto;
+  text-align: center;
+  border: 1px solid var(--edge-hot);
+  border-radius: 16px;
+  padding: 34px 30px;
+  background: linear-gradient(160deg, rgba(34, 211, 255, 0.06), var(--panel));
+}
+
+.gate h1,
+.gate h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.gate p {
+  color: var(--muted);
+  margin: 0 auto 16px;
+  max-width: 52ch;
+  font-size: 14px;
+}
+
+.gatelist {
+  text-align: left;
+  max-width: 420px;
+  margin: 0 auto 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.gatelist div {
+  display: flex;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.gatelist b {
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 12px;
+  flex: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Raffles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.rgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.raffle {
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: 0.18s;
+}
+
+.raffle:hover {
+  border-color: var(--edge-hot);
+  transform: translateY(-2px);
+}
+
+.raffle .rimg {
+  aspect-ratio: 16 / 9;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, #12212c, #06090d);
+  overflow: hidden;
+}
+
+.raffle .rimg img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.raffle .rimg .sym {
+  font-size: 38px;
+  opacity: 0.85;
+  font-family: var(--display);
+  font-weight: 700;
+  color: var(--blue-deep);
+}
+
+.raffle .rimg .badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
+
+.raffle .rb {
+  padding: 15px 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.raffle .rt {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 3px;
+}
+
+.raffle .rv {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--gold);
+  margin-bottom: 11px;
+}
+
+.rmeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 9px 0;
+  border-top: 1px solid var(--edge);
+}
+
+.rmeta b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.odds {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--blue);
+  margin-top: 8px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.stepper button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--edge-2);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.stepper button:hover {
+  border-color: var(--blue-deep);
+  color: var(--blue);
+}
+
+.stepper .n {
+  flex: 1;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Store
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--edge);
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+.tabs a,
+.tabs button {
+  padding: 10px 15px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.tabs a:hover,
+.tabs button:hover {
+  color: var(--text);
+}
+
+.tabs a.on,
+.tabs button.on {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.sgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 13px;
+}
+
+.item {
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: 0.18s;
+}
+
+.item:hover {
+  border-color: var(--edge-hot);
+  transform: translateY(-2px);
+}
+
+.item.cant {
+  opacity: 0.5;
+}
+
+.item .iimg {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(155deg, #111c25, #06090d);
+  position: relative;
+  overflow: hidden;
+}
+
+.item .iimg img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item .iimg .sym {
+  font-size: 40px;
+  opacity: 0.8;
+}
+
+.item .ib {
+  padding: 13px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.item .it {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.25;
+}
+
+.item .ip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.item .is {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: auto;
+}
+
+.item .is.low {
+  color: var(--warn);
+}
+
+.balbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--edge-hot);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  background: linear-gradient(100deg, rgba(255, 209, 102, 0.06), transparent 60%), var(--panel);
+}
+
+.balbar .bv {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Profile
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pgrid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.idcard {
+  border: 1px solid var(--edge-hot);
+  border-radius: 14px;
+  padding: 22px;
+  text-align: center;
+  background: linear-gradient(170deg, rgba(34, 211, 255, 0.07), var(--panel) 55%);
+}
+
+.idcard .big {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  margin: 0 auto 13px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--blue);
+  background: linear-gradient(150deg, #16283a, #0a1119);
+  border: 1px solid var(--edge-hot);
+  box-shadow: 0 0 34px -12px rgba(34, 211, 255, 0.8);
+  overflow: hidden;
+}
+
+.idcard .big img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.idcard .un {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.idcard .sub {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--edge);
+  font-size: 13.5px;
+}
+
+.linkrow .lk {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+}
+
+.linkrow .lv {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 11px;
+}
+
+.sbox {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  padding: 14px 15px;
+}
+
+.sbox .sl {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.sbox .sv {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sbox .sv.g {
+  color: var(--gold);
+}
+
+.sbox .sv.b {
+  color: var(--blue);
+}
+
+/* A caveat under a figure — when it was read, what it does not include. Sized
+   to be findable without competing with the number it qualifies. */
+.sbox .sn {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.verifybox {
+  border: 1px dashed var(--edge-hot);
+  border-radius: 12px;
+  padding: 18px;
+  background: rgba(34, 211, 255, 0.03);
+}
+
+.codeflash {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 0.22em;
+  color: var(--blue);
+  text-align: center;
+  padding: 14px 0;
+  background: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  margin: 12px 0;
+  text-shadow: 0 0 24px rgba(34, 211, 255, 0.5);
+}
+
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  justify-content: center;
+}
+
+.pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue);
+  animation: ping2 1.6s infinite;
+}
+
+@keyframes ping2 {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.bgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 10px;
+}
+
+.bdg {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  padding: 14px 13px;
+  text-align: center;
+  transition: 0.16s;
+  position: relative;
+}
+
+.bdg .bi {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  margin: 0 auto 9px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  background: var(--panel-3);
+  color: var(--muted-2);
+  border: 1px solid var(--edge);
+}
+
+/*
+ * A badge with real artwork.
+ *
+ * The SVG draws its own rounded tile, border and glow, so every piece of the
+ * placeholder's decoration is switched off rather than left to show through
+ * underneath it. The `.earned` and `.earned.gold` gradients below would
+ * otherwise paint a second tile behind the first.
+ */
+.bdg .bi.art,
+.bdg.earned .bi.art,
+.bdg.earned.gold .bi.art {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.bdg .bi.art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Locked badges are dimmed by `.bdg.locked`; draining the colour as well is
+   what makes "not yet" read at a glance across a grid of fourteen. */
+.bdg.locked .bi.art img {
+  filter: grayscale(0.8);
+}
+
+.bdg .bn {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.bdg .bd {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
+.bdg.earned {
+  border-color: var(--edge-hot);
+}
+
+.bdg.earned .bi {
+  background: linear-gradient(150deg, #14364a, #0a1a24);
+  color: var(--blue);
+  border-color: var(--edge-hot);
+  box-shadow: 0 0 20px -8px rgba(34, 211, 255, 0.9);
+}
+
+.bdg.earned.gold .bi {
+  background: linear-gradient(150deg, #ffe49b, #c79a3c);
+  color: #2e2103;
+  border-color: #ffe9ae;
+  box-shadow: 0 0 22px -8px rgba(255, 209, 102, 0.9);
+}
+
+.bdg.earned.gold {
+  border-color: rgba(255, 209, 102, 0.35);
+}
+
+.bdg.locked {
+  opacity: 0.5;
+}
+
+.bdg .pinbtn {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted-2);
+  letter-spacing: 0.08em;
+}
+
+.bdg.pinned .pinbtn {
+  color: var(--blue);
+}
+
+.acctgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.shelf {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 13px;
+}
+
+.mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  border: 1px solid var(--edge-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.mini-badge.gold {
+  color: var(--gold);
+  border-color: rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.mini-badge.blue {
+  color: var(--blue);
+  border-color: var(--edge-hot);
+  background: rgba(34, 211, 255, 0.07);
+}
+
+/* Grid children default to min-width:auto, which lets long content push a
+   track wider than its column and scroll the whole page sideways. */
+.pgrid > *,
+.statgrid > *,
+.bgrid > *,
+.acctgrid > *,
+.sgrid > *,
+.rgrid > *,
+.globby > *,
+.clips > *,
+.socials > *,
+.hero > *,
+.stats > *,
+.podium > *,
+.fgrid > *,
+.kpis > * {
+  min-width: 0;
+}
+
+.soc > div {
+  min-width: 0;
+}
+
+.soc .sn,
+.soc .sh {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Admin
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.staffbar {
+  border: 1px solid rgba(255, 179, 71, 0.35);
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(100deg, rgba(255, 179, 71, 0.07), transparent 60%), var(--panel);
+}
+
+.staffbar .sbt {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--warn);
+}
+
+.adm {
+  display: grid;
+  grid-template-columns: 212px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.admnav {
+  position: sticky;
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 8px;
+}
+
+.admnav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+  transition: 0.14s;
+}
+
+.admnav a:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.admnav a.on {
+  background: rgba(34, 211, 255, 0.08);
+  color: var(--blue);
+}
+
+.admnav .ct {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--warn);
+  color: #2b1b00;
+  font-weight: 600;
+  flex: none;
+}
+
+.admnav .sep {
+  height: 1px;
+  background: var(--edge);
+  margin: 6px 4px;
+}
+
+.admnav .gp {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  padding: 8px 11px 4px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 11px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  padding: 14px 15px;
+}
+
+.kpi .kl {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.kpi .kv {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi .kv.g {
+  color: var(--gold);
+}
+
+.kpi .kv.b {
+  color: var(--blue);
+}
+
+.kpi .kv.w {
+  color: var(--warn);
+}
+
+.kpi .kd {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 3px;
+}
+
+.qrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--edge);
+  border-radius: 11px;
+  background: var(--panel);
+  padding: 14px 16px;
+  margin-bottom: 9px;
+  transition: 0.15s;
+}
+
+.qrow:hover {
+  border-color: var(--edge-hot);
+}
+
+.qrow .qm {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+
+.qrow .qd {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.qrow .qd b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.qacts {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  margin-left: 7px;
+}
+
+.risk.hi {
+  background: rgba(255, 92, 122, 0.12);
+  color: var(--red);
+  border: 1px solid rgba(255, 92, 122, 0.3);
+}
+
+.risk.ok {
+  background: rgba(61, 220, 151, 0.1);
+  color: var(--green);
+  border: 1px solid rgba(61, 220, 151, 0.28);
+}
+
+.editrow {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(30, 33, 43, 0.6);
+}
+
+.editrow:last-child {
+  border-bottom: 0;
+}
+
+.editrow .er {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.emptyq {
+  border: 1px dashed var(--edge-2);
+  border-radius: 11px;
+  padding: 26px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+}
+
+.sync i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  display: block;
+  animation: ping2 2s infinite;
+}
+
+.sync.stale {
+  color: var(--warn);
+}
+
+.sync.stale i {
+  background: var(--warn);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Footer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+footer.site {
+  border-top: 1px solid var(--edge);
+  background: var(--ink-2);
+  margin-top: 40px;
+  padding: 32px 0 100px;
+}
+
+.fgrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+
+footer.site h4 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 11px;
+  font-weight: 500;
+}
+
+footer.site a {
+  display: block;
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 3px 0;
+}
+
+footer.site a:hover {
+  color: var(--blue);
+}
+
+.rg {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--edge);
+  padding-top: 18px;
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+.age {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--red);
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 12px;
+  flex: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Modal / toast
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 4, 6, 0.82);
+  backdrop-filter: blur(7px);
+}
+
+.mbox {
+  max-width: 460px;
+  width: 100%;
+  border: 1px solid var(--edge-hot);
+  border-radius: 16px;
+  padding: 30px;
+  text-align: center;
+  background: linear-gradient(170deg, rgba(34, 211, 255, 0.08), var(--panel) 55%);
+  box-shadow: 0 40px 100px -50px #000;
+}
+
+.mbox h2 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.mbox p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  transform: translate(-50%, 20px);
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid var(--edge-hot);
+  background: rgba(12, 13, 18, 0.96);
+  backdrop-filter: blur(8px);
+  border-radius: 11px;
+  padding: 12px 18px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  transition: 0.25s;
+  box-shadow: 0 20px 50px -25px #000;
+}
+
+.toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast.good {
+  border-color: rgba(61, 220, 151, 0.5);
+  color: var(--green);
+}
+
+.toast.bad {
+  border-color: rgba(255, 92, 122, 0.5);
+  color: var(--red);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mobile tab bar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mobnav {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  background: rgba(6, 7, 10, 0.95);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--edge);
+  padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+}
+
+.mobnav .mn {
+  display: flex;
+  justify-content: space-around;
+}
+
+.mobnav a {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 6px 1px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.01em;
+  color: var(--muted-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.mobnav a .mi {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.mobnav a.on {
+  color: var(--blue);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1080px) {
+  .gframe {
+    grid-template-columns: 1fr;
+  }
+  .gframe .gstage {
+    order: -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .razed-in {
+    grid-template-columns: 1fr;
+  }
+  .about {
+    grid-template-columns: 1fr;
+  }
+  .portrait {
+    max-width: 230px;
+  }
+  .pgrid {
+    grid-template-columns: 1fr;
+  }
+  .fgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  nav.mainnav {
+    display: none;
+  }
+  .mobnav {
+    display: block;
+  }
+  .hd {
+    height: 56px;
+    gap: 12px;
+  }
+  .brand .bt {
+    display: none;
+  }
+  .coinpill .mult {
+    display: none;
+  }
+  .sitemain {
+    padding: 20px 0 40px;
+  }
+  .podium {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .pod.first {
+    order: -1;
+  }
+  .ms-head {
+    grid-template-columns: 1fr;
+  }
+  .tier {
+    grid-template-columns: 44px 1fr;
+    row-gap: 12px;
+  }
+  .tier .tright {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+  .lb-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .fgrid {
+    grid-template-columns: 1fr;
+  }
+  .kgrid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+  footer.site {
+    padding-bottom: 120px;
+  }
+
+  .adm {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .admnav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 6px;
+    gap: 4px;
+  }
+  .admnav a {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .admnav .sep,
+  .admnav .gp {
+    display: none;
+  }
+  .qrow {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+  .qacts .btn {
+    flex: 1;
+  }
+  .kpis {
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .editrow {
+    grid-template-columns: 1fr 1fr !important;
+    row-gap: 8px;
+  }
+  .staffbar {
+    padding: 11px 14px;
+    gap: 9px;
+  }
+
+  .pgrid {
+    gap: 13px;
+  }
+  .acctgrid {
+    grid-template-columns: 1fr;
+  }
+  .idcard {
+    padding: 20px 16px;
+  }
+  .idcard .big {
+    width: 66px;
+    height: 66px;
+    font-size: 24px;
+  }
+  .idcard .un {
+    font-size: 18px;
+  }
+  .linkrow {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    font-size: 13px;
+  }
+  .linkrow .lv {
+    font-size: 12px;
+  }
+  .statgrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .sbox {
+    padding: 12px 13px;
+  }
+  .sbox .sv {
+    font-size: 17px;
+  }
+  .bgrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .bdg {
+    padding: 12px 10px;
+  }
+  .bdg .bi {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+    margin-bottom: 7px;
+  }
+  .bdg .bn {
+    font-size: 12px;
+  }
+  .bdg .bd {
+    font-size: 10.5px;
+  }
+  .verifybox {
+    padding: 14px;
+  }
+  .codeflash {
+    font-size: 24px;
+    letter-spacing: 0.16em;
+  }
+  .shelf {
+    gap: 5px;
+  }
+  .mini-badge {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  .sec-head {
+    gap: 10px;
+  }
+  .sec-head h1,
+  .sec-head h2 {
+    font-size: 20px;
+  }
+  .card {
+    padding: 15px;
+  }
+  .paytable .ptrow {
+    grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.05s !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Retired utilities
+   The same bridge as the token aliases above: two classes the not-yet-redesigned
+   pages still reach for. They now resolve to the new type scale and the new
+   page measure, so those pages sit inside the revamped shell correctly.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.container-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* The old display face was uppercase-only; the new one is not, so this is now
+   simply the display family at the weight headings use. */
+.display {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Provably fair panel
+   Sits below the table rather than inside the bet controls. The three values
+   are the claim, so they get room to be read and copied instead of being
+   folded into a drawer nobody opens.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.fairpanel {
+  margin-top: 14px;
+  border: 1px solid var(--edge-hot);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(34, 211, 255, 0.05), var(--panel) 60%);
+  padding: 20px 22px;
+}
+
+.fairhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.fairhead h2 {
+  font-size: 17px;
+  margin-top: 3px;
+}
+
+.fairgrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 90px;
+  gap: 12px;
+  align-items: start;
+}
+
+.fairgrid > * {
+  min-width: 0;
+}
+
+.fairpanel .seed {
+  margin-top: 0;
+}
+
+.fairpanel .sl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A copy affordance that stays out of the way until the label is read. */
+.seedcopy {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blue-deep);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 1px 5px;
+  transition: 0.14s;
+}
+
+.seedcopy:hover {
+  color: var(--blue);
+  border-color: var(--edge-hot);
+}
+
+.fairfoot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  border-top: 1px solid var(--edge);
+  padding-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .fairgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Blackjack table
+
+   The first table followed a supplied design that carried its own palette and
+   two of its own typefaces, and testers said so: it read as a different site,
+   the seats were cramped, and the betting was unreadable — three chip circles
+   per seat driven by one shared chip ladder, which is why more than one person
+   came away believing a bet placed on one hand had been copied onto all of
+   them.
+
+   So this is the site's own system rather than a second one. Cyan is the
+   interface colour, gold is money, green and red are outcomes, and the figures
+   are mono like every other figure on the site. The felt is the ground with a
+   faint cyan wash rather than casino green, for the same reason.
+
+   The betting is rebuilt around the complaint: every hand carries its own
+   panel, its own three stakes, its own running total and its own clear, so
+   what belongs to which hand is never inferred from position.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bjt {
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background:
+    radial-gradient(130% 80% at 50% -10%, rgba(34, 211, 255, 0.07), transparent 62%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.bjt-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--edge);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.bjt-head h2 {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bjt-rules {
+  font-size: 11.5px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.bjt-figs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.bjt-fig {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bjt-fig .k {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.bjt-fig .v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.bjt-fig .v.money {
+  color: var(--gold);
+  font-size: 21px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The balance pulses only when it actually moves, so a win is felt rather
+   than merely printed. */
+@keyframes bjtBalance {
+  0% { transform: none; }
+  30% { transform: translateY(-3px) scale(1.05); }
+  100% { transform: none; }
+}
+
+.bjt-fig .v.bumped {
+  animation: bjtBalance 420ms ease-out;
+}
+
+.bjt-sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--edge-2);
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bjt-sound:hover {
+  border-color: var(--edge-hot);
+  color: var(--text);
+}
+
+.bjt-sound i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--muted-2);
+}
+
+.bjt-sound[aria-pressed="true"] i {
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue);
+}
+
+/* ── Felt ───────────────────────────────────────────────────────────────── */
+
+.bjt-felt {
+  padding: 22px 18px 6px;
+}
+
+.bjt-dealer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.bjt-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  /* Held open for the skip button, which is only there while the cards are
+     coming. Without it the whole felt steps down at the start of every deal
+     and back up at the end of it. */
+  min-height: 26px;
+}
+
+.bjt-total {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--edge-2);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.bjt-total.soft {
+  color: var(--blue);
+  border-color: var(--edge-hot);
+}
+
+.bjt-total.bust {
+  color: var(--red);
+  border-color: var(--color-danger-line);
+}
+
+.bjt-hold {
+  min-height: 104px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.bjt-empty {
+  align-self: center;
+  font-size: 12.5px;
+  color: var(--muted-2);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+
+/* `.pcard` rather than a blackjack-prefixed name: baccarat deals the same
+   card, and one game owning the other's card styles is how they drift apart. */
+.pcard {
+  width: 58px;
+  height: 84px;
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: linear-gradient(180deg, #fdfdff, #e7ebf2);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  flex: none;
+  /* Dealt in one after another, so a hand arrives rather than appearing. */
+  animation: bjtDeal 260ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes bjtDeal {
+  from { opacity: 0; transform: translate(14px, -26px) rotate(7deg) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pcard.big {
+  width: 68px;
+  height: 98px;
+}
+
+.pcard .r {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 23px;
+  line-height: 1;
+  color: #10131a;
+}
+
+.pcard.big .r {
+  font-size: 27px;
+}
+
+.pcard .s {
+  font-size: 15px;
+  line-height: 1;
+  color: #10131a;
+}
+
+.pcard.red .r,
+.pcard.red .s {
+  color: #c2334f;
+}
+
+.pcard.down {
+  background: repeating-linear-gradient(45deg, #16202b 0 6px, #101820 6px 12px);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px var(--edge-hot);
+}
+
+/* ── Message strip ──────────────────────────────────────────────────────── */
+
+.bjt-say {
+  margin: 16px auto 18px;
+  max-width: 580px;
+  text-align: center;
+  font-size: 13px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+}
+
+.bjt-say.turn {
+  border-color: var(--edge-hot);
+  background: var(--color-brand-bg);
+  color: var(--blue);
+}
+
+.bjt-say.good {
+  border-color: var(--color-online-line);
+  background: var(--color-online-bg);
+  color: var(--green);
+}
+
+.bjt-say.bad {
+  border-color: var(--color-danger-line);
+  background: var(--color-danger-bg);
+  color: var(--red);
+}
+
+/* ── The hands ──────────────────────────────────────────────────────────── */
+
+.bjt-hands {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+}
+
+.bjt-hand {
+  position: relative;
+  flex: 1 1 236px;
+  max-width: 300px;
+  min-width: 214px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 13px 12px;
+  border-radius: 13px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+
+/* Whose turn it is, said in the interface colour rather than implied by a
+   subtle glow — the previous table's "it feels dead" complaint. */
+.bjt-hand.active {
+  border-color: var(--blue-deep);
+  box-shadow:
+    0 0 0 1px var(--blue-deep),
+    0 0 30px -8px rgba(34, 211, 255, 0.55);
+  transform: translateY(-3px);
+}
+
+.bjt-hand.won {
+  border-color: var(--color-online-line);
+  background: linear-gradient(180deg, var(--color-online-bg), var(--panel));
+}
+
+.bjt-hand.lost {
+  border-color: var(--color-danger-line);
+}
+
+.bjt-hand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bjt-hand-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+/* A numbered token on every hand. Position alone was doing this job before,
+   which is exactly the ambiguity the testers hit. */
+.bjt-no {
+  width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  border: 1px solid var(--edge-2);
+  color: var(--muted);
+}
+
+.bjt-hand.active .bjt-no {
+  border-color: var(--blue);
+  background: var(--color-brand-bg);
+  color: var(--blue);
+}
+
+.bjt-turn {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.bjt-cards {
+  display: flex;
+  gap: 12px;
+  min-height: 116px;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bjt-split {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.bjt-split .row {
+  display: flex;
+  gap: 5px;
+}
+
+.bjt-split .meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.bjt-total.focus {
+  border-color: var(--blue);
+  background: var(--color-brand-bg);
+  color: var(--blue);
+}
+
+@keyframes bjtPop {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: none; }
+}
+
+.bjt-res {
+  animation: bjtPop 220ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.bjt-res.win {
+  background: var(--green);
+  color: #04241a;
+}
+
+.bjt-res.push {
+  background: var(--edge-2);
+  color: var(--text);
+}
+
+.bjt-res.lose {
+  background: var(--red);
+  color: #2c060f;
+}
+
+/* ── The bet panel — the part this redesign exists for ──────────────────── */
+
+.bjt-bets {
+  border-top: 1px solid var(--edge);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/*
+ * A betting spot: somewhere to put a chip, not a figure with arithmetic
+ * either side of it.
+ *
+ * The whole row is the button. A dashed outline is the convention for an
+ * empty spot on a felt and it reads as a target without a label saying so;
+ * once something is on it the outline goes solid and the ground lifts, so a
+ * backed spot and an empty one are told apart across the table rather than by
+ * reading the number.
+ */
+.bjt-spot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: 9px;
+  border: 1px dashed var(--edge-2);
+  background: transparent;
+  text-align: left;
+  transition: 0.14s;
+}
+
+.bjt-spot:hover:not(:disabled) {
+  border-color: var(--blue-deep);
+  background: var(--panel-2);
+}
+
+.bjt-spot:not(.empty) {
+  border-style: solid;
+  background: var(--panel-2);
+}
+
+/* Not `cursor: not-allowed`: while a round is on, the spot is not refusing a
+   chip, it is showing what is already down. */
+.bjt-spot:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.bjt-spot .lbl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.bjt-spot .lbl s {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  text-decoration: none;
+}
+
+.bjt-spot.spot-main .lbl s { background: var(--gold); }
+.bjt-spot.spot-pairs .lbl s { background: #b57cff; }
+.bjt-spot.spot-plusThree .lbl s { background: var(--warn); }
+
+/* The chips actually placed, newest nearest the figure they add up to. They
+   overlap the way a stack does, so six of them still fit a narrow panel. */
+.bjt-spot .stack {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-left: 7px;
+}
+
+.bjt-spot .stack .chip {
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-left: -6px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: #05070a;
+  background: var(--chip, var(--muted));
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  animation: bjtChipDown 180ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.bjt-spot .stack .chip.more {
+  background: transparent;
+  border-color: var(--edge-2);
+  color: var(--muted-2);
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes bjtChipDown {
+  from { opacity: 0; transform: translateY(-9px) scale(0.8); }
+  to   { opacity: 1; transform: none; }
+}
+
+.bjt-spot .amt {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  min-width: 40px;
+  text-align: right;
+  color: var(--text);
+}
+
+.bjt-spot .amt.zero {
+  color: var(--muted-2);
+}
+
+@keyframes bjtBump {
+  0% { transform: none; }
+  40% { transform: scale(1.22); }
+  100% { transform: none; }
+}
+
+.bjt-spot .amt.bumped {
+  animation: bjtBump 260ms ease-out;
+  color: var(--gold);
+}
+
+/*
+ * One colour per denomination, shared by the chip in hand and the chips on
+ * the felt, so the chip that was picked is recognisably the chip that landed.
+ * Red at 5 and green at 25 are where a real tray puts them; the rest follow
+ * the site's palette rather than a casino's.
+ */
+.chipc-1  { --chip: #9aa4b2; }
+.chipc-5  { --chip: #ff5c7a; }
+.chipc-10 { --chip: #22d3ff; }
+.chipc-25 { --chip: #3ddc97; }
+.chipc-50 { --chip: #ffd166; }
+
+.bjt-step {
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--edge-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  transition: 0.14s;
+}
+
+.bjt-step:hover:not(:disabled) {
+  border-color: var(--blue-deep);
+  color: var(--blue);
+}
+
+.bjt-step:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.bjt-hand-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--edge);
+  padding-top: 9px;
+}
+
+.bjt-hand-foot .tot {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.bjt-hand-foot .tot b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--gold);
+}
+
+.bjt-mini {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  transition: 0.14s;
+}
+
+.bjt-mini:hover:not(:disabled) {
+  border-color: var(--edge-hot);
+  color: var(--blue);
+}
+
+.bjt-mini:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.bjt-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.bjt-notes .hit {
+  color: var(--green);
+}
+
+/* ── Control bar ────────────────────────────────────────────────────────── */
+
+.bjt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--edge);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.bjt-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bjt-group > .k {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.bjt-chip {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  border: 2px solid var(--edge-2);
+  border-color: color-mix(in srgb, var(--chip, var(--edge-2)) 55%, transparent);
+  background: var(--panel-2);
+  background: color-mix(in srgb, var(--chip, var(--panel-2)) 12%, var(--panel-2));
+  color: var(--chip, var(--text));
+  transition: 0.16s;
+}
+
+.bjt-chip:hover {
+  transform: translateY(-2px);
+}
+
+/* The one in hand is filled rather than outlined: it is the chip that lands,
+   so it looks like the chip that lands. */
+.bjt-chip[aria-pressed="true"] {
+  border-color: var(--chip, var(--blue));
+  background: var(--chip, var(--blue));
+  color: #05070a;
+  box-shadow: 0 0 0 4px rgba(34, 211, 255, 0.14);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--chip, var(--blue)) 18%, transparent);
+}
+
+.bjt-count {
+  width: 33px;
+  height: 33px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  border: 1px solid var(--edge-2);
+  color: var(--muted);
+  transition: 0.14s;
+}
+
+.bjt-count:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--edge-hot);
+}
+
+.bjt-count[aria-pressed="true"] {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #03181f;
+}
+
+.bjt-count:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bjt-acts {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* ── Reference drawer ───────────────────────────────────────────────────── */
+
+.bjt-ref {
+  border-top: 1px solid var(--edge);
+}
+
+.bjt-ref > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 18px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bjt-ref > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bjt-ref > summary:hover {
+  color: var(--blue);
+}
+
+.bjt-ref[open] > summary {
+  color: var(--text);
+  border-bottom: 1px solid var(--edge);
+}
+
+.bjt-refgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;
+  background: var(--edge);
+}
+
+.bjt-refgrid > div {
+  background: var(--panel);
+  padding: 15px 18px;
+}
+
+.bjt-refgrid h4 {
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 9px;
+}
+
+.bjt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bjt-row b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.bjt-note {
+  margin-top: 11px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted-2);
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .bjt-felt {
+    padding: 18px 12px 4px;
+  }
+
+  /* Hands scroll rather than shrink. Five 214px panels squeezed onto a phone
+     is what "cramped" meant. */
+  .bjt-hands {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    justify-content: flex-start;
+    margin: 0 -12px;
+    padding: 0 12px 18px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .bjt-hand {
+    scroll-snap-align: center;
+    flex: 0 0 84%;
+    max-width: 84%;
+  }
+
+  .bjt-bar,
+  .bjt-head {
+    padding: 12px;
+  }
+
+  .bjt-acts {
+    width: 100%;
+  }
+
+  .bjt-acts .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pcard,
+  .bjt-res,
+  .bjt-spot .stack .chip,
+  .bjt-spot .amt.bumped,
+  .bjt-fig .v.bumped {
+    animation: none;
+  }
+
+  .bjt-hand,
+  .bjt-chip {
+    transition: none;
+  }
+
+  .bjt-hand.active {
+    transform: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Baccarat table
+
+   Built in the same language as the blackjack table above — same chrome, same
+   cards, same palette — because they are two tables in one room, not two
+   products. What differs is the shape of the decision: baccarat has none once
+   the cards are out, so the whole game is the betting layout, and that is what
+   this gives the room to.
+
+   Five spots, each its own panel with its own stake, its own odds and its own
+   verdict after the coup. The spots keep a fixed order and a fixed colour, so
+   the eye learns where Banker is and stops re-reading.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bacc-felt {
+  padding: 26px 18px 10px;
+}
+
+/* ── The two hands ──────────────────────────────────────────────────────── */
+
+.bacc-hands {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 18px;
+}
+
+.bacc-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 12px 14px;
+  border-radius: 13px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.bacc-side.won {
+  border-color: var(--color-online-line);
+  background: linear-gradient(180deg, var(--color-online-bg), var(--panel));
+  box-shadow: 0 0 34px -14px var(--green);
+}
+
+.bacc-side.tied {
+  border-color: var(--edge-hot);
+  background: linear-gradient(180deg, var(--color-brand-bg), var(--panel));
+}
+
+.bacc-side .who {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bacc-side.won .who,
+.bacc-side.tied .who {
+  color: var(--text);
+}
+
+.bacc-pair {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #b57cff;
+  color: #180a2b;
+  font-weight: 700;
+}
+
+.bacc-row {
+  display: flex;
+  gap: 6px;
+  min-height: 98px;
+  align-items: center;
+}
+
+/* The score. Nine is the best hand in the game and gets to look like it. */
+.bacc-score {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.bacc-side.won .bacc-score {
+  color: var(--green);
+}
+
+.bacc-verdict {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 34px;
+  min-width: 78px;
+}
+
+.bacc-vs {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.bacc-flag {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: bjtPop 240ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.bacc-flag.player,
+.bacc-flag.banker {
+  background: var(--green);
+  color: #04241a;
+}
+
+.bacc-flag.tie {
+  background: var(--blue);
+  color: #03181f;
+}
+
+.bacc-flag.natural {
+  background: var(--gold);
+  color: #2e2103;
+}
+
+/* ── The betting layout ─────────────────────────────────────────────────── */
+
+.bacc-spots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 11px;
+  margin-top: 20px;
+  padding-bottom: 18px;
+}
+
+.bacc-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+
+.bacc-spot.staked {
+  border-color: var(--edge-2);
+}
+
+.bacc-spot.hit {
+  border-color: var(--color-online-line);
+  background: linear-gradient(180deg, var(--color-online-bg), var(--panel));
+}
+
+.bacc-spot.miss {
+  border-color: var(--color-danger-line);
+  opacity: 0.72;
+}
+
+.bacc-spot-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bacc-spot .name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.bacc-spot .name s {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  text-decoration: none;
+  flex: none;
+}
+
+.bacc-spot.k-player .name s { background: var(--blue); }
+.bacc-spot.k-banker .name s { background: var(--gold); }
+.bacc-spot.k-tie .name s { background: var(--green); }
+.bacc-spot.k-playerPair .name s { background: #b57cff; }
+.bacc-spot.k-bankerPair .name s { background: var(--warn); }
+
+.bacc-spot .odds {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.bacc-stake {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bacc-stake .amt {
+  flex: 1;
+  text-align: center;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--text);
+  padding: 7px 0;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+}
+
+.bacc-stake .amt.zero {
+  color: var(--muted-2);
+}
+
+.bacc-stake .amt.bumped {
+  animation: bjtBump 260ms ease-out;
+  color: var(--gold);
+  border-color: var(--gold-2);
+}
+
+.bacc-spot .verdict {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.bacc-spot .verdict.win {
+  background: var(--green);
+  color: #04241a;
+}
+
+.bacc-spot .verdict.push {
+  background: var(--edge-2);
+  color: var(--text);
+}
+
+.bacc-spot .verdict.lose {
+  background: rgba(255, 92, 122, 0.14);
+  color: var(--red);
+}
+
+.bacc-hint {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+
+/* ── Shoe history ───────────────────────────────────────────────────────── */
+
+.bacc-road {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 18px;
+  border-top: 1px solid var(--edge);
+}
+
+.bacc-road .k {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.bacc-beads {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* One bead per coup, newest first. Every shoe here is one coup long, so this
+   is a record of what has happened and never a hint about what is next —
+   worth saying on a game whose players are famous for reading patterns into
+   exactly this row. */
+.bacc-bead {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  border: 1px solid transparent;
+}
+
+.bacc-bead.player {
+  background: rgba(34, 211, 255, 0.16);
+  border-color: var(--blue-deep);
+  color: var(--blue);
+}
+
+.bacc-bead.banker {
+  background: rgba(255, 209, 102, 0.16);
+  border-color: var(--gold-2);
+  color: var(--gold);
+}
+
+.bacc-bead.tie {
+  background: rgba(61, 220, 151, 0.16);
+  border-color: var(--color-online-line);
+  color: var(--green);
+}
+
+.bacc-road .note {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--muted-2);
+  max-width: 42ch;
+}
+
+@media (max-width: 760px) {
+  .bacc-felt {
+    padding: 20px 12px 6px;
+  }
+
+  /* The verdict column drops between the two hands rather than beside them. */
+  .bacc-hands {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .bacc-verdict {
+    padding-top: 0;
+    flex-direction: row;
+    order: 2;
+  }
+
+  .bacc-side:first-child { order: 1; }
+  .bacc-side:last-child { order: 3; }
+
+  /*
+   * Two columns, with the tie stretched across the middle — which keeps the
+   * felt's own symmetry rather than losing it: each pair bet stays beside the
+   * hand it is about, and the tie still sits between the two sides.
+   *
+   *   Player pair | Player
+   *          Tie
+   *   Banker      | Banker pair
+   *
+   * Five equal columns would be the real layout but gives each spot 70px,
+   * which is not enough for a stake and two steppers.
+   */
+  .bacc-spots {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bacc-spot.k-tie {
+    grid-column: 1 / -1;
+  }
+
+  .bacc-road {
+    padding: 11px 12px;
+  }
+
+  .bacc-road .note {
+    margin-left: 0;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bacc-flag,
+  .bacc-stake .amt.bumped {
+    animation: none;
+  }
+
+  .bacc-side,
+  .bacc-spot {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Wall of fame rail — home page
+
+   A marquee, not a slideshow. It carries the big wins past the front page
+   instead of leaving them two clicks away behind a tab on /community, and it
+   moves because a still row of six reads as a grid while a moving one reads as
+   "there are more of these".
+
+   It stops whenever somebody might be aiming at it: on hover, on focus
+   anywhere inside it, and while a clip is playing. `.famtrack` holds the wins
+   twice and travels exactly half its own width, which is what makes the loop
+   seamless — the second set is under the cursor at the moment the first set
+   would have run out.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.famerail {
+  position: relative;
+  overflow: hidden;
+  /* Fades the wins out at both ends rather than cutting them off square, so
+     the row reads as continuing past the page instead of being clipped. */
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+
+.famtrack {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation-name: famslide;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  /* Duration is set per rail in the component, from how many wins there are. */
+  animation-duration: 34s;
+}
+
+@keyframes famslide {
+  from { transform: translateX(0); }
+  /* Half the track is one full set, plus the gap that set carries with it. */
+  to { transform: translateX(calc(-50% - 6px)); }
+}
+
+.famerail:hover .famtrack,
+.famerail:focus-within .famtrack,
+.famerail[data-paused] .famtrack {
+  animation-play-state: paused;
+}
+
+.famcard {
+  width: 244px;
+  flex: none;
+}
+
+/* A win card is taller than a plain clip — it carries the bet, the payout and
+   the slot underneath — and one card being taller than its neighbour makes the
+   whole row look broken while it slides, so they all take the row's height. */
+.famcard .clip {
+  height: 100%;
+}
+
+@media (max-width: 700px) {
+  .famcard {
+    width: 208px;
+  }
+}
+
+/*
+ * Asked to stop moving, it stops entirely — and becomes a rail the reader
+ * scrolls themselves, rather than a row that is simply frozen with half its
+ * contents unreachable. The duplicate set is display:none here because there
+ * is no loop left for it to serve, and a hand-scrolled rail that repeats
+ * itself halfway along is just confusing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .famerail {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .famtrack {
+    animation: none;
+  }
+
+  .famcard[inert] {
+    display: none;
+  }
+
+  .famcard {
+    scroll-snap-align: start;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Bonus hunt and the slot catalog
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* A slot as one line: art, name, and a quieter second line. Used in the hunt
+   tables, the request queue and the admin picker. */
+.slotcell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.slotcell img,
+.slotcell .ph {
+  width: 34px;
+  height: 45px;
+  flex: none;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+}
+
+/* The initials shown when a slot has no art, or its art failed to load. */
+.slotcell .ph,
+.slot-suggest .ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.slotcell > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slotcell b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slotcell small {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The admin type-ahead, hung under its input. */
+.slot-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--edge-2);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.slot-suggest button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slot-suggest button:hover,
+.slot-suggest button:focus-visible {
+  background: var(--panel);
+  outline: none;
+}
+
+.slot-suggest img,
+.slot-suggest .ph {
+  width: 26px;
+  height: 34px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--panel);
+  flex: none;
+}
+
+.slot-suggest span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slot-suggest small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* The two ways chat takes part, side by side. */
+.huntjoin {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 13px;
+  margin-bottom: 24px;
+}
+
+.huntjoin > * {
+  min-width: 0;
+}
+
+.hj-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.hj-head h3 {
+  font-size: 15px;
+}
+
+.huntjoin code,
+.sh-sub code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--blue);
+}
+
+/* The bonus being opened right now. */
+.tw tr.huntnow td {
+  background: rgba(34, 211, 255, 0.06);
+}
+
+.reqgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.reqcard {
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 9px 11px;
+}
+
+/* The catalog grid: portrait art the way casinos show it. */
+.slotgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 13px;
+}
+
+.slotgrid > * {
+  min-width: 0;
+}
+
+.slotcard {
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.sc-art {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: var(--panel-2);
+}
+
+.sc-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sc-none {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.sc-tags {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  display: flex;
+  gap: 5px;
+}
+
+/* Solid backing: the art behind these is often bright, and the site's
+   translucent tag style disappears into it. */
+.sc-tags .tag {
+  background: rgba(5, 5, 7, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.sc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px 11px;
+  min-width: 0;
+}
+
+.sc-body b {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-body small {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-body .sc-casinos {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 480px) {
+  .slotgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OBS overlay — /overlay/hunt
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Transparent so the source sits over the game capture. Scoped with :has so
+   only the overlay route loses the site's background. */
+html:has(.ovl),
+body:has(.ovl) {
+  background: transparent !important;
+  min-height: 0;
+}
+
+.ovl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.ovl-card {
+  background: rgba(8, 9, 13, 0.84);
+  border: 1px solid rgba(34, 211, 255, 0.28);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ovl .gold { color: var(--gold); }
+.ovl .green { color: var(--green); }
+.ovl .red { color: var(--red); }
+.ovl .blue { color: var(--blue); }
+
+.ovl-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ovl code {
+  font-family: var(--mono);
+  color: var(--blue);
+  background: rgba(34, 211, 255, 0.1);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.ovl small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Header ------------------------------------------------------------------ */
+.ovl-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.ovl-head b {
+  font-family: var(--display);
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-phase {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--edge-2);
+  color: var(--muted);
+}
+
+.ovl-phase.opening {
+  color: var(--blue);
+  border-color: rgba(34, 211, 255, 0.5);
+}
+
+.ovl-phase.collecting {
+  color: var(--gold);
+  border-color: rgba(255, 209, 102, 0.45);
+}
+
+/* Stats — wraps into a block in a narrow source, a strip in a wide one ---- */
+.ovl-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 14px;
+}
+
+.ovl-stats > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ovl-stats span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ovl-stats b {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Now opening ------------------------------------------------------------- */
+.ovl-now {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border-color: rgba(34, 211, 255, 0.55);
+}
+
+.ovl-now-text {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ovl-now-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ovl-now-name {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.ovl-now-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.ovl-now-meta b {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.ovl-cta {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Slot art ---------------------------------------------------------------- */
+.ovl-art {
+  flex: none;
+  width: 30px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.ovl-art.big {
+  width: 72px;
+  height: 96px;
+  border-radius: 8px;
+}
+
+.ovl-art.ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.ovl-art.big.ph {
+  font-size: 22px;
+}
+
+/* Bonus list -------------------------------------------------------------- */
+.ovl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px;
+}
+
+.ovl-row {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 7px;
+  transition: background-color 0.4s ease;
+}
+
+.ovl-row.now {
+  background: rgba(34, 211, 255, 0.14);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.ovl-row.pending:not(.now) {
+  opacity: 0.62;
+}
+
+.ovl-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.ovl-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ovl-name b {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-name small {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-x {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ovl-x small {
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.ovl-x.dim { color: var(--muted); }
+.ovl-x.gold { color: var(--gold); }
+
+.ovl-x.best {
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 209, 102, 0.55);
+}
+
+.ovl-more {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* Guess the balance ------------------------------------------------------- */
+.ovl-gtb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ovl-gtb.open {
+  border-color: rgba(61, 220, 151, 0.55);
+}
+
+.ovl-gtb.settled {
+  border-color: rgba(255, 209, 102, 0.55);
+}
+
+.ovl-gtb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.ovl-gtb-head b {
+  font-family: var(--mono);
+}
+
+.ovl-winner {
+  display: flex;
+  flex-direction: column;
+}
+
+.ovl-winner span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ovl-winner b {
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ovl-row {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Slot bingo
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The card: --n squares a side. An open square is just its label; a drawn
+   or green one shows the slot's art under a scrim, with the slot and the
+   viewer who called it. */
+.bingo {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bg-sq {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--text);
+  isolation: isolate;
+}
+
+.bg-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+}
+
+.bg-art.ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--muted-2);
+  padding-bottom: 30%;
+}
+
+/* A scrim so the text reads on any art, however bright. */
+.bg-sq.won::after,
+.bg-sq.live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(5, 5, 7, 0.55) 0%, rgba(5, 5, 7, 0) 30%, rgba(5, 5, 7, 0.2) 50%, rgba(5, 5, 7, 0.92) 100%);
+}
+
+.bg-pos {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* An open square: its label, large and quiet, in the middle. */
+.bg-sq.open {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.015);
+  border-style: dashed;
+  border-color: var(--edge-2);
+}
+
+.bg-sq.open .bg-pos {
+  position: static;
+  font-size: 15px;
+  color: var(--muted-2);
+}
+
+.bg-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 7px 7px;
+  min-width: 0;
+}
+
+.bg-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-who {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Green: won by a viewer whose buy made a profit. */
+.bg-sq.won {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.bg-sq.won::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(61, 220, 151, 0.22);
+}
+
+.bg-sq.won .bg-pos,
+.bg-sq.won .bg-who {
+  color: var(--green);
+}
+
+.bg-sq.won .bg-who b {
+  color: var(--text);
+}
+
+/* On the completed line — the BINGO. */
+.bg-sq.line {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 20px rgba(255, 209, 102, 0.45);
+}
+
+.bg-sq.line .bg-pos {
+  color: var(--gold);
+}
+
+/* Drawn and being bought right now. */
+.bg-sq.live {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px var(--blue), 0 0 22px rgba(34, 211, 255, 0.4);
+  animation: bingo-live 1.6s ease-in-out infinite;
+}
+
+.bg-sq.live .bg-who {
+  color: var(--blue);
+}
+
+@keyframes bingo-live {
+  50% {
+    box-shadow: 0 0 0 2px var(--blue), 0 0 8px rgba(34, 211, 255, 0.15);
+  }
+}
+
+.bingo-banner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 209, 102, 0.55);
+  background: rgba(255, 209, 102, 0.08);
+  color: var(--gold);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.bingo-now {
+  border-color: rgba(34, 211, 255, 0.45);
+}
+
+.bingo-winner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-top: 1px solid var(--edge);
+  min-width: 0;
+}
+
+.bingo-winner small {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--green);
+  border: 1px solid rgba(61, 220, 151, 0.5);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* Page layouts: the card beside what goes with it, stacked when narrow. */
+.bingo-page,
+.bingo-admin {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.bingo-page {
+  grid-template-columns: minmax(0, 560px) minmax(260px, 1fr);
+  margin-bottom: 8px;
+}
+
+.bingo-admin {
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+  margin-top: 18px;
+}
+
+@media (max-width: 900px) {
+  .bingo-page,
+  .bingo-admin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .bingo {
+    gap: 4px;
+  }
+  .bg-name {
+    font-size: 10.5px;
+  }
+  .bg-who {
+    font-size: 9.5px;
+  }
+  .bg-body {
+    padding: 4px 5px 5px;
+  }
+  .bg-pos {
+    font-size: 9px;
+  }
+}
+
+/* On stream. */
+.bingo-ovl .bg-name {
+  font-size: 13px;
+}
+
+.bingo-ovl .bg-who {
+  font-size: 12px;
+}
+
+.ovl-bingo-win {
+  border-color: rgba(255, 209, 102, 0.7);
+}
+
+.ovl-bingo-win .ovl-now-name {
+  font-size: 34px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-sq.live {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   King of the hill
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The hill: the king's slot art as a tall tile beside who holds it and the
+   multiplier to beat; the challenger, while one plays, in the same shape in
+   blue beneath. */
+.koth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kt {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  min-width: 0;
+}
+
+.kt-king {
+  border-color: rgba(255, 209, 102, 0.6);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.1), rgba(255, 209, 102, 0) 60%), var(--panel);
+  box-shadow: 0 0 24px rgba(255, 209, 102, 0.12);
+}
+
+.kt-challenger {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue), 0 0 22px rgba(34, 211, 255, 0.3);
+  animation: koth-live 1.6s ease-in-out infinite;
+}
+
+@keyframes koth-live {
+  50% {
+    box-shadow: 0 0 0 1px var(--blue), 0 0 8px rgba(34, 211, 255, 0.1);
+  }
+}
+
+.kt-empty {
+  border-style: dashed;
+  border-color: var(--edge-2);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.kt-art {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 3 / 4;
+  height: auto;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.kt-art.ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.kt-challenger .kt-art {
+  width: 72px;
+}
+
+.kt-crown {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  aspect-ratio: 3 / 4;
+  border-radius: 9px;
+  border: 1px dashed var(--edge-2);
+  font-size: 30px;
+  color: var(--muted-2);
+}
+
+.kt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kt-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kt-king .kt-label {
+  color: var(--gold);
+}
+
+.kt-challenger .kt-label {
+  color: var(--blue);
+}
+
+.kt-who {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kt-challenger .kt-who {
+  font-size: 18px;
+}
+
+.kt-slot,
+.kt-meta {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kt-x {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.kt-need {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.kt-need b {
+  font-family: var(--mono);
+  color: var(--gold);
+}
+
+/* The challenger list: the multiplier chip is gold for the king, green for
+   a buy that took the hill in its time, grey for one that fell short. */
+.bg-chip.koth-chip-king {
+  color: var(--gold);
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.bg-chip.koth-chip-short {
+  color: var(--muted);
+  border-color: var(--edge-2);
+}
+
+.koth-page,
+.koth-admin {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.koth-page {
+  grid-template-columns: minmax(0, 560px) minmax(260px, 1fr);
+  margin-bottom: 8px;
+}
+
+.koth-admin {
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+  margin-top: 18px;
+}
+
+@media (max-width: 900px) {
+  .koth-page,
+  .koth-admin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .kt {
+    gap: 12px;
+    padding: 12px;
+  }
+  .kt-art {
+    width: 72px;
+  }
+  .kt-challenger .kt-art,
+  .kt-crown {
+    width: 56px;
+  }
+  .kt-who {
+    font-size: 18px;
+  }
+  .kt-x {
+    font-size: 24px;
+  }
+}
+
+/* On stream: the panel is the card already, so the hill drops its own frame
+   colour a touch and reads larger. */
+.koth-ovl .kt {
+  background: rgba(8, 9, 13, 0.6);
+}
+
+.koth-ovl .kt-who {
+  font-size: 26px;
+}
+
+.koth-ovl .kt-x {
+  font-size: 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kt-challenger {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Boss raid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The boss: a horned glyph beside its name and a health bar that drains as
+   chat's buys land. The bar reddens as the boss weakens and pulses when it is
+   nearly down; once slain the card goes grey and the name is struck through. */
+.raid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boss {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 92, 122, 0.55);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(255, 92, 122, 0.14), rgba(255, 92, 122, 0) 55%), var(--panel);
+  box-shadow: 0 0 26px rgba(255, 92, 122, 0.12);
+  min-width: 0;
+}
+
+.boss-glyph {
+  flex: none;
+  width: 104px;
+  height: 104px;
+  color: var(--red);
+  filter: drop-shadow(0 0 14px rgba(255, 92, 122, 0.35));
+}
+
+.boss-horn {
+  fill: var(--panel-3);
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.boss-head {
+  fill: var(--panel-2);
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+}
+
+.boss-eye {
+  fill: var(--gold);
+}
+
+.boss-mouth {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.boss-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.boss-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.boss-name {
+  font-family: var(--display);
+  font-size: 24px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boss-bar {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--edge-2);
+  overflow: hidden;
+}
+
+.boss-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--hp);
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c7324f, var(--red));
+  box-shadow: 0 0 12px rgba(255, 92, 122, 0.55);
+  transition: width 0.6s ease;
+}
+
+.boss-mid .boss-bar > span {
+  background: linear-gradient(90deg, #c7324f, var(--warn));
+}
+
+.boss-low .boss-bar > span {
+  animation: boss-low 1.1s ease-in-out infinite;
+}
+
+@keyframes boss-low {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.boss-hp {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.boss-hp b {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.boss-note {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boss-note b {
+  color: var(--text);
+}
+
+/* Slain. */
+.boss-dead {
+  border-color: rgba(255, 209, 102, 0.6);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(255, 209, 102, 0.1), rgba(255, 209, 102, 0) 55%), var(--panel);
+  box-shadow: 0 0 24px rgba(255, 209, 102, 0.12);
+}
+
+.boss-dead .boss-glyph {
+  color: var(--muted-2);
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.boss-dead .boss-eye {
+  fill: var(--muted-2);
+}
+
+.boss-dead .boss-label {
+  color: var(--gold);
+}
+
+.boss-dead .boss-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 3px;
+  color: var(--muted);
+}
+
+/* The raider attacking right now. */
+.raid-atk {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--blue);
+  box-shadow: 0 0 0 1px var(--blue), 0 0 22px rgba(34, 211, 255, 0.3);
+  animation: koth-live 1.6s ease-in-out infinite;
+  min-width: 0;
+}
+
+.raid-atk .boss-label {
+  color: var(--blue);
+}
+
+.raid-atk-art {
+  flex: none;
+  width: 60px;
+  aspect-ratio: 3 / 4;
+  height: auto;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.raid-atk-art.ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.raid-atk-who {
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.raid-atk-need {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.raid-atk-need b {
+  font-family: var(--mono);
+  color: var(--gold);
+}
+
+/* Damage by viewer. */
+.raid-board {
+  display: flex;
+  flex-direction: column;
+}
+
+.raid-board-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 8em) minmax(40px, 1fr) 4.5em;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--edge);
+  font-size: 14px;
+}
+
+.raid-board-row b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.raid-board-rank {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.raid-board-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.raid-board-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--red);
+}
+
+.raid-board-row.killer b {
+  color: var(--gold);
+}
+
+.raid-board-row.killer .raid-board-bar > span {
+  background: var(--gold);
+}
+
+.raid-board-dmg {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bg-chip.raid-chip {
+  color: var(--red);
+  border-color: rgba(255, 92, 122, 0.5);
+}
+
+.raid-page,
+.raid-admin {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.raid-page {
+  grid-template-columns: minmax(0, 560px) minmax(260px, 1fr);
+  margin-bottom: 8px;
+}
+
+.raid-admin {
+  grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+  margin-top: 18px;
+}
+
+@media (max-width: 900px) {
+  .raid-page,
+  .raid-admin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .boss {
+    gap: 12px;
+    padding: 12px;
+  }
+  .boss-glyph {
+    width: 72px;
+    height: 72px;
+  }
+  .boss-name {
+    font-size: 20px;
+  }
+  .raid-board-row {
+    grid-template-columns: 16px minmax(0, 7em) minmax(30px, 1fr) 4em;
+  }
+}
+
+/* On stream. */
+.raid-ovl .boss,
+.raid-ovl .raid-atk {
+  background-color: rgba(8, 9, 13, 0.6);
+}
+
+.raid-ovl .boss-name {
+  font-size: 28px;
+}
+
+.raid-ovl .boss-bar {
+  height: 20px;
+}
+
+.ovl-raid .raid-board {
+  margin-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .raid-atk,
+  .boss-low .boss-bar > span {
+    animation: none;
+  }
+  .boss-bar > span {
+    transition: none;
+  }
+}
+
+/* The stream games' stats strip, on its own: five figures always on one row,
+   so it fits the 520 × 90 source the admin screens tell staff to make. (The
+   hunt's strip keeps wrapping into a block, which its own screen expects.) */
+.ovl-p-stats:is(.ovl-bingo, .ovl-koth, .ovl-raid, .ovl-battle, .ovl-tourney) .ovl-stats {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ovl-p-stats:is(.ovl-bingo, .ovl-koth, .ovl-raid, .ovl-battle, .ovl-tourney) .ovl-stats span {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+}
+
+.ovl-p-stats:is(.ovl-bingo, .ovl-koth, .ovl-raid, .ovl-battle, .ovl-tourney) .ovl-stats b {
+  font-size: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Team battle
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Two teams facing each other: the first in blue on the left, the second in
+   red on the right, and a tug-of-war bar between them whose split is each
+   team's share of the points. */
+.battle {
+  --bt-a: var(--blue);
+  --bt-b: var(--red);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bt-c-a { color: var(--blue); }
+.bt-c-b { color: var(--red); }
+
+.bt-board {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--edge-2);
+  background:
+    radial-gradient(90% 140% at 0% 0%, rgba(34, 211, 255, 0.12), transparent 55%),
+    radial-gradient(90% 140% at 100% 0%, rgba(255, 92, 122, 0.12), transparent 55%),
+    var(--panel);
+}
+
+.bt-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bt-team {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bt-team.bt-b {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.bt-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bt-a .bt-name { color: var(--bt-a, var(--blue)); }
+.bt-b .bt-name { color: var(--bt-b, var(--red)); }
+
+.bt-total {
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-sub {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.bt-team.won .bt-total {
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(255, 209, 102, 0.45);
+}
+
+.bt-team.lost {
+  opacity: 0.55;
+}
+
+.bt-tug {
+  display: flex;
+  height: 14px;
+  margin: 12px 0 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.bt-tug-a {
+  width: var(--a);
+  background: linear-gradient(90deg, var(--blue-2, #0ea5c6), var(--blue));
+  box-shadow: 0 0 12px rgba(34, 211, 255, 0.45);
+  transition: width 0.6s ease;
+}
+
+.bt-tug-b {
+  flex: 1;
+  background: linear-gradient(90deg, var(--red), #c7324f);
+  box-shadow: 0 0 12px rgba(255, 92, 122, 0.45);
+  border-left: 2px solid var(--ground, #050507);
+}
+
+.bt-state {
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.bt-state b {
+  color: var(--text);
+}
+
+.bt-state b.bt-c-a { color: var(--blue); }
+.bt-state b.bt-c-b { color: var(--red); }
+
+/* The member playing, framed in their team's colour. */
+.bt-player {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  min-width: 0;
+  animation: koth-live 1.6s ease-in-out infinite;
+}
+
+.bt-player.bt-a {
+  border: 1px solid var(--blue);
+  box-shadow: 0 0 0 1px var(--blue), 0 0 22px rgba(34, 211, 255, 0.3);
+}
+
+.bt-player.bt-b {
+  border: 1px solid var(--red);
+  box-shadow: 0 0 0 1px var(--red), 0 0 22px rgba(255, 92, 122, 0.3);
+  animation-name: bt-live-b;
+}
+
+@keyframes bt-live-b {
+  50% {
+    box-shadow: 0 0 0 1px var(--red), 0 0 8px rgba(255, 92, 122, 0.1);
+  }
+}
+
+.bt-player.bt-a .boss-label { color: var(--blue); }
+.bt-player.bt-b .boss-label { color: var(--red); }
+
+/* Each team's scorers, side by side. */
+.bt-rosters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.bt-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bt-roster .bt-name {
+  margin-bottom: 4px;
+}
+
+.bt-roster-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--edge);
+  font-size: 14px;
+}
+
+.bt-roster-row b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bt-roster-row span {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bg-chip.bt-chip-a { color: var(--blue); border-color: rgba(34, 211, 255, 0.5); }
+.bg-chip.bt-chip-b { color: var(--red); border-color: rgba(255, 92, 122, 0.5); }
+.tag.bt-tag-a { color: var(--blue); border-color: rgba(34, 211, 255, 0.45); }
+.tag.bt-tag-b { color: var(--red); border-color: rgba(255, 92, 122, 0.45); }
+
+.ovl-now.bt-now-a { border-color: rgba(34, 211, 255, 0.7); }
+.ovl-now.bt-now-b { border-color: rgba(255, 92, 122, 0.7); }
+
+@media (max-width: 520px) {
+  .bt-total {
+    font-size: 26px;
+  }
+  .bt-rosters {
+    gap: 12px;
+  }
+}
+
+/* On stream. */
+.battle-ovl .bt-board,
+.battle-ovl .bt-player {
+  background-color: rgba(8, 9, 13, 0.6);
+}
+
+.battle-ovl .bt-total {
+  font-size: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-player {
+    animation: none;
+  }
+  .bt-tug-a {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Slot tournament
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The bracket: a column per round. Each column spreads its matches evenly
+   down the same height, so a later round's match sits level with the pair
+   that feeds it. */
+.tb {
+  display: grid;
+  grid-template-columns: repeat(var(--rounds), minmax(150px, 1fr));
+  gap: 18px;
+  min-width: calc(var(--rounds) * 168px);
+}
+
+.tb-round {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tb-round-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.tb-matches {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.tb-match {
+  position: relative;
+  border-radius: 9px;
+  border: 1px solid var(--edge-2);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+/* A short stub off each match toward the next round. */
+.tb-round:not(:last-child) .tb-match::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -19px;
+  width: 18px;
+  border-top: 1px solid var(--edge-2);
+}
+
+.tb-match.current {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue), 0 0 18px rgba(34, 211, 255, 0.3);
+}
+
+.tb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.tb-row + .tb-row {
+  border-top: 1px solid var(--edge);
+}
+
+.tb-row b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-score {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-row.empty {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  justify-content: center;
+}
+
+.tb-row.won {
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.tb-row.won b,
+.tb-row.won .tb-score {
+  color: var(--gold);
+}
+
+.tb-row.lost {
+  opacity: 0.45;
+}
+
+.tb-row.live {
+  background: rgba(34, 211, 255, 0.1);
+}
+
+.tb-row.live b {
+  color: var(--blue);
+}
+
+/* The match being played, head to head. */
+.tv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--edge-2);
+  background:
+    radial-gradient(80% 140% at 50% 0%, rgba(34, 211, 255, 0.1), transparent 60%),
+    var(--panel);
+  min-width: 0;
+}
+
+.tv-round {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-align: center;
+}
+
+.tv-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.tv-vs {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.tv-side {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  min-width: 0;
+}
+
+.tv-side.live {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue), 0 0 18px rgba(34, 211, 255, 0.3);
+}
+
+.tv-side .boss-label {
+  color: var(--muted);
+}
+
+.tv-side.live .boss-label {
+  color: var(--blue);
+}
+
+.tv-score {
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-note {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--warn);
+}
+
+@media (max-width: 520px) {
+  .tv-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tv-vs {
+    text-align: center;
+    font-size: 15px;
+  }
+}
+
+/* On stream: the bracket fills the source and reads from across the room. */
+.tb-ovl {
+  min-width: 0;
+}
+
+.tb-ovl .tb-row {
+  font-size: 14px;
+  padding: 7px 10px;
+}
+
+.tb-ovl .tb-match {
+  background: rgba(18, 20, 27, 0.85);
+}
+
+.ovl-tourney .tv {
+  background-color: rgba(8, 9, 13, 0.6);
+  border: 0;
+  padding: 4px;
+}
+
+/* An OBS source is sized by staff, not a phone: the two players always face
+   each other, whatever the source's width. */
+.ovl-tourney .tv-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.ovl-tourney .tv-vs {
+  font-size: 20px;
+}

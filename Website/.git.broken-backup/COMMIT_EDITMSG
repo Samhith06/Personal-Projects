@@ -1,0 +1,25 @@
+fix: simplify tournament admin setup per live usage feedback
+
+After running the new admin dashboard live, several fields turned out
+to be unnecessary busywork rather than useful configuration:
+
+- Registration open/close is a manual admin action (Open Registration
+  / Lock Registration buttons), not something worth pre-scheduling —
+  drops registrationOpensAt/registrationClosesAt and the "closes in"
+  countdown on the public page.
+- Eligible-slots curation added admin overhead for no real fairness
+  benefit — entrants can now name any slot at registration (web form
+  uses the full slot-catalog picker; chat entry accepts any slot text),
+  the same permissive pattern Bonus Bingo already uses. Drops
+  Tournament.eligibleSlots and the TournamentScoringMethod enum's
+  sibling fields (scoringMethod, spinsPerMatch) which were purely
+  descriptive and never drove any logic anyway.
+- Drops the per-tournament Audit Log tab and its backend endpoint
+  entirely — not needed for this feature.
+
+Also fixes the admin tournament list stacking every past tournament
+above the active one's control panel as more get created — completed/
+cancelled tournaments now collapse into a "History (N)" toggle instead
+of piling up at the top.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>

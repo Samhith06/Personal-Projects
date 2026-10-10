@@ -1,0 +1,243 @@
+// Wallet — personal finance & wealth management data model
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String
+  image        String?
+  createdAt    DateTime @default(now())
+
+  salaryProfile    SalaryProfile?
+  incomeEntries    IncomeEntry[]
+  pfAccount        PFAccount?
+  pfContributions  PFContribution[]
+  expenses         Expense[]
+  investments      Investment[]
+  assets           Asset[]
+  liabilities      Liability[]
+  goals            Goal[]
+  netWorthSnapshots NetWorthSnapshot[]
+}
+
+model SalaryProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grossMonthly        Decimal
+  employeePFPercent   Decimal
+  employerPFPercent   Decimal
+  incomeTaxMonthly    Decimal
+  professionalTax     Decimal
+  otherDeductions     Decimal
+  creditDay           Int
+  updatedAt           DateTime @updatedAt
+}
+
+enum IncomeSource {
+  SALARY
+  BONUS
+  FREELANCE
+  BUSINESS
+  OTHER
+}
+
+model IncomeEntry {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month             Int
+  year              Int
+  source            IncomeSource
+  grossAmount       Decimal
+  employeePF        Decimal      @default(0)
+  employerPF        Decimal      @default(0)
+  incomeTax         Decimal      @default(0)
+  professionalTax   Decimal      @default(0)
+  otherDeductions   Decimal      @default(0)
+  netAmount         Decimal
+  date              DateTime
+  notes             String?
+  createdAt         DateTime     @default(now())
+
+  @@index([userId, year, month])
+}
+
+model PFAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startingBalance Decimal  @default(0)
+  currentBalance  Decimal  @default(0)
+  updatedAt       DateTime @updatedAt
+}
+
+model PFContribution {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month           Int
+  year            Int
+  employeeAmount  Decimal
+  employerAmount  Decimal
+  interestAmount  Decimal  @default(0)
+  date            DateTime
+  incomeEntryId   String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, year, month])
+}
+
+enum ExpenseCategory {
+  RENT
+  FOOD
+  GROCERIES
+  TRAVEL
+  TRANSPORT
+  SHOPPING
+  ENTERTAINMENT
+  BILLS
+  HEALTHCARE
+  EDUCATION
+  FAMILY
+  SUBSCRIPTIONS
+  INSURANCE
+  OTHER
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Decimal
+  date          DateTime
+  category      ExpenseCategory
+  subcategory   String?
+  paymentMethod String
+  notes         String?
+  isRecurring   Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+
+  @@index([userId, date])
+  @@index([userId, category])
+}
+
+enum InvestmentType {
+  SIP
+  MUTUAL_FUND
+  STOCK
+  RECURRING_DEPOSIT
+  FIXED_DEPOSIT
+  PPF
+  NPS
+  GOLD
+  SILVER
+  BOND
+  OTHER
+}
+
+model Investment {
+  id              String                   @id @default(cuid())
+  userId          String
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  type            InvestmentType
+  amountInvested  Decimal                  @default(0)
+  investmentDate  DateTime
+  currentValue    Decimal                  @default(0)
+  quantityGrams   Decimal?
+  interestRatePercent Decimal?
+  notes           String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  contributions   InvestmentContribution[]
+
+  @@index([userId, type])
+}
+
+model InvestmentContribution {
+  id           String     @id @default(cuid())
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  amount       Decimal
+  date         DateTime
+  createdAt    DateTime   @default(now())
+
+  @@index([investmentId, date])
+}
+
+enum AssetCategory {
+  CASH
+  BANK
+  PROPERTY
+  OTHER
+}
+
+model Asset {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  category     AssetCategory
+  currentValue Decimal
+  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+}
+
+enum LiabilityCategory {
+  CREDIT_CARD
+  PERSONAL_LOAN
+  CAR_LOAN
+  HOME_LOAN
+  BNPL
+  OTHER
+}
+
+model Liability {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  category     LiabilityCategory
+  currentValue Decimal
+  interestRate Decimal           @default(0)
+  updatedAt    DateTime          @updatedAt
+  createdAt    DateTime          @default(now())
+}
+
+model Goal {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  targetAmount       Decimal
+  currentAmount      Decimal  @default(0)
+  targetDate         DateTime
+  monthlyContribution Decimal @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model NetWorthSnapshot {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month            Int
+  year             Int
+  totalAssets      Decimal
+  totalLiabilities Decimal
+  netWorth         Decimal
+  createdAt        DateTime @default(now())
+
+  @@unique([userId, year, month])
+  @@index([userId, year, month])
+}

@@ -1,0 +1,64 @@
+AI-Powered Flashcard Generator
+Frontend: Study UI with spaced repetition cards
+
+ML: Use GPT + NLP to generate flashcards from PDF/text
+
+What it does: Upload a textbook chapter, get auto-generated flashcards with definitions/questions.
+
+Why it's great: LLM + productivity = standout project.
+
+
+6. Crypto Price Pattern Detector
+Frontend: Candlestick chart UI + trend detection highlights
+
+ML: Pattern recognition (CNN on candlestick chart images), anomaly detection
+
+What it does: Highlights suspicious or rapid market movement patterns.
+
+Why it's cutting-edge: Crypto + visual analytics = standout portfolio.
+
+7. Financial News Summarizer
+Frontend: News feed with smart summaries and risk level tagging
+
+ML: Text summarization (T5/BART), named entity recognition (NER)
+
+What it does: Summarizes financial articles with insights about affected companies/assets.
+
+Why it’s useful: Shows transformer NLP + real business use case.
+
+2. Stock Sentiment Analyzer
+Frontend: Ticker input + real-time sentiment feed
+
+ML: NLP on financial news/Twitter (FinBERT), sentiment scoring
+
+What it does: Shows sentiment score for a company with recent tweets/articles.
+
+Why it's powerful: Shows real-world NLP on financial data.
+
+
+
+Small time Projects: 
+
+Movie Search App
+
+Description: Build an app to search for movies and display details like ratings, cast, and synopsis.
+Features:
+Use a movie API (e.g., OMDB or TMDB) to fetch data.
+Style with Tailwind for a card-based layout.
+Add a search bar with debouncing to limit API calls.
+Include a "watchlist" feature using local storage.
+Learning Outcome: Learn API integration, debouncing, and responsive design.
+
+Weather App
+
+Description: Create an app that fetches and displays weather data based on user input (city name).
+Features:
+Use a free weather API (e.g., OpenWeatherMap) to fetch real-time data.
+Style the app with Tailwind CSS for a sleek, responsive design.
+Display temperature, humidity, and weather conditions with icons.
+Add a loading spinner and error handling for invalid inputs.
+Learning Outcome: Learn to work with APIs, async JavaScript (fetch), and error handling.
+
+
+https://grok.com/share/bGVnYWN5_2d25cbcb-1190-419e-8ded-d46d075bc4a4
+https://chatgpt.com/share/68457c68-6028-8011-94cb-775770df3c62

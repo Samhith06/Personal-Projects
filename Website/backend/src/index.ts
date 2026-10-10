@@ -1,0 +1,363 @@
+// Must run before any other local import — several modules (e.g. config/redis,
+// config/env) read process.env at import time via validateEnv(), and CommonJS
+// require() calls execute in the order they're written, not hoisted like ESM.
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import rateLimit from '@/config/rateLimit';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+
+import { logger } from '@/utils/logger';
+import { errorHandler } from '@/middleware/errorHandler';
+import { notFoundHandler } from '@/middleware/notFoundHandler';
+import { authMiddleware } from '@/middleware/auth';
+import type { JWTPayload } from '@/middleware/auth';
+import { validateEnv } from '@/config/env';
+import jwt from 'jsonwebtoken';
+import { RazedWagerSyncJob } from '@/jobs/razedWagerSync';
+import { KickChatService } from '@/services/KickChatService';
+
+// Validate environment variables
+const env = validateEnv();
+
+const app = express();
+const server = createServer(app);
+
+// Socket.IO setup
+// Support multiple origins for Socket.IO (with and without www)
+const socketCorsOrigins = env.CORS_ORIGIN.split(',').map(origin =>
+  origin.trim()
+);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: socketCorsOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// Trust Railway's proxy chain (edge + load balancer = multiple hops)
+app.set('trust proxy', true);
+
+// Security middleware
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// CORS configuration
+// Support multiple origins (with and without www)
+const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+logger.info(`CORS Origins configured: ${corsOrigins.join(', ')}`);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (corsOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        logger.warn(`CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  })
+);
+
+// Compression middleware
+app.use(compression());
+
+// Request logging
+app.use(
+  morgan('combined', {
+    stream: {
+      write: (message: string) => {
+        logger.info(message.trim());
+      },
+    },
+  })
+);
+
+// Global rate limiter — GET requests are skipped (per-route limiters cover them).
+// Only POST/PUT/DELETE write operations are globally capped.
+const limiter = rateLimit({
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_MAX_REQUESTS,
+  skip: (req) => req.method === 'GET',
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/', limiter);
+
+// Body parsing middleware.
+// 10mb was far beyond anything this API accepts (there are no upload endpoints),
+// which made it a cheap way to tie up memory. 1mb still cuts that surface by
+// 10x while leaving real headroom for the largest legitimate payload:
+// POST /users/bulk/points, which carries an array of user UUIDs (~39 bytes each
+// once JSON-encoded). 1mb ≈ 26k ids, well clear of the 5k ceiling the user
+// export already implies.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Cookie parsing middleware
+app.use(cookieParser());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: env.NODE_ENV,
+  });
+});
+
+// API routes
+import authRoutes from '@/routes/auth';
+import adminRoutes from '@/routes/admin';
+import moderatorRoutes from '@/routes/moderator';
+import scheduleRoutes from '@/routes/schedule';
+import guessTheBalanceRoutes from '@/routes/guessTheBalance';
+import storeRoutes from '@/routes/store';
+import notificationRoutes from '@/routes/notifications';
+import milestoneRoutes from '@/routes/milestones';
+import streamEventRoutes from '@/routes/streamEvents';
+import checkinRoutes from '@/routes/checkin';
+import activationRoutes from '@/routes/activation';
+import publicProfileRoutes from '@/routes/publicProfile';
+import raffleRoutes from '@/routes/raffles';
+import viewingRoutes from '@/routes/viewing';
+import tournamentRoutes from '@/routes/tournament';
+import { setTournamentIO } from '@/controllers/TournamentController';
+// import bonusHuntRoutes from '@/routes/bonusHunt';
+import liveHuntRoutes from '@/routes/liveHunt';
+import huntRoutes from '@/routes/hunts';
+import bonusBingoRoutes from '@/routes/bonusBingo';
+import { setBingoIO } from '@/controllers/BingoBoardController';
+import viewerPickerRoutes from '@/routes/viewerPicker';
+import { setPickerIO } from '@/controllers/ViewerPickerController';
+import slotRequestRoutes from '@/routes/slotRequest';
+import { setSlotRequestIO } from '@/controllers/SlotRequestController';
+import kingOfTheHillRoutes from '@/routes/kingOfTheHill';
+import { setKothIO } from '@/controllers/KingOfTheHillController';
+import highRollerRoutes from '@/routes/highRoller';
+import { setHighRollerIO } from '@/controllers/HighRollerController';
+import wagerLeaderboardRoutes from '@/routes/wagerLeaderboard';
+import weeklyRaffleRoutes from '@/routes/weeklyRaffle';
+import { setWeeklyRaffleIO } from '@/controllers/WeeklyRaffleController';
+import bossRaidRoutes from '@/routes/bossRaid';
+import { setBossRaidIO } from '@/controllers/BossRaidController';
+import bountyHunterRoutes from '@/routes/bountyHunter';
+import { setBountyHunterIO } from '@/controllers/BountyHunterController';
+import slotWorldCupRoutes from '@/routes/slotWorldCup';
+import { setSlotWorldCupIO } from '@/controllers/SlotWorldCupController';
+import liftRoutes from '@/routes/lift';
+import { setLiftIO } from '@/controllers/LiftController';
+
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/moderator', moderatorRoutes);
+app.use('/api/schedule', scheduleRoutes);
+app.use('/api/guess-the-balance', guessTheBalanceRoutes);
+app.use('/api/store', storeRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/milestones', milestoneRoutes);
+app.use('/api/stream-events', streamEventRoutes);
+app.use('/api/checkin', checkinRoutes);
+app.use('/api/activation', activationRoutes);
+app.use('/api/users', publicProfileRoutes);
+app.use('/api/raffles', raffleRoutes);
+app.use('/api/viewing', viewingRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+// app.use('/api/bonus-hunt', bonusHuntRoutes);
+app.use('/api/live-hunt', liveHuntRoutes);
+app.use('/api/hunts', huntRoutes);
+app.use('/api/bonus-bingo', bonusBingoRoutes);
+app.use('/api/viewer-picker', viewerPickerRoutes);
+app.use('/api/slot-requests', slotRequestRoutes);
+app.use('/api/king-of-the-hill', kingOfTheHillRoutes);
+app.use('/api/high-roller', highRollerRoutes);
+app.use('/api/wager-leaderboard', wagerLeaderboardRoutes);
+app.use('/api/weekly-raffle', weeklyRaffleRoutes);
+app.use('/api/boss-raid', bossRaidRoutes);
+app.use('/api/bounty-hunter', bountyHunterRoutes);
+app.use('/api/slot-world-cup', slotWorldCupRoutes);
+app.use('/api/lift', liftRoutes);
+
+// Wire up tournament real-time events
+setTournamentIO(io);
+setBingoIO(io);
+setPickerIO(io);
+setSlotRequestIO(io);
+setKothIO(io);
+setHighRollerIO(io);
+setWeeklyRaffleIO(io);
+setBossRaidIO(io);
+setBountyHunterIO(io);
+setSlotWorldCupIO(io);
+setLiftIO(io);
+
+// Socket.IO connection handling
+io.on('connection', socket => {
+  logger.info(`Client connected: ${socket.id}`);
+
+  // Tournament rooms
+  socket.on('joinTournament', (tournamentId: string) => {
+    socket.join(`tournament:${tournamentId}`);
+  });
+  socket.on('leaveTournament', (tournamentId: string) => {
+    socket.leave(`tournament:${tournamentId}`);
+  });
+
+  // Bingo rooms
+  socket.on('joinBingo', (gameId: string) => {
+    socket.join(`bingo:${gameId}`);
+  });
+  socket.on('leaveBingo', (gameId: string) => {
+    socket.leave(`bingo:${gameId}`);
+  });
+
+  // Viewer picker rooms
+  socket.on('joinPicker', (pickerId: string) => {
+    socket.join(`picker:${pickerId}`);
+  });
+  socket.on('leavePicker', (pickerId: string) => {
+    socket.leave(`picker:${pickerId}`);
+  });
+
+  // King of the Hill rooms
+  socket.on('joinKoth', (sessionId: string) => {
+    socket.join(`koth:${sessionId}`);
+  });
+  socket.on('leaveKoth', (sessionId: string) => {
+    socket.leave(`koth:${sessionId}`);
+  });
+
+  // Lift rooms
+  socket.on('joinLift', (sessionId: string) => {
+    socket.join(`lift:${sessionId}`);
+  });
+  socket.on('leaveLift', (sessionId: string) => {
+    socket.leave(`lift:${sessionId}`);
+  });
+
+  // High Roller rooms
+  socket.on('joinHighRoller', (sessionId: string) => {
+    socket.join(`highroller:${sessionId}`);
+  });
+  socket.on('leaveHighRoller', (sessionId: string) => {
+    socket.leave(`highroller:${sessionId}`);
+  });
+
+  // Boss Raid rooms
+  socket.on('joinBossRaid', (raidId: string) => {
+    socket.join(`bossraid:${raidId}`);
+  });
+  socket.on('leaveBossRaid', (raidId: string) => {
+    socket.leave(`bossraid:${raidId}`);
+  });
+
+  // Bounty Hunter rooms
+  socket.on('joinBountyHunter', (huntId: string) => {
+    socket.join(`bountyhunter:${huntId}`);
+  });
+  socket.on('leaveBountyHunter', (huntId: string) => {
+    socket.leave(`bountyhunter:${huntId}`);
+  });
+
+  // Slot World Cup rooms
+  socket.on('joinSlotWorldCup', (tournamentId: string) => {
+    socket.join(`slotWorldCup:${tournamentId}`);
+  });
+  socket.on('leaveSlotWorldCup', (tournamentId: string) => {
+    socket.leave(`slotWorldCup:${tournamentId}`);
+  });
+
+  socket.on('disconnect', () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+  });
+
+  // Authentication for socket connections
+  socket.on('authenticate', async (token: string) => {
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET) as JWTPayload;
+      (socket as any).user = decoded;
+      socket.emit('authenticated', { success: true });
+      logger.info(`Socket authenticated: ${socket.id} (userId: ${decoded.id})`);
+    } catch (error) {
+      logger.warn(`Socket authentication failed: ${socket.id}`);
+      socket.emit('authentication_error', { message: 'Invalid token' });
+      socket.disconnect();
+    }
+  });
+});
+
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  RazedWagerSyncJob.stop();
+  KickChatService.stop();
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  RazedWagerSyncJob.stop();
+  KickChatService.stop();
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
+  });
+});
+
+// Start server
+const PORT = parseInt(process.env.PORT || String(env.PORT || 3001), 10);
+const HOST = '0.0.0.0'; // Listen on all network interfaces for Railway
+server.listen(PORT, HOST, () => {
+  logger.info(`🚀 Server running on ${HOST}:${PORT} in ${env.NODE_ENV} mode`);
+  logger.info(`📊 Health check available at http://${HOST}:${PORT}/health`);
+  logger.info(`🌍 Environment PORT: ${process.env.PORT}`);
+
+  // Start background jobs
+  RazedWagerSyncJob.start();
+  logger.info('✅ Background jobs started');
+
+  // Start Kick chat listener (verification + chat points + !join)
+  KickChatService.setIO(io);
+  KickChatService.start().catch((err) =>
+    logger.error('KickChatService failed to start', { error: (err as Error).message })
+  );
+});
+
+export { app, server, io };

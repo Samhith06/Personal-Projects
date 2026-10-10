@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FGDR — FatGuysDontRun</title>
+  <meta name="description" content="The official home of FGDR — FatGuysDontRun. Four creators, one crew, one community. Watch live on Kick, follow the wager leaderboard, raffles, challenges and milestones.">
+  <meta name="theme-color" content="#05060a">
+  <meta name="color-scheme" content="dark">
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://d8j0ntlcm91z4.cloudfront.net" crossorigin>
+  <link rel="preconnect" href="https://player.kick.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <main id="main">
+    <!-- ============================================================ HERO -->
+    <section class="hero" id="home" aria-labelledby="hero-title">
+      <div class="hero__media" aria-hidden="true">
+        <div class="hero__poster"></div>
+        <video class="hero__video" muted playsinline loop disablepictureinpicture preload="none"
+          data-src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260702_102608_5fa1187d-9ac6-44fb-82ab-54376200abc0.mp4"></video>
+        <div class="hero__overlay"></div>
+        <div class="hero__particles"></div>
+      </div>
+
+      <div class="hero__content container">
+        <div class="hero__logo" data-hero-logo></div>
+        <h1 class="hero__title" id="hero-title">
+          <span class="hero__eyebrow">FGDR</span>
+          <span class="hero__name">FatGuysDontRun</span>
+        </h1>
+        <p class="hero__tagline">Four creators. One crew. One community.</p>
+        <p class="hero__support">Watch the action. Follow the competition. Join the FGDR community.</p>
+        <div class="hero__cta">
+          <a class="btn btn--gold btn--lg" href="#live" data-hero-watch><span class="live-dot" aria-hidden="true"></span>Watch live</a>
+          <a class="btn btn--ghost btn--lg" href="#leaderboard">View leaderboard</a>
+        </div>
+      </div>
+
+      <a class="hero__scroll" href="#live"><span>Explore FGDR</span><svg class="icon" aria-hidden="true"><use href="#i-arrow-down"></use></svg></a>
+    </section>
+
+    <!-- ========================================================= LIVE NOW -->
+    <section class="section section--live" id="live" aria-labelledby="live-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">On Kick · Updated live</p>
+            <h2 class="sec-title sec-title--xl" id="live-title">Live <span class="gold">now</span></h2>
+          </div>
+          <div class="live-summary" data-live-summary aria-live="polite"></div>
+        </header>
+        <div class="live-grid reveal" data-mount="live" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================= THE CREW -->
+    <section class="section section--crew" id="crew" aria-labelledby="crew-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">The streamers</p>
+            <h2 class="sec-title" id="crew-title">The <span class="gold">crew</span></h2>
+            <p class="sec-sub">Four channels, one brand. Different styles, the same table.</p>
+          </div>
+        </header>
+        <div class="crew reveal" data-mount="crew"></div>
+      </div>
+    </section>
+
+    <!-- ============================================== WALL OF FAME + CLIPS -->
+    <section class="section section--fame" id="wall" aria-labelledby="wall-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Biggest moments</p>
+            <h2 class="sec-title" id="wall-title">Wall of <span class="gold">fame</span></h2>
+            <p class="sec-sub">The crew’s biggest hits, posted by the creators and verified against the stream.</p>
+          </div>
+          <div class="seg" role="tablist" aria-label="Sort wins" data-tabs="wins">
+            <button role="tab" type="button" aria-controls="wins-panel" aria-selected="true" data-value="multiplier">Top multiplier</button>
+            <button role="tab" type="button" aria-controls="wins-panel" aria-selected="false" tabindex="-1" data-value="payout">Top payout</button>
+            <button role="tab" type="button" aria-controls="wins-panel" aria-selected="false" tabindex="-1" data-value="latest">Latest</button>
+          </div>
+        </header>
+        <div class="fame reveal" id="wins-panel" role="tabpanel" aria-label="Wall of Fame" data-mount="wins"></div>
+        <p class="fineprint reveal">These are rare, exceptional results — not typical outcomes. Most sessions lose money. 18+ only; please gamble responsibly.</p>
+
+        <div class="clips-block" id="clips">
+          <header class="clips-head reveal">
+            <div>
+              <p class="kicker">Kick · X · Instagram · YouTube · TikTok</p>
+              <h3 class="clips-title">Clips</h3>
+            </div>
+            <button class="btn btn--gold btn--sm" type="button" data-open-upload hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>Submit a clip<span class="btn__tag">Creators</span></button>
+          </header>
+          <section class="queue" data-mount="queue" aria-label="Clip submissions" hidden></section>
+          <div class="chips reveal" data-mount="clip-filters" role="group" aria-label="Filter clips by platform"></div>
+          <div class="clip-grid reveal" data-mount="clips" aria-live="polite"></div>
+          <div class="clips-more" data-mount="clips-more"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ STATS -->
+    <section class="stats-band" aria-label="FGDR by the numbers">
+      <div class="container reveal">
+        <dl class="stats" data-mount="stats"></dl>
+      </div>
+    </section>
+
+    <!-- ====================================================== LEADERBOARD -->
+    <section class="section section--stage" id="leaderboard" aria-labelledby="lb-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Competition</p>
+            <h2 class="sec-title" id="lb-title">FGDR <span class="gold">wager</span> leaderboard</h2>
+            <p class="sec-sub">Every wager with the FGDR affiliate counts. Climb the board, hold your spot, take the prize.</p>
+          </div>
+          <div class="seg" role="tablist" aria-label="Leaderboard period" data-tabs="leaderboard">
+            <button role="tab" type="button" id="lb-tab-today" aria-controls="lb-panel" aria-selected="false" tabindex="-1" data-value="today">Today</button>
+            <button role="tab" type="button" id="lb-tab-week" aria-controls="lb-panel" aria-selected="true" data-value="week"><span><span class="seg__pre">This </span>week</span></button>
+            <button role="tab" type="button" id="lb-tab-month" aria-controls="lb-panel" aria-selected="false" tabindex="-1" data-value="month"><span><span class="seg__pre">This </span>month</span></button>
+            <button role="tab" type="button" id="lb-tab-alltime" aria-controls="lb-panel" aria-selected="false" tabindex="-1" data-value="alltime">All time</button>
+          </div>
+        </header>
+        <div class="lb reveal" id="lb-panel" role="tabpanel" aria-label="Leaderboard standings" data-mount="leaderboard"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================== RAFFLES -->
+    <section class="section" id="raffles" aria-labelledby="raffles-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Prize draws</p>
+            <h2 class="sec-title" id="raffles-title">Raffles</h2>
+            <p class="sec-sub">Members-only draws, run live on stream.</p>
+          </div>
+          <div class="seg" role="tablist" aria-label="Raffle status" data-tabs="raffles">
+            <button role="tab" type="button" aria-controls="raffle-panel" aria-selected="true" data-value="active">Active <span class="seg__count" data-raffle-count="active"></span></button>
+            <button role="tab" type="button" aria-controls="raffle-panel" aria-selected="false" tabindex="-1" data-value="upcoming">Upcoming <span class="seg__count" data-raffle-count="upcoming"></span></button>
+            <button role="tab" type="button" aria-controls="raffle-panel" aria-selected="false" tabindex="-1" data-value="ended">Ended <span class="seg__count" data-raffle-count="ended"></span></button>
+          </div>
+        </header>
+        <div class="raffle-grid reveal" id="raffle-panel" role="tabpanel" aria-label="Raffles" data-mount="raffles"></div>
+        <p class="fineprint reveal">No purchase necessary where required by law. Free alternative entry available. 18+ only; eligibility and full rules apply.</p>
+      </div>
+    </section>
+
+    <!-- ======================================================= CHALLENGES -->
+    <section class="section section--tint" id="challenges" aria-labelledby="challenges-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Community competitions</p>
+            <h2 class="sec-title" id="challenges-title">FGDR <span class="gold">challenges</span></h2>
+            <p class="sec-sub">Shared goals and head-to-head races. Hit the target, share the reward.</p>
+          </div>
+        </header>
+        <div class="challenge-grid reveal" data-mount="challenges"></div>
+      </div>
+    </section>
+
+    <!-- ======================================================= MILESTONES -->
+    <section class="section" id="milestones" aria-labelledby="ms-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Progression</p>
+            <h2 class="sec-title" id="ms-title">Wager milestones</h2>
+            <p class="sec-sub">Six tiers. Every unlock is permanent — and every tier pays.</p>
+          </div>
+          <div class="ms-summary" data-mount="milestones-summary"></div>
+        </header>
+        <ol class="ms-path reveal" data-mount="milestones"></ol>
+      </div>
+    </section>
+
+    <!-- ======================================================== COMMUNITY -->
+    <section class="section section--compact" id="community" aria-labelledby="community-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">What's happening</p>
+            <h2 class="sec-title sec-title--sm" id="community-title">FGDR community</h2>
+          </div>
+        </header>
+        <div class="community reveal">
+          <div class="community__feed">
+            <p class="kicker community__label">Recent activity</p>
+            <div data-mount="activity"></div>
+          </div>
+          <article class="announce" data-mount="announcement" aria-label="Featured announcement"></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= SCHEDULE -->
+    <section class="section section--compact" id="schedule" aria-labelledby="schedule-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">Upcoming broadcasts</p>
+            <h2 class="sec-title sec-title--sm" id="schedule-title">Stream schedule</h2>
+            <p class="sec-sub">All times shown in your local time (<span data-tz></span>).</p>
+          </div>
+        </header>
+        <div class="chips reveal" data-mount="schedule-filters" role="group" aria-label="Filter by creator"></div>
+        <div class="reveal" data-mount="schedule"></div>
+      </div>
+    </section>
+
+    <!-- ==================================================== COMMUNITY CTA -->
+    <section class="cta-section" aria-labelledby="cta-title">
+      <div class="container">
+        <div class="cta reveal">
+          <div class="cta__copy">
+            <p class="eyebrow">Members club</p>
+            <h2 class="sec-title" id="cta-title">Join the <span class="gold">FGDR</span> community</h2>
+            <p class="sec-sub">Raffle drops, challenge announcements, go-live alerts and the crew — all in one place.</p>
+            <div class="cta__actions">
+              <a class="btn btn--gold btn--lg" href="#" data-community-link><svg class="icon" aria-hidden="true"><use href="#i-discord"></use></svg>Join the Discord</a>
+              <a class="btn btn--ghost btn--lg" href="https://www.kick.com/fatguysdontrun" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#i-kick"></use></svg>Follow on Kick</a>
+            </div>
+          </div>
+          <div class="cta__art" aria-hidden="true">
+            <span class="cta__chip cta__chip--1"></span>
+            <span class="cta__chip cta__chip--2"></span>
+            <span class="cta__chip cta__chip--3"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/kick-player.js"></script>
+  <script src="js/highlights.js"></script>
+  <script src="js/preview-tools.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

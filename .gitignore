@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Build output / caches
+.next/
+out/
+dist/
+build/
+.turbo/
+.vercel/
+.cache/
+coverage/
+
+# Secrets - keep only example templates
+.env
+.env.*
+!.env*.example
+
+# Nested repo metadata (temporarily renamed during add)
+.git_nested/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

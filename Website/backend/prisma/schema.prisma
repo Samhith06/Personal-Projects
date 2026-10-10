@@ -1,0 +1,1488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String                   @id @default(uuid())
+  discordId                String                   @unique @map("discord_id")
+  kickUsername             String?                  @unique @map("kick_username")
+  kickVerified             Boolean                  @default(false) @map("kick_verified")
+  displayName              String                   @map("display_name")
+  avatarUrl                String?                  @map("avatar_url")
+  points                   Int                      @default(0)
+  totalEarned              Int                      @default(0) @map("total_earned")
+  totalSpent               Int                      @default(0) @map("total_spent")
+  isAdmin                  Boolean                  @default(false) @map("is_admin")
+  isSuspended              Boolean                  @default(false) @map("is_suspended")
+  suspensionReason         String?                  @map("suspension_reason")
+  suspensionExpiresAt      DateTime?                @map("suspension_expires_at")
+  createdAt                DateTime                 @default(now()) @map("created_at")
+  updatedAt                DateTime                 @updatedAt @map("updated_at")
+  lastActiveAt             DateTime                 @default(now()) @map("last_active_at")
+  kickId                   String?                  @unique @map("kick_id")
+  kickAccessToken          String?                  @map("kick_access_token")
+  kickRefreshToken         String?                  @map("kick_refresh_token")
+  kickTokenExpiresAt       DateTime?                @map("kick_token_expires_at")
+  isModerator              Boolean                  @default(false) @map("is_moderator")
+  rainbetUsername          String?                  @unique @map("rainbet_username")
+  rainbetVerified          Boolean                  @default(false) @map("rainbet_verified")
+  isVip                    Boolean                  @default(false) @map("is_vip")
+  isDepositor              Boolean                  @default(false) @map("is_depositor")
+  totalWagered             Decimal                  @default(0) @map("total_wagered") @db.Decimal(15, 2)
+  weeklyWagered            Decimal                  @default(0) @map("weekly_wagered") @db.Decimal(14, 2)
+  monthlyWagered           Decimal                  @default(0) @map("monthly_wagered") @db.Decimal(14, 2)
+  totalDeposited           Decimal                  @default(0) @map("total_deposited") @db.Decimal(15, 2)
+  lastDailyCheckIn         DateTime?                @map("last_daily_check_in")
+  auditLogsAsAdmin         AuditLog[]               @relation("AdminAuditLogs")
+  auditLogsAsTarget        AuditLog[]               @relation("TargetAuditLogs")
+  bonusHuntPredictions     BonusHuntPrediction[]
+  bonusHuntSessions        BonusHuntSession[]
+  notifications            Notification[]
+  adminPointTransactions   PointTransaction[]       @relation("AdminPointTransactions")
+  pointTransactions        PointTransaction[]       @relation("UserPointTransactions")
+  raffleTickets            RaffleTicket[]
+  raffleWins               RaffleWinner[]
+  createdRaffles           Raffle[]
+  storePurchases           StorePurchase[]
+  updatedSystemConfig      SystemConfig[]
+  sessions                 UserSession[]
+  statistics               UserStatistics?
+  viewingSessions          ViewingSession[]
+  createdGames             GuessTheBalance[]        @relation("GuessTheBalanceCreator")
+  wonGames                 GuessTheBalance[]        @relation("GuessTheBalanceWinner")
+  guessSubmissions         GuessSubmission[]
+  milestoneClaims          MilestoneClaim[]
+  createdTournaments       Tournament[]             @relation("TournamentCreator")
+  tournamentParticipations TournamentParticipant[]  @relation("TournamentParticipants")
+  tournamentEntries        TournamentEntry[]        @relation("TournamentEntries")
+  tournamentBans           TournamentBan[]          @relation("TournamentBanned")
+  tournamentBansIssued     TournamentBan[]          @relation("TournamentBanIssuedBy")
+  createdBingos            BonusBingo[]             @relation("BingoCreator")
+  currentBingoGames        BonusBingo[]             @relation("BingoCurrentUser")
+  bingoParticipations      BingoParticipant[]       @relation("BingoParticipants")
+  bingoClaimedCells        BingoCell[]              @relation("BingoCellClaimer")
+  viewerPickerEntries      ViewerPickerEntry[]
+  viewerPickerWinners      ViewerPickerWinner[]
+  slotRequests             SlotRequest[]
+  kothEntries              KingOfTheHillEntry[]
+  kothRounds               KingOfTheHillRound[]
+  razedDailyWagers         RazedDailyWager[]
+  wagerRacePayouts         WagerRacePayout[]
+  highRollerPlayers        HighRollerPlayer[]
+  weeklyRaffleWins         WeeklyRaffle[]           @relation("WeeklyRaffleWinner")
+  weeklyRafflesCreated     WeeklyRaffle[]           @relation("WeeklyRaffleCreator")
+  weeklyRafflesDrawn       WeeklyRaffle[]           @relation("WeeklyRaffleDrawnBy")
+  bossRaidsCreated         BossRaid[]               @relation("BossRaidCreator")
+  bossRaidEntries          BossRaidEntry[]
+  bossRaidRounds           BossRaidRound[]
+  bountyHuntersCreated     BountyHunter[]           @relation("BountyHunterCreator")
+  bountyHunterEntries      BountyHunterEntry[]
+  bountyHunterRounds       BountyHunterRound[]
+  slotWorldCupsCreated     SlotWorldCup[]           @relation("SlotWorldCupCreator")
+  slotWorldCupPredictions  SlotWorldCupPrediction[] @relation("SlotWorldCupPredictions")
+  liftPlayers              LiftPlayer[]
+
+  @@index([kickId], map: "idx_users_kick_id")
+  @@index([kickUsername], map: "idx_users_kick_username")
+  @@map("users")
+}
+
+model UserSession {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  tokenHash        String   @map("token_hash")
+  refreshTokenHash String?  @map("refresh_token_hash")
+  expiresAt        DateTime @map("expires_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  lastUsedAt       DateTime @default(now()) @map("last_used_at")
+  userAgent        String?  @map("user_agent")
+  ipAddress        String?  @map("ip_address")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model PointTransaction {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  amount          Int
+  transactionType String   @map("transaction_type")
+  reason          String
+  referenceId     String?  @map("reference_id")
+  referenceType   String?  @map("reference_type")
+  adminId         String?  @map("admin_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  metadata        Json?
+  admin           User?    @relation("AdminPointTransactions", fields: [adminId], references: [id])
+  user            User     @relation("UserPointTransactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("point_transactions")
+}
+
+model UserStatistics {
+  userId             String    @id @map("user_id")
+  totalViewingTime   Int       @default(0) @map("total_viewing_time")
+  totalPurchases     Int       @default(0) @map("total_purchases")
+  totalRaffleTickets Int       @default(0) @map("total_raffle_tickets")
+  totalWins          Int       @default(0) @map("total_wins")
+  longestStreak      Int       @default(0) @map("longest_streak")
+  currentStreak      Int       @default(0) @map("current_streak")
+  lastStreamWatched  DateTime? @map("last_stream_watched")
+  achievements       Json      @default("[]")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_statistics")
+}
+
+model Raffle {
+  id                  String         @id @default(uuid())
+  title               String
+  description         String?
+  prize               String
+  ticketPrice         Int            @map("ticket_price")
+  maxTickets          Int            @map("max_tickets")
+  ticketsSold         Int            @default(0) @map("tickets_sold")
+  status              String         @default("active")
+  category            String?
+  isFeatured          Boolean        @default(false) @map("is_featured")
+  createdBy           String?        @map("created_by")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  endsAt              DateTime       @map("ends_at")
+  winnerSelectedAt    DateTime?      @map("winner_selected_at")
+  metadata            Json?
+  maxEntriesPerUser   Int            @default(-1) @map("max_entries_per_user")
+  numberOfWinners     Int            @default(1) @map("number_of_winners")
+  minWagerRequirement Decimal        @default(0) @map("min_wager_requirement") @db.Decimal(10, 2)
+  wagerDays           Int            @default(7) @map("wager_days")
+  tickets             RaffleTicket[]
+  winners             RaffleWinner[]
+  creator             User?          @relation(fields: [createdBy], references: [id])
+
+  @@map("raffles")
+}
+
+model RaffleTicket {
+  id           String        @id @default(uuid())
+  raffleId     String        @map("raffle_id")
+  userId       String        @map("user_id")
+  ticketNumber Int           @map("ticket_number")
+  purchasedAt  DateTime      @default(now()) @map("purchased_at")
+  raffle       Raffle        @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  winner       RaffleWinner?
+
+  @@unique([raffleId, ticketNumber])
+  @@map("raffle_tickets")
+}
+
+model RaffleWinner {
+  id               String        @id @default(uuid())
+  raffleId         String        @map("raffle_id")
+  userId           String        @map("user_id")
+  ticketId         String?       @unique @map("ticket_id")
+  position         Int
+  prizeDescription String?       @map("prize_description")
+  selectedAt       DateTime      @default(now()) @map("selected_at")
+  notifiedAt       DateTime?     @map("notified_at")
+  prizeDeliveredAt DateTime?     @map("prize_delivered_at")
+  deliveryMethod   String?       @map("delivery_method")
+  raffle           Raffle        @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  ticket           RaffleTicket? @relation(fields: [ticketId], references: [id])
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("raffle_winners")
+}
+
+model StoreItem {
+  id           String          @id @default(uuid())
+  name         String
+  description  String?
+  price        Int
+  category     String
+  stock        Int             @default(-1)
+  deliveryType String          @default("instant") @map("delivery_type")
+  isActive     Boolean         @default(true) @map("is_active")
+  sortOrder    Int             @default(0) @map("sort_order")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  metadata     Json?
+  purchases    StorePurchase[]
+
+  @@map("store_items")
+}
+
+model StorePurchase {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  itemId       String    @map("item_id")
+  quantity     Int
+  unitPrice    Int       @map("unit_price")
+  totalPrice   Int       @map("total_price")
+  status       String    @default("completed")
+  purchasedAt  DateTime  @default(now()) @map("purchased_at")
+  deliveredAt  DateTime? @map("delivered_at")
+  refundedAt   DateTime? @map("refunded_at")
+  refundReason String?   @map("refund_reason")
+  metadata     Json?
+  item         StoreItem @relation(fields: [itemId], references: [id])
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("store_purchases")
+}
+
+model BonusHuntSession {
+  id              String                @id @default(uuid())
+  userId          String                @map("user_id")
+  sessionName     String?               @map("session_name")
+  startingBalance Decimal               @map("starting_balance") @db.Decimal(10, 2)
+  currentBalance  Decimal               @map("current_balance") @db.Decimal(10, 2)
+  targetBalance   Decimal?              @map("target_balance") @db.Decimal(10, 2)
+  status          String                @default("active")
+  startedAt       DateTime              @default(now()) @map("started_at")
+  endedAt         DateTime?             @map("ended_at")
+  totalBonuses    Int                   @default(0) @map("total_bonuses")
+  totalSpent      Decimal               @default(0) @map("total_spent") @db.Decimal(10, 2)
+  totalWon        Decimal               @default(0) @map("total_won") @db.Decimal(10, 2)
+  bonusBuys       BonusBuy[]
+  predictions     BonusHuntPrediction[]
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_hunt_sessions")
+}
+
+model BonusBuy {
+  id          String           @id @default(uuid())
+  sessionId   String           @map("session_id")
+  gameName    String           @map("game_name")
+  buyAmount   Decimal          @map("buy_amount") @db.Decimal(10, 2)
+  payout      Decimal          @db.Decimal(10, 2)
+  multiplier  Decimal          @db.Decimal(6, 2)
+  purchasedAt DateTime         @default(now()) @map("purchased_at")
+  metadata    Json?
+  session     BonusHuntSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_buys")
+}
+
+model BonusHuntPrediction {
+  id               String           @id @default(uuid())
+  sessionId        String           @map("session_id")
+  userId           String           @map("user_id")
+  predictedBalance Decimal          @map("predicted_balance") @db.Decimal(10, 2)
+  pointsWagered    Int              @map("points_wagered")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  resolvedAt       DateTime?        @map("resolved_at")
+  won              Boolean?
+  pointsWon        Int              @default(0) @map("points_won")
+  session          BonusHuntSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@map("bonus_hunt_predictions")
+}
+
+model ViewingSession {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  streamId        String?   @map("stream_id")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  durationMinutes Int?      @map("duration_minutes")
+  pointsEarned    Int       @default(0) @map("points_earned")
+  validated       Boolean   @default(false)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("viewing_sessions")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  message   String
+  channels  String[]
+  priority  String    @default("normal")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime? @map("expires_at")
+  metadata  Json?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model SystemConfig {
+  key         String   @id
+  value       Json
+  description String?
+  updatedBy   String?  @map("updated_by")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updater     User?    @relation(fields: [updatedBy], references: [id])
+
+  @@map("system_config")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String?  @map("admin_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  admin      User?    @relation("AdminAuditLogs", fields: [adminId], references: [id])
+  target     User?    @relation("TargetAuditLogs", fields: [targetId], references: [id])
+
+  @@index([adminId, createdAt])
+  @@index([targetId])
+  @@map("audit_logs")
+}
+
+model GuessTheBalance {
+  id                  String                @id @default(uuid())
+  title               String?
+  description         String?
+  startingBalance     Decimal               @map("starting_balance") @db.Decimal(12, 2)
+  numberOfBonuses     Int                   @map("number_of_bonuses")
+  breakEvenMultiplier Decimal               @map("break_even_multiplier") @db.Decimal(6, 2)
+  finalBalance        Decimal?              @map("final_balance") @db.Decimal(12, 2)
+  status              GuessTheBalanceStatus @default(DRAFT)
+  winnerId            String?               @map("winner_id")
+  // Set instead of winnerId when the closest guess came from a chat-only
+  // entrant with no linked account — there's no User row to point winnerId
+  // at, so the reward is skipped (same convention as Boss Raid's top-3) but
+  // the win itself still shows up.
+  winnerKickUsername  String?               @map("winner_kick_username")
+  winnerGuess         Decimal?              @map("winner_guess") @db.Decimal(12, 2)
+  winnerReward        Int?                  @default(0) @map("winner_reward")
+  createdBy           String                @map("created_by")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  openedAt            DateTime?             @map("opened_at")
+  closedAt            DateTime?             @map("closed_at")
+  completedAt         DateTime?             @map("completed_at")
+  metadata            Json?
+  creator             User                  @relation("GuessTheBalanceCreator", fields: [createdBy], references: [id])
+  winner              User?                 @relation("GuessTheBalanceWinner", fields: [winnerId], references: [id])
+  guesses             GuessSubmission[]
+
+  @@index([status])
+  @@index([createdBy])
+  @@map("guess_the_balance")
+}
+
+model GuessSubmission {
+  id          String          @id @default(uuid())
+  gameId      String          @map("game_id")
+  // Nullable — a "!guess <amount>" chat submission is accepted even without a
+  // linked/verified site account; kickUsername is then the sole identity,
+  // same nullable userId?/kickUsername? split as BingoParticipant.
+  userId      String?         @map("user_id")
+  kickUsername String?        @map("kick_username")
+  guessAmount Decimal         @map("guess_amount") @db.Decimal(12, 2)
+  submittedAt DateTime        @default(now()) @map("submitted_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  game        GuessTheBalance @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@unique([gameId, kickUsername])
+  @@index([gameId])
+  @@index([userId])
+  @@map("guess_submissions")
+}
+
+enum GuessTheBalanceStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+enum TournamentStatus {
+  DRAFT
+  REGISTRATION
+  LOCKED
+  DRAWN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// SLOT_SELECTION is intentionally left dangling (unused going forward):
+// Postgres has no clean `DROP VALUE` for enums, and a full type-swap
+// migration to remove it costs more than leaving one unused label. Slot is
+// now chosen at registration, so no match ever needs a slot-selection state.
+enum MatchStatus {
+  PENDING
+  SLOT_SELECTION
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum TournamentEntrySource {
+  WEB
+  CHAT
+}
+
+model Tournament {
+  id                  String                  @id @default(uuid())
+  title               String
+  status              TournamentStatus        @default(DRAFT)
+  keyword             String                  @default("!jointourney") @map("keyword")
+  maxPlayers          Int                     @default(8) @map("max_players")
+  currentRound        Int                     @default(0) @map("current_round")
+  allowDuplicateSlots Boolean                 @default(false) @map("allow_duplicate_slots")
+  betAmountPerSpin    Decimal?                @map("bet_amount_per_spin") @db.Decimal(10, 2)
+  prizePoolDisplay    String?                 @map("prize_pool_display")
+  // Commit-reveal draw fairness: seedCommitmentHash (sha256 of drawSeed) is
+  // published the moment registration locks, before anyone can know who's
+  // eligible for the draw — proving the outcome wasn't picked after the
+  // fact. drawSeed itself stays server-only until drawExecutedAt is set.
+  seedCommitmentHash  String?                 @map("seed_commitment_hash")
+  drawSeed            String?                 @map("draw_seed")
+  drawExecutedAt      DateTime?               @map("draw_executed_at")
+  drawResult          Json?                   @map("draw_result")
+  createdById         String                  @map("created_by_id")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+  createdBy           User                    @relation("TournamentCreator", fields: [createdById], references: [id])
+  participants        TournamentParticipant[]
+  matches             TournamentMatch[]
+  entries             TournamentEntry[]
+  bans                TournamentBan[]
+
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id                  String                       @id @default(uuid())
+  tournamentId        String                       @map("tournament_id")
+  // Nullable — a participant drawn from a chat-only ("!jointourney <slot>")
+  // entry may never have linked a site account. kickUsername is then the
+  // sole identity, mirroring BingoParticipant's userId?/kickUsername? split.
+  userId              String?                      @map("user_id")
+  kickUsername        String?                      @map("kick_username")
+  seed                Int?
+  currentSlot         String?                      @map("current_slot")
+  eliminated          Boolean                      @default(false)
+  finalPosition       Int?                         @map("final_position")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  tournament          Tournament                   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user                User?                        @relation("TournamentParticipants", fields: [userId], references: [id], onDelete: Cascade)
+  matchParticipations TournamentMatchParticipant[]
+
+  @@unique([tournamentId, userId])
+  @@unique([tournamentId, kickUsername])
+  @@map("tournament_participants")
+}
+
+model TournamentEntry {
+  id           String                @id @default(uuid())
+  tournamentId String                @map("tournament_id")
+  // Nullable — anyone typing the join keyword in Kick chat is entered even
+  // without ever having verified a site account; kickUsername is then the
+  // sole identity (same nullable-userId/kickUsername split as
+  // BingoParticipant). A linked, verified chatter still gets both set.
+  userId       String?               @map("user_id")
+  kickUsername String?               @map("kick_username")
+  // Nullable at the DB level so historical pre-revamp rows don't need a
+  // backfill; every entry created going forward always has one (enforced in
+  // app code, not the schema) since slot is now chosen at entry time.
+  slot         String?
+  source       TournamentEntrySource @default(WEB)
+  invalidated  Boolean               @default(false)
+  enteredAt    DateTime              @default(now()) @map("entered_at")
+  tournament   Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User?                 @relation("TournamentEntries", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@unique([tournamentId, kickUsername])
+  @@map("tournament_entries")
+}
+
+model TournamentMatch {
+  id           String                       @id @default(uuid())
+  tournamentId String                       @map("tournament_id")
+  round        Int
+  matchNumber  Int                          @map("match_number")
+  status       MatchStatus                  @default(PENDING)
+  winnerId     String?                      @map("winner_id")
+  nextMatchId  String?                      @map("next_match_id")
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+  tournament   Tournament                   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  participants TournamentMatchParticipant[]
+
+  @@unique([tournamentId, round, matchNumber])
+  @@map("tournament_matches")
+}
+
+model TournamentMatchParticipant {
+  id            String                @id @default(uuid())
+  matchId       String                @map("match_id")
+  participantId String                @map("participant_id")
+  slotCall      String?               @map("slot_call")
+  resultText    String?               @map("result_text")
+  match         TournamentMatch       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  participant   TournamentParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, participantId])
+  @@map("tournament_match_participants")
+}
+
+// Tournament-scoped block: prevents a user from entering THIS tournament
+// again, without touching their site account (unlike AdminService's
+// sitewide suspension).
+model TournamentBan {
+  id           String     @id @default(uuid())
+  tournamentId String     @map("tournament_id")
+  // Nullable — an admin can ban an unlinked chat-only entrant, who has no
+  // userId to hang the ban off of; kickUsername covers that case the same
+  // way TournamentEntry/TournamentParticipant do.
+  userId       String?    @map("user_id")
+  kickUsername String?    @map("kick_username")
+  bannedById   String     @map("banned_by_id")
+  reason       String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User?      @relation("TournamentBanned", fields: [userId], references: [id], onDelete: Cascade)
+  bannedBy     User       @relation("TournamentBanIssuedBy", fields: [bannedById], references: [id])
+
+  @@unique([tournamentId, userId])
+  @@unique([tournamentId, kickUsername])
+  @@map("tournament_bans")
+}
+
+model StreamEvent {
+  id          String   @id @default(uuid())
+  title       String
+  scheduledAt DateTime @map("scheduled_at")
+  gameType    String?  @map("game_type")
+  description String?
+  isLive      Boolean  @default(false) @map("is_live")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([scheduledAt])
+  @@map("stream_events")
+}
+
+model MilestoneClaim {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tierId    Int      @map("tier_id")
+  tierName  String   @map("tier_name")
+  reward    Int
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tierId])
+  @@map("milestone_claims")
+}
+
+// ─── Viewer Picker ────────────────────────────────────────────────────────────
+
+enum ViewerPickerStatus {
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+model ViewerPicker {
+  id             String               @id @default(uuid())
+  keyword        String
+  label          String?
+  status         ViewerPickerStatus   @default(OPEN)
+  winningEntryId String?              @unique @map("winning_entry_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  closedAt       DateTime?            @map("closed_at")
+  entries        ViewerPickerEntry[]  @relation("PickerEntries")
+  winningEntry   ViewerPickerEntry?   @relation("PickerWinningEntry", fields: [winningEntryId], references: [id], onDelete: SetNull)
+  winners        ViewerPickerWinner[]
+
+  @@map("viewer_pickers")
+}
+
+// Entries are keyed by the raw Kick chat username so anyone who types the keyword can
+// enter, whether or not they've linked Kick or registered on the site — `userId` is an
+// optional bonus link, resolved when the chatter's username happens to match a site account.
+model ViewerPickerEntry {
+  id           String        @id @default(uuid())
+  pickerId     String        @map("picker_id")
+  kickUsername String        @map("kick_username")
+  userId       String?       @map("user_id")
+  enteredAt    DateTime      @default(now()) @map("entered_at")
+  picker       ViewerPicker  @relation("PickerEntries", fields: [pickerId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  winningFor   ViewerPicker? @relation("PickerWinningEntry")
+
+  @@unique([pickerId, kickUsername])
+  @@map("viewer_picker_entries")
+}
+
+// Persists every winner drawn for a giveaway (supports "Pick Another Winner" without
+// losing earlier picks — `ViewerPicker.winningEntryId` above only ever points at the
+// single most recent draw).
+model ViewerPickerWinner {
+  id           String       @id @default(uuid())
+  pickerId     String       @map("picker_id")
+  kickUsername String       @map("kick_username")
+  userId       String?      @map("user_id")
+  wonAt        DateTime     @default(now()) @map("won_at")
+  picker       ViewerPicker @relation(fields: [pickerId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([pickerId])
+  @@map("viewer_picker_winners")
+}
+
+// ─── King of the Hill ─────────────────────────────────────────────────────────
+
+enum KingOfTheHillStatus {
+  OPEN
+  CLOSED
+}
+
+enum KothEntryStatus {
+  WAITING
+  DRAWN
+  KING
+}
+
+model KingOfTheHill {
+  id        String               @id @default(uuid())
+  label     String?
+  status    KingOfTheHillStatus  @default(OPEN)
+  createdAt DateTime             @default(now()) @map("created_at")
+  closedAt  DateTime?            @map("closed_at")
+  entries   KingOfTheHillEntry[]
+  rounds    KingOfTheHillRound[]
+
+  @@map("king_of_the_hill_sessions")
+}
+
+// Entries are keyed by the raw Kick chat username so anyone who types the keyword can
+// join, whether or not they've linked Kick or registered on the site — `userId` is an
+// optional bonus link, resolved when the chatter's username happens to match a site account.
+model KingOfTheHillEntry {
+  id           String               @id @default(uuid())
+  sessionId    String               @map("session_id")
+  kickUsername String               @map("kick_username")
+  userId       String?              @map("user_id")
+  slotName     String?              @map("slot_name")
+  status       KothEntryStatus      @default(WAITING)
+  joinedAt     DateTime             @default(now()) @map("joined_at")
+  drawnAt      DateTime?            @map("drawn_at")
+  session      KingOfTheHill        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user         User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  rounds       KingOfTheHillRound[]
+
+  @@unique([sessionId, kickUsername])
+  @@map("king_of_the_hill_entries")
+}
+
+model KingOfTheHillRound {
+  id           String             @id @default(uuid())
+  sessionId    String             @map("session_id")
+  entryId      String             @map("entry_id")
+  userId       String?            @map("user_id")
+  slotName     String?            @map("slot_name")
+  betAmount    Decimal?           @map("bet_amount") @db.Decimal(10, 2)
+  payoutAmount Decimal?           @map("payout_amount") @db.Decimal(10, 2)
+  multiplier   Decimal?           @db.Decimal(6, 2)
+  isKing       Boolean            @default(false) @map("is_king")
+  drawnAt      DateTime           @default(now()) @map("drawn_at")
+  slotCalledAt DateTime?          @map("slot_called_at")
+  playedAt     DateTime?          @map("played_at")
+  dethronedAt  DateTime?          @map("dethroned_at")
+  session      KingOfTheHill      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  entry        KingOfTheHillEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("king_of_the_hill_rounds")
+}
+
+// ─── High Roller ───────────────────────────────────────────────────────────────
+
+enum HighRollerStatus {
+  OPEN
+  CLOSED
+}
+
+enum HighRollerPrediction {
+  OVER
+  UNDER
+}
+
+model HighRoller {
+  id                 String                        @id @default(uuid())
+  title              String?
+  threshold          Decimal                       @db.Decimal(10, 2)
+  status             HighRollerStatus              @default(OPEN)
+  paused             Boolean                       @default(false)
+  roundLocked        Boolean                       @default(false) @map("round_locked")
+  roundNumber        Int                           @default(0) @map("round_number")
+  finalRound         Boolean                       @default(false) @map("final_round")
+  treatMissedAsWrong Boolean                       @default(true) @map("treat_missed_as_wrong")
+  joinKeyword        String                        @default("!join") @map("join_keyword")
+  leaveKeyword       String                        @default("!leave") @map("leave_keyword")
+  overKeyword        String                        @default("!over") @map("over_keyword")
+  underKeyword       String                        @default("!under") @map("under_keyword")
+  suggestKeyword     String?                       @default("!suggest") @map("suggest_keyword")
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  closedAt           DateTime?                     @map("closed_at")
+  players            HighRollerPlayer[]
+  rounds             HighRollerRound[]
+  suggestionDraws    HighRollerSuggestionDraw[]
+  suggestionEntrants HighRollerSuggestionEntrant[]
+
+  @@map("high_roller_sessions")
+}
+
+// Players are keyed by the raw Kick chat username so anyone who types the join keyword
+// can play, whether or not they've linked Kick or registered on the site — `userId` is an
+// optional bonus link, resolved when the chatter's username happens to match a site account.
+model HighRollerPlayer {
+  id                String                      @id @default(uuid())
+  sessionId         String                      @map("session_id")
+  kickUsername      String                      @map("kick_username")
+  userId            String?                     @map("user_id")
+  currentStreak     Int                         @default(0) @map("current_streak")
+  bestStreak        Int                         @default(0) @map("best_streak")
+  roundsPlayed      Int                         @default(0) @map("rounds_played")
+  correctCount      Int                         @default(0) @map("correct_count")
+  currentPrediction HighRollerPrediction?       @map("current_prediction")
+  joinedAt          DateTime                    @default(now()) @map("joined_at")
+  leftAt            DateTime?                   @map("left_at")
+  session           HighRoller                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  predictions       HighRollerRoundPrediction[]
+
+  @@unique([sessionId, kickUsername])
+  @@map("high_roller_players")
+}
+
+// Append-only: one row per resolved round, for the round-history view.
+model HighRollerRound {
+  id          String                      @id @default(uuid())
+  sessionId   String                      @map("session_id")
+  roundNumber Int                         @map("round_number")
+  threshold   Decimal                     @db.Decimal(10, 2)
+  slotResult  Decimal                     @map("slot_result") @db.Decimal(10, 2)
+  winningSide HighRollerPrediction        @map("winning_side")
+  numberOver  Int                         @map("number_over")
+  numberUnder Int                         @map("number_under")
+  resolvedAt  DateTime                    @default(now()) @map("resolved_at")
+  session     HighRoller                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  predictions HighRollerRoundPrediction[]
+
+  @@map("high_roller_rounds")
+}
+
+// One row per player per resolved round — needed for accuracy/history since a player's
+// streak alone doesn't tell you what they guessed or whether this specific round hit.
+model HighRollerRoundPrediction {
+  id          String                @id @default(uuid())
+  roundId     String                @map("round_id")
+  playerId    String                @map("player_id")
+  prediction  HighRollerPrediction?
+  correct     Boolean
+  streakAfter Int                   @map("streak_after")
+  round       HighRollerRound       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player      HighRollerPlayer      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, playerId])
+  @@map("high_roller_round_predictions")
+}
+
+// History of "draw a viewer to suggest the next slot" picks, so exclude-previous-winners can be enforced.
+model HighRollerSuggestionDraw {
+  id           String     @id @default(uuid())
+  sessionId    String     @map("session_id")
+  kickUsername String     @map("kick_username")
+  slotName     String?    @map("slot_name")
+  slotCalledAt DateTime?  @map("slot_called_at")
+  drawnAt      DateTime   @default(now()) @map("drawn_at")
+  session      HighRoller @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("high_roller_suggestion_draws")
+}
+
+// Viewers who opted in via the "!suggest" chat command — the eligible pool for a "suggestion
+// draw" that isn't limited to players who joined the prediction game itself.
+model HighRollerSuggestionEntrant {
+  id           String     @id @default(uuid())
+  sessionId    String     @map("session_id")
+  kickUsername String     @map("kick_username")
+  enteredAt    DateTime   @default(now()) @map("entered_at")
+  session      HighRoller @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, kickUsername])
+  @@map("high_roller_suggestion_entrants")
+}
+
+// ─── Bonus Bingo ─────────────────────────────────────────────────────────────
+
+enum BingoStatus {
+  DRAFT
+  REGISTRATION
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CellStatus {
+  EMPTY
+  ACTIVE
+  GREEN
+}
+
+model BonusBingo {
+  id                  String             @id @default(uuid())
+  title               String
+  keyword             String             @default("!join") @map("keyword")
+  gridSize            Int                @default(5) @map("grid_size")
+  status              BingoStatus        @default(DRAFT)
+  linePoints          Int                @default(500) @map("line_points")
+  currentCellId       String?            @map("current_cell_id")
+  currentUserId       String?            @map("current_user_id")
+  currentKickUsername String?            @map("current_kick_username")
+  createdById         String             @map("created_by_id")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  completedAt         DateTime?          @map("completed_at")
+  createdBy           User               @relation("BingoCreator", fields: [createdById], references: [id])
+  currentUser         User?              @relation("BingoCurrentUser", fields: [currentUserId], references: [id])
+  cells               BingoCell[]
+  participants        BingoParticipant[]
+  lineWins            BingoLineWin[]
+
+  @@map("bonus_bingo")
+}
+
+model BingoCell {
+  id                    String     @id @default(uuid())
+  gameId                String     @map("game_id")
+  row                   Int
+  col                   Int
+  status                CellStatus @default(EMPTY)
+  slotName              String?    @map("slot_name")
+  claimedById           String?    @map("claimed_by_id")
+  claimedByKickUsername String?    @map("claimed_by_kick_username")
+  claimedAt             DateTime?  @map("claimed_at")
+  playedAt              DateTime?  @map("played_at")
+  game                  BonusBingo @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  claimedBy             User?      @relation("BingoCellClaimer", fields: [claimedById], references: [id])
+
+  @@unique([gameId, row, col])
+  @@map("bingo_cells")
+}
+
+// A participant may join via the authenticated website "Join" button (userId set,
+// kickUsername null) or via the "!join" Kick chat command (kickUsername always set,
+// userId resolved as an optional bonus link) — so anyone watching in chat can play
+// bingo whether or not they've linked Kick or registered on the site.
+model BingoParticipant {
+  id            String     @id @default(uuid())
+  gameId        String     @map("game_id")
+  userId        String?    @map("user_id")
+  kickUsername  String?    @map("kick_username")
+  // Locked in via "!join <slot>" — unlike Boss Raid/Bounty Hunter/King of the Hill,
+  // a bingo participant can be drawn for several different cells over one game, so this
+  // is only a *default* pre-fill applied on each draw, not a one-time commitment; it's
+  // still overridable per cell via "!slot <name>" or the admin picker.
+  preferredSlot String?    @map("preferred_slot")
+  joinedAt      DateTime   @default(now()) @map("joined_at")
+  game          BonusBingo @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user          User?      @relation("BingoParticipants", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([gameId, userId])
+  @@unique([gameId, kickUsername])
+  @@map("bingo_participants")
+}
+
+// ─── Slot Requests ───────────────────────────────────────────────────────────
+
+enum SlotRequestStatus {
+  PENDING
+  ADDED
+  REJECTED
+}
+
+model SlotRequest {
+  id           String            @id @default(uuid())
+  slotName     String            @map("slot_name")
+  kickUsername String            @map("kick_username")
+  userId       String?           @map("user_id")
+  status       SlotRequestStatus @default(PENDING)
+  requestedAt  DateTime          @default(now()) @map("requested_at")
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status], map: "idx_slot_requests_status")
+  @@map("slot_requests")
+}
+
+model BingoLineWin {
+  id          String     @id @default(uuid())
+  gameId      String     @map("game_id")
+  lineType    String     @map("line_type")
+  lineIndex   Int        @map("line_index")
+  pointsEach  Int        @map("points_each")
+  completedAt DateTime   @default(now()) @map("completed_at")
+  game        BonusBingo @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, lineType, lineIndex])
+  @@map("bingo_line_wins")
+}
+
+// ─── Razed Wager Tracking ───────────────────────────────────────────────────
+
+model RazedDailyWager {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime @db.Date
+  amount    Decimal  @db.Decimal(14, 2)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("razed_daily_wagers")
+}
+
+model RazedUnlinkedWager {
+  id            String   @id @default(uuid())
+  razedUsername String   @map("razed_username")
+  date          DateTime @db.Date
+  amount        Decimal  @db.Decimal(14, 2)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([razedUsername, date])
+  @@index([razedUsername])
+  @@map("razed_unlinked_wagers")
+}
+
+// ─── Admin-created wager races ──────────────────────────────────────────────
+// Replaces the old fixed-calendar-month leaderboard: admins create each race
+// with its own start/end date and however many paid positions they want.
+
+model WagerRace {
+  id             String   @id @default(uuid())
+  type           String   @default("MONTHLY") // "WEEKLY" | "MONTHLY" — one active race per type, otherwise fully independent
+  startDate      DateTime @map("start_date")
+  endDate        DateTime @map("end_date")
+  totalPrizePool Int      @default(0) @map("total_prize_pool")
+  status         String   @default("active") // "active" (running or awaiting payout) | "ended" (paid out)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  prizes  WagerRacePrize[]
+  payouts WagerRacePayout[]
+
+  @@index([type, status, startDate, endDate])
+  @@map("wager_races")
+}
+
+model WagerRacePrize {
+  id       String    @id @default(uuid())
+  raceId   String    @map("race_id")
+  position Int
+  amount   Int
+  race     WagerRace @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, position])
+  @@map("wager_race_prizes")
+}
+
+// A winner is owed real money whether or not they've linked a site account, so
+// exactly one of `userId` (linked) or `razedUsername` (unlinked Razed wagerer)
+// is set. Recording only linked winners used to leave silent holes in the payout
+// history — an unlinked #1 simply vanished from the list.
+model WagerRacePayout {
+  id            String    @id @default(uuid())
+  raceId        String    @map("race_id")
+  userId        String?   @map("user_id")
+  razedUsername String?   @map("razed_username")
+  position      Int
+  wagered       Decimal   @db.Decimal(14, 2)
+  prizeAmount   Int       @map("prize_amount")
+  paidAt        DateTime  @default(now()) @map("paid_at")
+  race          WagerRace @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, userId])
+  @@unique([raceId, razedUsername])
+  @@map("wager_race_payouts")
+}
+
+// ─── Bonus Hunt Tracker (shared across admins/mods) ────────────────────────
+
+model Hunt {
+  id          String   @id
+  name        String
+  date        String
+  currency    String
+  startCost   Decimal  @map("start_cost") @db.Decimal(12, 2)
+  bonuses     Json     @default("[]")
+  isStarted   Boolean  @default(false) @map("is_started")
+  isCompleted Boolean  @default(false) @map("is_completed")
+  gtbGameId   String?  @map("gtb_game_id")
+  createdAt   DateTime @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("hunts")
+}
+
+// ─── Weekly Raffle (eligibility-based, separate from the ticket-purchase Raffle) ──
+
+enum WeeklyRaffleStatus {
+  OPEN
+  DRAWN
+}
+
+model WeeklyRaffle {
+  id                   String             @id @default(uuid())
+  weekStart            DateTime           @map("week_start")
+  weekEnd              DateTime           @map("week_end")
+  status               WeeklyRaffleStatus @default(OPEN)
+  // Array of typed requirement objects, e.g. [{ "type": "MIN_WEEKLY_WAGER", "value": 500 }]
+  // — kept as JSON so new requirement types don't need a schema migration.
+  requirements         Json               @default("[]")
+  winnerUserId         String?            @map("winner_user_id")
+  // Ordered array of eligible userIds as eliminated (last entry = winner) — the
+  // provably-fair record the reveal animation replays.
+  eliminationOrder     Json?              @map("elimination_order")
+  eligibleCount        Int?               @map("eligible_count")
+  drawnAt              DateTime?          @map("drawn_at")
+  drawnBy              String?            @map("drawn_by")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  createdBy            String?            @map("created_by")
+  // Admin overrides on top of computed eligibility — arrays of userIds. A user in
+  // both is treated as excluded (removal wins), so add doesn't need to special-case it.
+  manualAddUserIds     Json               @default("[]") @map("manual_add_user_ids")
+  manualExcludeUserIds Json               @default("[]") @map("manual_exclude_user_ids")
+
+  winner      User? @relation("WeeklyRaffleWinner", fields: [winnerUserId], references: [id])
+  creator     User? @relation("WeeklyRaffleCreator", fields: [createdBy], references: [id])
+  drawnByUser User? @relation("WeeklyRaffleDrawnBy", fields: [drawnBy], references: [id])
+
+  @@unique([weekStart])
+  @@map("weekly_raffles")
+}
+
+// ─── Community Boss Raid (chat-driven co-op slot event) ────────────────────
+
+enum BossRaidStatus {
+  REGISTRATION
+  ACTIVE
+  COMPLETED
+}
+
+enum BossRaidEntryStatus {
+  WAITING
+  DRAWN
+  DONE
+}
+
+model BossRaid {
+  id                     String         @id @default(uuid())
+  bossKey                String         @map("boss_key")
+  keyword                String
+  status                 BossRaidStatus @default(REGISTRATION)
+  maxHp                  Int            @default(10000) @map("max_hp")
+  currentHp              Int            @default(10000) @map("current_hp")
+  phase                  Int            @default(1)
+  rage                   Int            @default(0)
+  roundCount             Int            @default(0) @map("round_count")
+  consecutiveBucket      String?        @map("consecutive_bucket")
+  consecutiveCount       Int            @default(0) @map("consecutive_count")
+  legendaryBuffRounds    Int            @default(0) @map("legendary_buff_rounds")
+  soulShields            Int            @default(3) @map("soul_shields")
+  voidModifier           String?        @map("void_modifier")
+  voidModifierRoundsLeft Int            @default(0) @map("void_modifier_rounds_left")
+  defeated               Boolean        @default(false)
+  createdAt              DateTime       @default(now()) @map("created_at")
+  closedAt               DateTime?      @map("closed_at")
+  createdById            String         @map("created_by_id")
+
+  creator User            @relation("BossRaidCreator", fields: [createdById], references: [id])
+  entries BossRaidEntry[]
+  rounds  BossRaidRound[]
+
+  @@map("boss_raids")
+}
+
+model BossRaidEntry {
+  id           String              @id @default(uuid())
+  raidId       String              @map("raid_id")
+  kickUsername String              @map("kick_username")
+  userId       String?             @map("user_id")
+  slotName     String?             @map("slot_name")
+  status       BossRaidEntryStatus @default(WAITING)
+  joinedAt     DateTime            @default(now()) @map("joined_at")
+  drawnAt      DateTime?           @map("drawn_at")
+
+  raid   BossRaid        @relation(fields: [raidId], references: [id], onDelete: Cascade)
+  user   User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  rounds BossRaidRound[]
+
+  @@unique([raidId, kickUsername])
+  @@map("boss_raid_entries")
+}
+
+model BossRaidRound {
+  id           String    @id @default(uuid())
+  raidId       String    @map("raid_id")
+  entryId      String    @map("entry_id")
+  userId       String?   @map("user_id")
+  slotName     String?   @map("slot_name")
+  betAmount    Decimal?  @map("bet_amount") @db.Decimal(10, 2)
+  payoutAmount Decimal?  @map("payout_amount") @db.Decimal(10, 2)
+  multiplier   Decimal?  @db.Decimal(8, 2)
+  damageDealt  Int       @default(0) @map("damage_dealt")
+  healApplied  Int       @default(0) @map("heal_applied")
+  isDeadBonus  Boolean   @default(false) @map("is_dead_bonus")
+  isRetrigger  Boolean   @default(false) @map("is_retrigger")
+  isCrit       Boolean   @default(false) @map("is_crit")
+  isLegendary  Boolean   @default(false) @map("is_legendary")
+  skipped      Boolean   @default(false)
+  drawnAt      DateTime  @default(now()) @map("drawn_at")
+  slotCalledAt DateTime? @map("slot_called_at")
+  playedAt     DateTime? @map("played_at")
+
+  raid  BossRaid      @relation(fields: [raidId], references: [id], onDelete: Cascade)
+  entry BossRaidEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("boss_raid_rounds")
+}
+
+// ─── Community Bounty Hunter (secret target multiplier, closest hit wins) ──
+
+enum BountyHunterStatus {
+  REGISTRATION
+  ACTIVE
+  SETTLED
+}
+
+enum BountyHunterEntryStatus {
+  WAITING
+  DRAWN
+  DONE
+}
+
+model BountyHunter {
+  id               String             @id @default(uuid())
+  keyword          String
+  status           BountyHunterStatus @default(REGISTRATION)
+  registrationOpen Boolean            @default(true) @map("registration_open")
+  target           Int
+  targetMin        Int                @default(50) @map("target_min")
+  targetMax        Int                @default(500) @map("target_max")
+  claimZone        Int                @default(25) @map("claim_zone")
+  pot              Int                @default(5000)
+  rolloverCount    Int                @default(0) @map("rollover_count")
+  epoch            Int                @default(0)
+  winnerEntryId    String?            @map("winner_entry_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  closedAt         DateTime?          @map("closed_at")
+  createdById      String             @map("created_by_id")
+
+  creator User                @relation("BountyHunterCreator", fields: [createdById], references: [id])
+  entries BountyHunterEntry[]
+  rounds  BountyHunterRound[]
+
+  @@map("bounty_hunters")
+}
+
+model BountyHunterEntry {
+  id           String                  @id @default(uuid())
+  huntId       String                  @map("hunt_id")
+  kickUsername String                  @map("kick_username")
+  userId       String?                 @map("user_id")
+  slotName     String?                 @map("slot_name")
+  status       BountyHunterEntryStatus @default(WAITING)
+  joinedAt     DateTime                @default(now()) @map("joined_at")
+  drawnAt      DateTime?               @map("drawn_at")
+
+  hunt   BountyHunter        @relation(fields: [huntId], references: [id], onDelete: Cascade)
+  user   User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  rounds BountyHunterRound[]
+
+  @@unique([huntId, kickUsername])
+  @@map("bounty_hunter_entries")
+}
+
+model BountyHunterRound {
+  id           String    @id @default(uuid())
+  huntId       String    @map("hunt_id")
+  entryId      String    @map("entry_id")
+  userId       String?   @map("user_id")
+  epoch        Int
+  slotName     String?   @map("slot_name")
+  betAmount    Decimal?  @map("bet_amount") @db.Decimal(10, 2)
+  payoutAmount Decimal?  @map("payout_amount") @db.Decimal(10, 2)
+  multiplier   Decimal?  @db.Decimal(10, 2)
+  distance     Int?
+  qualifies    Boolean   @default(false)
+  skipped      Boolean   @default(false)
+  drawnAt      DateTime  @default(now()) @map("drawn_at")
+  slotCalledAt DateTime? @map("slot_called_at")
+  playedAt     DateTime? @map("played_at")
+
+  hunt  BountyHunter      @relation(fields: [huntId], references: [id], onDelete: Cascade)
+  entry BountyHunterEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user  User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("bounty_hunter_rounds")
+}
+
+// ─── Slot World Cup (community slot bracket + prediction tournament) ───────
+
+enum SlotWorldCupStatus {
+  NOMINATION
+  BRACKET_SET
+  PREDICTIONS_OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SlotWorldCupSeeding {
+  RANDOM
+  POPULARITY
+}
+
+// Chat suggestions land as PENDING and the admin approves them into the bracket
+// or rejects them. Rejected ones stay recorded so the same slot doesn't keep
+// reappearing in the queue every time another viewer nominates it.
+enum SlotWorldCupNominationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SlotWorldCup {
+  id                String              @id @default(uuid())
+  title             String
+  size              Int                 @default(8)
+  status            SlotWorldCupStatus  @default(NOMINATION)
+  nominationsOpen   Boolean             @default(true) @map("nominations_open")
+  nominationCommand String              @default("!wc") @map("nomination_command")
+  // How each matchup is played out on stream (Bonus Buy / 100 Spins / …). Free
+  // text rather than an enum so the admin can set a one-off "Custom" rule
+  // without a migration; it's descriptive only — the winner is always decided
+  // by the higher multiplier.
+  matchRule         String              @default("Bonus Buy") @map("match_rule")
+  seeding           SlotWorldCupSeeding @default(RANDOM)
+  currentRound      Int                 @default(0) @map("current_round")
+  totalRounds       Int                 @map("total_rounds")
+  scoringConfig     Json                @map("scoring_config")
+  rewardConfig      Json                @map("reward_config")
+  championSlotId    String?             @map("champion_slot_id")
+  runnerUpSlotId    String?             @map("runner_up_slot_id")
+  createdById       String              @map("created_by_id")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  closedAt          DateTime?           @map("closed_at")
+
+  creator     User                     @relation("SlotWorldCupCreator", fields: [createdById], references: [id])
+  nominations SlotWorldCupNomination[]
+  slots       SlotWorldCupSlot[]
+  matches     SlotWorldCupMatch[]
+  predictions SlotWorldCupPrediction[]
+
+  @@map("slot_world_cups")
+}
+
+model SlotWorldCupNomination {
+  id             String                       @id @default(uuid())
+  tournamentId   String                       @map("tournament_id")
+  kickUsername   String                       @map("kick_username")
+  slotName       String                       @map("slot_name")
+  normalizedName String                       @map("normalized_name")
+  status         SlotWorldCupNominationStatus @default(PENDING)
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  tournament SlotWorldCup @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, kickUsername])
+  @@index([tournamentId, normalizedName])
+  @@index([tournamentId, status])
+  @@map("slot_world_cup_nominations")
+}
+
+model SlotWorldCupSlot {
+  id              String  @id @default(uuid())
+  tournamentId    String  @map("tournament_id")
+  slotName        String  @map("slot_name")
+  provider        String?
+  imageUrl        String? @map("image_url")
+  seed            Int
+  votes           Int     @default(0)
+  eliminatedRound Int?    @map("eliminated_round")
+
+  tournament SlotWorldCup        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchesAsA SlotWorldCupMatch[] @relation("MatchSlotA")
+  matchesAsB SlotWorldCupMatch[] @relation("MatchSlotB")
+  matchesWon SlotWorldCupMatch[] @relation("MatchWinner")
+
+  @@unique([tournamentId, seed])
+  @@map("slot_world_cup_slots")
+}
+
+model SlotWorldCupMatch {
+  id            String    @id @default(uuid())
+  tournamentId  String    @map("tournament_id")
+  round         Int
+  matchNumber   Int       @map("match_number")
+  slotAId       String?   @map("slot_a_id")
+  slotBId       String?   @map("slot_b_id")
+  winnerId      String?   @map("winner_id")
+  nextMatchId   String?   @map("next_match_id")
+  nextMatchSlot String?   @map("next_match_slot")
+  // Admin enters bet + payout per slot for the round; the multiplier is derived
+  // and whichever slot hit the higher multiplier wins the matchup automatically.
+  betAmountA    Decimal?  @map("bet_amount_a") @db.Decimal(12, 2)
+  payoutAmountA Decimal?  @map("payout_amount_a") @db.Decimal(14, 2)
+  multiplierA   Decimal?  @map("multiplier_a") @db.Decimal(10, 2)
+  betAmountB    Decimal?  @map("bet_amount_b") @db.Decimal(12, 2)
+  payoutAmountB Decimal?  @map("payout_amount_b") @db.Decimal(14, 2)
+  multiplierB   Decimal?  @map("multiplier_b") @db.Decimal(10, 2)
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tournament SlotWorldCup      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  slotA      SlotWorldCupSlot? @relation("MatchSlotA", fields: [slotAId], references: [id])
+  slotB      SlotWorldCupSlot? @relation("MatchSlotB", fields: [slotBId], references: [id])
+  winner     SlotWorldCupSlot? @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  @@unique([tournamentId, round, matchNumber])
+  @@map("slot_world_cup_matches")
+}
+
+model SlotWorldCupPrediction {
+  id             String   @id @default(uuid())
+  tournamentId   String   @map("tournament_id")
+  userId         String   @map("user_id")
+  displayName    String   @map("display_name")
+  picks          Json
+  championPickId String?  @map("champion_pick_id")
+  score          Int      @default(0)
+  correctPicks   Int      @default(0) @map("correct_picks")
+  accuracy       Float    @default(0)
+  submittedAt    DateTime @default(now()) @map("submitted_at")
+
+  tournament SlotWorldCup @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User         @relation("SlotWorldCupPredictions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@map("slot_world_cup_predictions")
+}
+
+// ─── Lift ──────────────────────────────────────────────────────────────────
+// Chat-driven survival game: viewers !join, then !ready, then pick an
+// elevator each round (!a.."!f") until one survivor remains. Phase
+// progression after "start" is driven server-side by LiftService's timers,
+// not admin clicks — see LiftService for the CHOICE/SYNC round logic.
+
+enum LiftStatus {
+  JOIN
+  READY
+  ROUND_LOBBY
+  ROUND_DECISION
+  ROUND_LOCK
+  ROUND_PAUSE
+  ROUND_RESOLVE
+  FINALE
+  ENDED
+  CANCELLED
+}
+
+enum LiftRoundType {
+  CHOICE
+  SYNC
+}
+
+model LiftSession {
+  id           String        @id @default(uuid())
+  label        String?
+  status       LiftStatus    @default(JOIN)
+  round        Int           @default(0)
+  joinKeyword  String        @default("!join") @map("join_keyword")
+  readyKeyword String        @default("!ready") @map("ready_keyword")
+  phaseEndsAt  DateTime?     @map("phase_ends_at")
+  caption      String?
+  captionSub   String?       @map("caption_sub")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  endedAt      DateTime?     @map("ended_at")
+  players      LiftPlayer[]
+  rounds       LiftRound[]
+
+  @@map("lift_sessions")
+}
+
+// Players are keyed by the raw Kick chat username so anyone who types the join
+// keyword can play, whether or not they've linked Kick or registered on the
+// site — `userId` is an optional bonus link, resolved when the chatter's
+// username happens to match a site account (mirrors KingOfTheHillEntry).
+model LiftPlayer {
+  id              String      @id @default(uuid())
+  sessionId       String      @map("session_id")
+  kickUsername    String      @map("kick_username")
+  userId          String?     @map("user_id")
+  avatarUrl       String?     @map("avatar_url")
+  avatarSeed      Int         @default(0) @map("avatar_seed")
+  joinedAt        DateTime    @default(now()) @map("joined_at")
+  readyAt         DateTime?   @map("ready_at")
+  alive           Boolean     @default(true)
+  eliminatedRound Int?        @map("eliminated_round")
+  currentElevator String?     @map("current_elevator")
+  session         LiftSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, kickUsername])
+  @@map("lift_players")
+}
+
+model LiftRound {
+  id          String         @id @default(uuid())
+  sessionId   String         @map("session_id")
+  roundNumber Int            @map("round_number")
+  type        LiftRoundType
+  createdAt   DateTime       @default(now()) @map("created_at")
+  session     LiftSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  elevators   LiftElevator[]
+
+  @@unique([sessionId, roundNumber])
+  @@map("lift_rounds")
+}
+
+model LiftElevator {
+  id            String    @id @default(uuid())
+  roundId       String    @map("round_id")
+  letter        String
+  requiredCount Int?      @map("required_count")
+  doomed        Boolean   @default(false)
+  status        String    @default("idle")
+  finalCount    Int?      @map("final_count")
+  round         LiftRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, letter])
+  @@map("lift_elevators")
+}

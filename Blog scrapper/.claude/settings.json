@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python step1_scraper_test.py)",
+      "Bash(python -c \"import requests; r = requests.get\\('https://docs.databricks.com/gcp/en/feed.xml', headers={'User-Agent': 'Mozilla/5.0'}\\); print\\(r.status_code\\); print\\(r.text[:3000]\\)\")"
+    ]
+  }
+}

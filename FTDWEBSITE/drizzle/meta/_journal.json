@@ -1,0 +1,83 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789745984884,
+      "tag": "0000_redundant_snowbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789839675801,
+      "tag": "0001_vip_rewards_giveaways_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789839702707,
+      "tag": "0002_drop_stream_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789839703707,
+      "tag": "0003_vip_ladder_and_daddykong",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789839704707,
+      "tag": "0004_remove_sample_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790074215115,
+      "tag": "0005_bonus_hunts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790164351864,
+      "tag": "0006_hunt_chat_calls_and_guesses",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790768518250,
+      "tag": "0007_leaderboard_custom_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790779712079,
+      "tag": "0008_stake_wager_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791016318044,
+      "tag": "0009_leaderboard_stake_sites",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791054332768,
+      "tag": "0010_stake_eu_username",
+      "breakpoints": true
+    }
+  ]
+}

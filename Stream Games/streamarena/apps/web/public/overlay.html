@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>StreamArena Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Sora:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+  /*
+   * §19 — a different design problem from the dashboard.
+   *
+   *   - background fully transparent; never set a page colour
+   *   - fixed 1920x1080 canvas, no scrolling, no breakpoints
+   *   - no text under 20px, no weight under 500, no borders under 2px
+   *   - panels sit on rgba(19,19,28,.88) with blur; never fully opaque or clear
+   *   - keep the centre free; the game and facecam live there
+   *   - animate only when data changes — no idle loops except one LIVE dot
+   */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1920px; height: 1080px;
+    background: transparent;          /* OBS composites over the stream */
+    overflow: hidden;
+    font-family: Inter, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+   * Same two palettes as the dashboard (see theme.js), inlined because the
+   * overlay ships no build step and no Tailwind — OBS loads this file cold.
+   * `--accent` is whichever hue carries highlights in the active palette: cyan
+   * for Bonus Hunt, sky blue for tournaments. It is deliberately NOT gold; gold
+   * means best-or-notable and has to stay unambiguous.
+   */
+  :root {
+    --panel: rgba(19, 19, 28, .88);
+    --border: #2A2A3A;
+    --primary: #A855F7;
+    --accent: #22D3EE;
+    --accent-soft: rgba(34, 211, 238, .10);
+    --muted: #9A9AB0;
+    --track: rgba(53, 52, 56, .9);
+    --text: #F5F5FA;
+
+    /* Meaning, not decoration — identical across palettes. */
+    --gold: #FFC53D;
+    --win: #22E88F;
+    --loss: #FF4D6A;
+  }
+
+  [data-game="slot-tournament"] {
+    --panel: rgba(11, 17, 32, .88);
+    --border: #293548;
+    --primary: #6366F1;
+    --accent: #38BDF8;
+    --accent-soft: rgba(56, 189, 248, .10);
+    --muted: #94A3B8;
+    --track: rgba(41, 53, 72, .9);
+    --text: var(--text);
+  }
+
+  .panel {
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: Sora, sans-serif; font-weight: 800; letter-spacing: -.02em; }
+  .label { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+
+  #stage { position: relative; width: 1920px; height: 1080px; }
+  .left  { position: absolute; left: 48px; top: 120px; width: 470px; }
+  .right { position: absolute; right: 48px; top: 120px; width: 470px; }
+  .bottom{ position: absolute; left: 48px; right: 48px; bottom: 48px; }
+
+  /* Panels only animate when their data changes. */
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+  .enter { animation: slideIn .25s cubic-bezier(.16,1,.3,1); }
+
+  @keyframes glowPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255,197,61,.7); }
+    70%  { box-shadow: 0 0 0 28px rgba(255,197,61,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,197,61,0); }
+  }
+  .celebrate { animation: glowPulse 1.4s ease-out 2; }
+
+  /* The single permitted infinite loop (§19). */
+  @keyframes breathe { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .live-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--loss); animation: breathe 2s ease-in-out infinite; }
+
+  .row { display: flex; align-items: center; gap: 16px; padding: 14px 18px;
+         border-bottom: 2px solid var(--border); font-size: 22px; font-weight: 600; }
+  .row:last-child { border-bottom: none; }
+  .thumb { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; border: 2px solid var(--border); flex-shrink: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Collecting-phase chrome ──────────────────────────────────────────────
+   * Glass panels with a coloured top edge and a blurred colour bloom behind
+   * them. Everything here is drawn from the palette variables, so the
+   * tournament palette restyles it without a second stylesheet.
+   */
+  #topbar { position: absolute; left: 48px; right: 48px; top: 34px; height: 62px;
+            display: flex; align-items: center; justify-content: space-between; }
+
+  .wordmark { font-family: Sora, sans-serif; font-weight: 800; font-size: 30px;
+              letter-spacing: -.02em; color: var(--accent);
+              filter: drop-shadow(0 0 10px var(--accent)); }
+
+  .tabs { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 34px; }
+  .tab { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;
+         text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+         opacity: .5; padding-bottom: 6px; border-bottom: 3px solid transparent; }
+  .tab.on { color: var(--accent); border-bottom-color: var(--accent); opacity: 1; }
+
+  .pill { display: flex; align-items: center; gap: 16px; padding: 10px 22px; border-radius: 999px;
+          background: var(--panel); backdrop-filter: blur(12px); border: 2px solid var(--border); }
+  .divider { width: 2px; height: 20px; background: var(--border); }
+
+  .card { position: relative; overflow: hidden; padding: 22px 26px; border-radius: 16px;
+          background: var(--panel); backdrop-filter: blur(16px);
+          border: 2px solid var(--border); border-top-width: 4px; }
+  /* The bloom sits behind the content and is what stops a flat panel reading as
+     a grey box over dark stream footage. */
+  .bloom { position: absolute; right: -30px; top: -30px; width: 130px; height: 130px;
+           border-radius: 50%; filter: blur(34px); opacity: .28; }
+
+  /* The queue only scrolls when it overflows — see renderQueue(). §19 allows the
+     one breathing LIVE dot and nothing else idle, and a list that cannot show
+     all of itself is conveying information rather than decorating. */
+  @keyframes scrollY { from { transform: translateY(0) } to { transform: translateY(-50%) } }
+  .queue { position: relative; overflow: hidden; height: 560px;
+           -webkit-mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+           mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent); }
+  .queue-track { display: flex; flex-direction: column; gap: 10px; }
+  .queue-track.scrolling { animation: scrollY var(--scroll-duration, 30s) linear infinite; }
+
+  .entry { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 12px;
+           background: var(--panel); backdrop-filter: blur(10px); border: 2px solid var(--border); }
+  .entry.waiting { opacity: .68; }
+  .entry-name { font-size: 22px; font-weight: 700; }
+  .entry-who  { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 500; color: var(--muted); }
+
+  /*
+   * Bonus type. Only the two that change how a result reads get a badge — a
+   * regular bonus is the default and labelling every row would turn the badge
+   * into noise rather than a signal.
+   */
+  .badge { flex-shrink: 0; padding: 2px 10px; border-radius: 999px;
+           font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700;
+           letter-spacing: .06em; text-transform: uppercase; line-height: 1.5; }
+  .badge-scatter { background: var(--gold); color: #23211a; }
+  .badge-super { background: linear-gradient(90deg, var(--primary), var(--loss)); color: #fff; }
+
+  .bar { height: 14px; border-radius: 999px; overflow: hidden;
+         background: var(--track); border: 2px solid var(--border); }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--primary);
+              transition: width .5s cubic-bezier(.16,1,.3,1); position: relative; }
+  .bar-fill::after { content: ''; position: absolute; inset: 0;
+                     background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent); }
+
+  /* slotTile() takes a class name, and the overlay ships no Tailwind — so the
+     three sizes it is asked for here are declared outright. */
+  .thumb-lg    { width: 76px; height: 76px; border-radius: 12px; object-fit: cover;
+                 flex-shrink: 0; font-size: 26px; }
+  .sq-thumb    { width: 40px; height: 40px; border-radius: 8px;  object-fit: cover; font-size: 20px; }
+  .sq-thumb-lg { width: 74px; height: 74px; border-radius: 10px; object-fit: cover; font-size: 26px; }
+
+  .hidden { display: none !important; }
+
+  /* Takeover for the result reveal and the between-rounds bracket. */
+  #takeover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+              background: var(--panel); backdrop-filter: blur(20px); }
+
+  /*
+   * The name reel — Giveaways §7.
+   *
+   * A fixed row height is load-bearing rather than cosmetic: the settle
+   * position is computed as `index * ROW`, so a row that grew with a long
+   * username would land the reel between two names. The overflow mask keeps
+   * exactly three names in frame, which is what makes the last second readable.
+   */
+  #ga-reel-window { position: relative; height: 288px; overflow: hidden;
+                    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
+                            mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent); }
+  #ga-reel-strip  { will-change: transform, filter; }
+  .ga-reel-name   { height: 96px; display: flex; align-items: center; justify-content: center;
+                    font-family: Sora, sans-serif; font-weight: 800; letter-spacing: -.02em;
+                    font-size: 56px; color: var(--muted); }
+
+  /* The settle, and the only state change after it. Nothing moves from here. */
+  #ga-reel-window.settled .ga-reel-name { color: var(--muted); opacity: .25; }
+  #ga-reel-window.settled #ga-reel-line { opacity: 1; }
+  #ga-reel-line   { position: absolute; inset: 96px 0 96px 0; pointer-events: none; opacity: .55;
+                    border-top: 2px solid var(--primary); border-bottom: 2px solid var(--primary);
+                    background: rgba(168, 85, 247, .08); transition: opacity .25s ease; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- Top bar: identity on the left, phase in the middle, liveness on the right.
+       Kept to 62px so the centre of frame stays clear for the game (§19). -->
+  <div id="topbar">
+    <div class="wordmark">StreamArena</div>
+    <div class="tabs" id="tabs"></div>
+    <div class="pill">
+      <div class="live-dot" id="dot"></div>
+      <span class="label" id="phase" style="color:var(--loss);font-size:17px">Connecting</span>
+      <div class="divider"></div>
+      <span id="viewers-icon" style="display:flex;color:var(--primary)"></span>
+      <span class="mono" id="participants" style="font-size:21px;font-weight:700;color:var(--text)">—</span>
+    </div>
+  </div>
+
+  <div class="left"  id="left"></div>
+  <div class="right" id="right"></div>
+  <div class="bottom" id="bottom"></div>
+  <div id="takeover" class="hidden"></div>
+</div>
+
+<script type="module">
+import { connect, money, signed, multiplier, countdown, escapeHtml, slotTile } from '/app.js'
+
+const token = location.pathname.split('/').pop()
+const params = new URLSearchParams(location.search)
+const currency = params.get('currency') ?? 'EUR'
+
+let state = {}
+let gameId = null
+
+const el = (id) => document.getElementById(id)
+
+/*
+ * Inline SVG rather than an icon font. The overlay is the one surface that is
+ * on stream, so it must not depend on Google Fonts resolving — a missing icon
+ * font renders the ligature name as literal text ("account_balance_wallet")
+ * across the broadcast.
+ */
+const ICON = {
+  wallet: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><circle cx="16" cy="13" r="1.5" fill="currentColor" stroke="none"/></svg>',
+  target: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+  viewers: '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14c2.1.5 3.5 2 3.5 5"/></svg>',
+  check: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg>',
+  waiting: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2" stroke-linecap="round"/></svg>',
+  matching: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+}
+
+/** The three phases a viewer sees, so the overlay says where the hunt is. */
+const HUNT_TABS = [
+  ['collecting', 'Collecting'],
+  ['guessing', 'Guessing'],
+  ['opening', 'Opening'],
+  ['complete', 'Final Result'],
+]
+
+function renderTabs(phase, tabs = HUNT_TABS) {
+  el('tabs').innerHTML = tabs.map(
+    ([key, label]) => `<span class="tab ${key === phase ? 'on' : ''}">${label}</span>`,
+  ).join('')
+}
+
+/** A stat card: coloured top edge, matching bloom behind it, icon on the right. */
+/**
+ * The required average multiplier.
+ *
+ * A dash when no stake is recorded — zero would tell chat the hunt is already
+ * home when in truth nothing is yet known.
+ */
+function breakEvenText() {
+  const x = state.breakEvenMultiplier
+  return x === null || x === undefined ? '—' : `${x.toFixed(2)}x`
+}
+
+function statCard(label, value, colour, icon, size) {
+  return `
+  <div class="card enter" style="border-top-color:${colour};margin-bottom:16px">
+    <div class="bloom" style="background:${colour}"></div>
+    <div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:20px">
+      <div style="min-width:0">
+        <div class="label" style="margin-bottom:8px">${escapeHtml(label)}</div>
+        <div class="display" style="font-size:${size}px;color:${colour};line-height:1.05">${value}</div>
+      </div>
+      <span style="color:${colour};flex-shrink:0;filter:drop-shadow(0 0 6px ${colour})">${icon}</span>
+    </div>
+  </div>`
+}
+
+/**
+ * The requested-slots feed.
+ *
+ * Rebuilt only when the entries actually change. The overlay re-renders on
+ * every patch — a balance edit, a guess arriving — and rewriting this innerHTML
+ * restarts the CSS animation, so an untracked rebuild would make the list stutter
+ * back to the top several times a minute.
+ */
+/** A badge only for the types that change how a win reads. */
+function bonusBadge(type) {
+  if (type === 'five_scatter') return '<span class="badge badge-scatter">5-Scatter</span>'
+  if (type === 'super') return '<span class="badge badge-super">Super</span>'
+  return ''
+}
+
+let queueSignature = null
+
+function renderQueue(entries) {
+  const signature = entries.map((e) => `${e.slotName}|${e.requestedBy}|${e.status}|${e.bonusType}`).join('~')
+  if (signature === queueSignature) return
+  queueSignature = signature
+
+  if (entries.length === 0) {
+    el('right').innerHTML = ''
+    return
+  }
+
+  const rows = entries.map((e) => {
+    const banked = e.status === 'collected' || e.status === 'opened'
+    // A red cross would read as "rejected". `queued` means the streamer simply
+    // has not played it yet, which is the normal state for most of a hunt.
+    const mark = banked
+      ? `<span style="color:var(--win);filter:drop-shadow(0 0 6px var(--win))">${ICON.check}</span>`
+      : e.status === 'pending'
+        ? `<span style="color:var(--gold)">${ICON.matching}</span>`
+        : `<span style="color:var(--muted)">${ICON.waiting}</span>`
+
+    return `
+      <div class="entry ${banked ? '' : 'waiting'}">
+        ${slotTile(e.slotName, e.thumbnail, 'thumb')}
+        <div class="grow">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span class="entry-name truncate">${escapeHtml(e.slotName)}</span>
+            ${bonusBadge(e.bonusType)}
+          </div>
+          <div class="entry-who truncate">@${escapeHtml(e.requestedBy)}</div>
+        </div>
+        ${mark}
+      </div>`
+  })
+
+  // Rendered twice so the loop is seamless: the animation translates by -50%,
+  // which lands the copy exactly where the original started.
+  el('right').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px 12px">
+      <span class="label">Requested slots</span>
+      <span class="mono" style="font-size:19px;color:var(--muted)">Queue: ${entries.length}</span>
+    </div>
+    <div class="queue"><div class="queue-track">${rows.join('')}${rows.join('')}</div></div>`
+
+  // Measured rather than estimated from a row count: the real height depends on
+  // fonts and wrapping, and guessing it makes the scroll speed drift as the
+  // queue grows. Speed is held constant (px/sec) so a long hunt does not race
+  // past unreadably — only the loop gets longer.
+  const track = el('right').querySelector('.queue-track')
+  const viewport = el('right').querySelector('.queue')
+  const contentHeight = track.scrollHeight / 2
+
+  if (contentHeight > viewport.clientHeight) {
+    track.style.setProperty('--scroll-duration', `${Math.round(contentHeight / 26)}s`)
+    track.classList.add('scrolling')
+  }
+}
+
+connect({
+  url: `${location.origin.replace(/^http/, 'ws')}/ws/overlay/${token}`,
+  onState: (next, frame) => {
+    gameId = frame.gameId ?? gameId
+    if (gameId === 'slot-tournament') document.documentElement.dataset.game = gameId
+    /*
+     * §6.3 / §13 — an animation interrupted by a reconnect is never replayed.
+     * A flip that re-runs after an OBS hiccup, showing chat a result they have
+     * already seen, looks exactly like a re-roll.
+     */
+    if (frame.t === 'snapshot') {
+      resetFlip?.()
+      /*
+       * Giveaways §7.2 — "reconnect during the reel jumps to the settled state
+       * and never replays", for a sharper reason than the platform's usual one:
+       * a replayed name reel is indistinguishable from a redraw.
+       */
+      reelStarted = next.phase !== 'draw' ? false : true
+    }
+    state = next
+    render()
+  },
+  onCue: cue,
+  onStatus: (status) => {
+    el('dot').style.background = status === 'connected' ? 'var(--loss)' : 'var(--muted)'
+    if (status === 'ended') el('phase').textContent = 'ENDED'
+  },
+})
+
+function render() {
+  // The pill reads LIVE; the phase is named by the tabs, so it needn't repeat here.
+  el('phase').textContent = 'LIVE'
+  el('viewers-icon').innerHTML = ICON.viewers
+  const people = state.participantCount ?? state.poolCount ?? state.entrantCount
+  el('participants').textContent = people ? people.toLocaleString() : '—'
+
+  if (gameId === 'slot-tournament') return renderTournament()
+  if (gameId === 'slot-bingo') return renderBingo()
+  if (gameId === 'team-battles') return renderBattles()
+  if (gameId === 'giveaways') return renderGiveaways()
+  renderHunt()
+}
+
+// ─── Bonus Hunt ─────────────────────────────────────────────────────────────
+
+function renderHunt() {
+  const phase = state.phase
+  const banked = state.collectedCount ?? 0
+  const target = state.targetBonuses ?? 0
+
+  // §13 — break-even is the emotional centre of the game and should be the
+  // largest number on the overlay during collection and guessing.
+  renderTabs(phase)
+
+  el('left').innerHTML = `
+    ${statCard('Starting balance', money(state.startBalance, currency), 'var(--primary)', ICON.wallet, 40)}
+    ${phase === 'complete'
+      ? statCard('Total won', money(state.won, currency), 'var(--primary)', ICON.wallet, 50)
+      : statCard('Break-even average', breakEvenText(), 'var(--gold)', ICON.target, 56)}
+    ${phase === 'opening' || phase === 'complete'
+      ? statCard('Profit / loss', signed(state.profit ?? 0, currency),
+                 (state.profit ?? 0) >= 0 ? 'var(--win)' : 'var(--loss)', ICON.target, 46)
+      : ''}`
+
+  if (phase === 'guessing') {
+    el('right').innerHTML = `
+      <div class="panel enter" style="padding:28px;text-align:center;">
+        <div class="label" style="margin-bottom:12px">Guess the balance</div>
+        <div class="display mono" id="countdown" style="font-size:82px;color:var(--primary);line-height:1">—</div>
+        <div style="font-size:24px;font-weight:600;margin-top:16px;color:var(--muted)">
+          Type <span class="mono" style="color:var(--accent)">!guess &lt;amount&gt;</span> in chat
+        </div>
+        <div class="mono" style="font-size:28px;font-weight:700;margin-top:18px">
+          ${(state.guessCount ?? 0).toLocaleString()} guesses in
+        </div>
+      </div>`
+  } else if (phase === 'opening' || phase === 'complete') {
+    // §20 — the guess leaderboard during opening: the five closest to the
+    // running total. The streamer's narration fuel for the whole phase.
+    const closest = state.closestGuesses ?? []
+    el('right').innerHTML = closest.length === 0 ? '' : `
+      <div class="panel enter" style="overflow:hidden">
+        <div class="label" style="padding:18px 18px 10px">Closest guesses</div>
+        ${closest.map((g, i) => `
+          <div class="row" ${i === 0 ? 'style="background:var(--accent-soft)"' : ''}>
+            <span class="mono" style="width:34px;color:${i === 0 ? 'var(--accent)' : 'var(--muted)'}">${i + 1}</span>
+            <span class="grow truncate">${escapeHtml(g.username)}</span>
+            <span class="mono" style="color:${i === 0 ? 'var(--accent)' : 'var(--text)'}">${money(g.amount, currency)}</span>
+          </div>`).join('')}
+      </div>`
+  } else {
+    // Newest first: a viewer who just typed !sr wants to see their slot arrive.
+    renderQueue([...(state.entries ?? [])].reverse())
+  }
+
+  // The other phases own #right, so the queue must be rebuilt when we return.
+  if (phase !== 'collecting') queueSignature = null
+
+  el('bottom').innerHTML = `
+    <div class="panel" style="display:flex;align-items:center;justify-content:space-between;padding:24px 36px;">
+      <div style="display:flex;align-items:center;gap:36px;flex:1">
+        <div>
+          <div class="label" style="margin-bottom:8px">Bonuses banked</div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span class="display" style="font-size:52px;color:var(--primary)">${banked}</span>
+            <span class="mono" style="font-size:26px;color:var(--muted)">/ ${target}</span>
+          </div>
+        </div>
+        <div style="flex:1;max-width:640px">
+          <div class="bar">
+            <div class="bar-fill" style="width:${target ? Math.min(100, (banked / target) * 100) : 0}%"></div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="label" style="margin-bottom:8px">Total won</div>
+        <div class="display" style="font-size:44px;color:${(state.won ?? 0) > 0 ? 'var(--win)' : 'var(--muted)'}">
+          ${money(state.won ?? 0, currency)}</div>
+      </div>
+    </div>`
+
+  if (phase === 'complete') showHuntResult()
+}
+
+function showHuntResult() {
+  const profit = state.profit ?? 0
+  const w = state.winner
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="text-align:center">
+      <div class="label" style="font-size:26px;margin-bottom:20px;color:${profit >= 0 ? 'var(--win)' : 'var(--loss)'}">
+        Hunt complete</div>
+      <div class="display" style="font-size:150px;line-height:1;color:${profit >= 0 ? 'var(--win)' : 'var(--loss)'}">
+        ${signed(profit, currency)}</div>
+      <div class="mono" style="font-size:32px;margin-top:24px;color:var(--muted)">
+        ${money(state.startBalance, currency)} → ${money(state.finalBalance, currency)}</div>
+      ${w ? `
+        <div class="panel celebrate" style="margin-top:44px;padding:32px 56px;display:inline-block">
+          <div class="label" style="color:var(--gold);margin-bottom:12px">Guess the Balance winner</div>
+          <div class="display" style="font-size:56px">@${escapeHtml(w.username)}</div>
+          <div class="mono" style="font-size:26px;margin-top:10px;color:var(--muted)">
+            guessed ${money(w.amount, currency)} · off by ${money(w.difference, currency)}</div>
+        </div>` : ''}
+    </div>`
+}
+
+// ─── Slot Tournament ────────────────────────────────────────────────────────
+
+function renderTournament() {
+  const phase = state.phase
+  const m = state.currentMatch
+
+  if (phase === 'joining') {
+    el('left').innerHTML = stat('Entrants joined', String(state.poolCount ?? 0), 'var(--primary)', 76)
+    el('right').innerHTML = ''
+    el('bottom').innerHTML = `
+      <div class="panel" style="padding:28px 36px;text-align:center">
+        <div style="font-size:32px;font-weight:700">
+          Type <span class="mono" style="color:var(--accent)">!join &lt;slot&gt;</span> to claim a seat
+        </div>
+        <div class="mono" style="font-size:24px;color:var(--muted);margin-top:10px">
+          ${state.seats} seats · slots are unique, first come first served
+        </div>
+      </div>`
+    return
+  }
+
+  if (m && m.a && m.b && m.b !== 'bye') {
+    const split = m.split ?? { aPct: 50, bPct: 50, total: 0 }
+    el('left').innerHTML = contender(m.a, 'var(--primary)', m.winner === 'a')
+    el('right').innerHTML = contender(m.b, 'var(--accent)', m.winner === 'b')
+    el('bottom').innerHTML = `
+      <div class="panel" style="padding:24px 36px">
+        <div style="display:flex;justify-content:space-between;font-size:24px;font-weight:700;margin-bottom:12px">
+          <span style="color:var(--primary)">${split.aPct}%</span>
+          <span style="color:var(--muted)" class="mono">
+            ${m.status === 'voting'
+              ? `<span id="countdown">—</span> · type !vote a or !vote b`
+              : `${split.total} votes`}
+          </span>
+          <span style="color:var(--accent)">${split.bPct}%</span>
+        </div>
+        <div style="height:18px;display:flex;border-radius:999px;overflow:hidden;border:2px solid var(--border)">
+          <div style="background:var(--primary);width:${split.aPct}%;transition:width .4s ease-out"></div>
+          <div style="background:var(--accent);width:${split.bPct}%;transition:width .4s ease-out"></div>
+        </div>
+      </div>`
+  }
+
+  if (phase === 'complete') showTournamentResult()
+}
+
+function contender(s, colour, won) {
+  return `
+  <div class="panel enter" style="padding:28px;${won ? `border-color:${colour}` : ''}">
+    <!-- §20 — username above slot name, everywhere. -->
+    <div class="display truncate" style="font-size:44px;color:${colour}">@${escapeHtml(s.username)}</div>
+    <div class="mono truncate" style="font-size:24px;font-weight:500;color:var(--muted);margin-top:8px">
+      ${escapeHtml(s.slotName)}</div>
+    ${s.multiplier != null ? `
+      <div class="display" style="font-size:68px;margin-top:20px;color:var(--gold)">${multiplier(s.multiplier)}</div>
+      <div class="mono" style="font-size:20px;color:var(--muted);margin-top:6px">
+        ${money(s.buyCost, currency)} → ${money(s.payout, currency)}</div>` : ''}
+  </div>`
+}
+
+function showTournamentResult() {
+  const c = state.champion
+  const t = state.topPredictor
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="text-align:center">
+      <div class="label" style="font-size:26px;color:var(--gold);margin-bottom:20px">Tournament champion</div>
+      ${c ? `<div class="display" style="font-size:110px;line-height:1;color:var(--primary)">@${escapeHtml(c.username)}</div>
+             <div class="mono" style="font-size:34px;margin-top:18px;color:var(--muted)">${escapeHtml(c.slotName)}</div>`
+          : '<div class="display" style="font-size:64px;color:var(--muted)">No champion</div>'}
+      ${t ? `
+        <div class="panel celebrate" style="margin-top:44px;padding:28px 52px;display:inline-block">
+          <div class="label" style="color:var(--accent);margin-bottom:10px">Top predictor</div>
+          <div class="display" style="font-size:48px">@${escapeHtml(t.username)}</div>
+          <div class="mono" style="font-size:24px;margin-top:8px;color:var(--muted)">
+            ${t.correct}/${t.total} called correctly</div>
+        </div>` : ''}
+    </div>`
+}
+
+// ─── Slot Bingo ─────────────────────────────────────────────────────────────
+
+const BINGO_TABS = [
+  ['joining', 'Joining'],
+  ['placement', 'The Board'],
+  ['buying', 'Playing'],
+  ['complete', 'Result'],
+]
+
+/** buying/result/pick are one thing to a viewer: the board is being played. */
+function bingoTab(phase) {
+  return phase === 'joining' || phase === 'placement' || phase === 'complete' ? phase : 'buying'
+}
+
+function renderBingo() {
+  const phase = state.phase ?? 'joining'
+  renderTabs(bingoTab(phase), BINGO_TABS)
+
+  if (phase !== 'complete') el('takeover').className = 'hidden'
+
+  if (phase === 'joining') return bingoJoining()
+  if (phase === 'placement') return bingoReveal()
+  if (phase === 'complete') return bingoFinal()
+  bingoPlaying()
+}
+
+/**
+ * The board.
+ *
+ * Colour carries the meaning here, not text: red, green and gold are legible
+ * across a compressed 1080p stream at a glance, and a username in a 128px cell
+ * would not be. Every name the viewer needs is somewhere at full size — the
+ * armed card, the one-away rail, the winners list — so the grid is free to be
+ * a grid.
+ */
+function bingoGrid(size, cellPx) {
+  const squares = state.squares ?? []
+  const one = new Set(
+    (state.lines ?? [])
+      .filter((l) => l.state === 'oneAway')
+      .flatMap((l) => l.squareIds),
+  )
+
+  return `
+  <div style="display:grid;gap:6px;grid-template-columns:repeat(${size},${cellPx}px)">
+    ${squares.map((s) => bingoCell(s, one.has(s.id), cellPx)).join('')}
+  </div>`
+}
+
+function bingoCell(square, oneAway, cellPx) {
+  const armed = square.id === state.currentSquareId
+  const settled = square.status === 'settled'
+
+  const edge = armed
+    ? 'var(--accent)'
+    : square.tier === 'gold'
+      ? 'var(--gold)'
+      : square.tier === 'green'
+        ? 'var(--win)'
+        : square.tier === 'red'
+          ? 'var(--loss)'
+          : oneAway
+            ? 'var(--gold)'
+            : 'var(--border)'
+
+  const fill = settled
+    ? square.tier === 'gold'
+      ? 'rgba(255,197,61,.20)'
+      : square.tier === 'green'
+        ? 'rgba(34,232,143,.16)'
+        : 'rgba(255,77,106,.10)'
+    : 'var(--panel)'
+
+  const body = settled
+    ? `<div class="display" style="font-size:${Math.max(22, Math.round(cellPx * 0.24))}px;color:${
+        square.tier === 'gold' ? 'var(--gold)' : square.tier === 'green' ? 'var(--win)' : 'var(--loss)'
+      }">${compactX(square.multiplier)}</div>`
+    : square.owner === 'open'
+      ? `<div class="mono" style="font-size:20px;color:var(--muted);text-align:center;line-height:1.2">
+           ${square.unlockAfterPick != null ? `OPENS<br>${square.unlockAfterPick}` : '—'}</div>`
+      : square.owner === 'free'
+        ? `<div class="label" style="font-size:20px;color:var(--accent)">FREE</div>`
+        : slotTile(square.slotName, square.thumbnail, cellPx >= 120 ? 'sq-thumb-lg' : 'sq-thumb')
+
+  return `
+  <div style="width:${cellPx}px;height:${cellPx}px;position:relative;border-radius:12px;
+              border:${armed ? 4 : 2}px solid ${edge};background:${fill};backdrop-filter:blur(10px);
+              display:flex;align-items:center;justify-content:center;overflow:hidden
+              ${armed ? ';box-shadow:0 0 0 6px rgba(34,211,238,.18)' : ''}
+              ${square.owner === 'open' && !settled ? ';border-style:dashed' : ''}">
+    <span class="mono" style="position:absolute;top:4px;left:8px;font-size:20px;font-weight:700;
+                              color:var(--muted);opacity:.75">${escapeHtml(square.id)}</span>
+    ${body}
+  </div>`
+}
+
+/**
+ * A multiplier that fits in a cell.
+ *
+ * `118.60x` is seven characters and will not fit an 81px square at a size §19
+ * allows, so precision gives way at the point it stops mattering: nobody
+ * watching needs the second decimal of a 118x, and the exact figure is on the
+ * streamer's dashboard either way.
+ */
+function compactX(x) {
+  if (x === null || x === undefined) return '—'
+  if (x >= 100) return `${Math.round(x)}x`
+  if (x >= 10) return `${x.toFixed(1)}x`
+  return `${x.toFixed(2)}x`
+}
+
+function bingoJoining() {
+  const claimed = (state.squares ?? []).filter((s) => s.owner === 'viewer').length
+  const total = state.squaresTotal ?? 25
+
+  el('left').innerHTML =
+    stat('Squares claimed', `${claimed}<span style="color:var(--muted);font-size:44px">/${total}</span>`,
+      'var(--primary)', 76) +
+    (state.joinWindowEndsAt
+      ? stat('Joining closes in', '<span id="countdown">—</span>', 'var(--accent)', 62)
+      : '')
+
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = `
+    <div class="panel" style="padding:28px 36px;text-align:center">
+      <div style="font-size:32px;font-weight:700">
+        Type <span class="mono" style="color:var(--accent)">!join &lt;slot&gt;</span> to claim a square
+      </div>
+      <div class="mono" style="font-size:24px;color:var(--muted);margin-top:10px">
+        One square each · slots are unique, first come first served
+      </div>
+    </div>`
+}
+
+/**
+ * The board reveal — the moment the draw lands.
+ *
+ * A takeover rather than a side panel, because this is the only time the whole
+ * board and everyone's name on it are worth the full frame, and §5.1's
+ * placement advantage ("the centre sits on four lines") is only arguable while
+ * chat can see where they ended up.
+ */
+function bingoReveal() {
+  const squares = state.squares ?? []
+  const size = state.size ?? 5
+
+  el('left').innerHTML = ''
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = ''
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="display:flex;align-items:center;gap:64px">
+      <div>${bingoGrid(size, 150)}</div>
+      <div style="width:520px">
+        <div class="label" style="font-size:26px;color:var(--accent);margin-bottom:14px">The board is set</div>
+        <div class="display" style="font-size:62px;line-height:1.05;margin-bottom:28px">
+          ${squares.filter((s) => s.owner === 'viewer').length} squares claimed
+        </div>
+        <div class="panel" style="padding:22px 26px">
+          <div class="label" style="margin-bottom:12px">Best placement</div>
+          ${bestPlacements(squares, 4)}
+        </div>
+        <div class="mono" style="font-size:22px;color:var(--muted);margin-top:22px;line-height:1.5">
+          ${state.linesTotal ?? 12} lines · every green builds one · ${size} in a row ends the board
+        </div>
+      </div>
+    </div>`
+}
+
+/** §5.1 — placement is not neutral, so name the people it favoured. */
+function bestPlacements(squares, count) {
+  const top = squares
+    .filter((s) => s.owner === 'viewer')
+    .sort((a, b) => (b.lineCount ?? 0) - (a.lineCount ?? 0))
+    .slice(0, count)
+
+  if (top.length === 0) return '<div class="mono" style="font-size:22px;color:var(--muted)">No viewer squares</div>'
+
+  return top
+    .map(
+      (s) => `
+      <div class="row" style="padding:10px 0;font-size:24px">
+        <span class="mono" style="color:var(--accent);width:56px;flex-shrink:0">${escapeHtml(s.id)}</span>
+        <span class="grow truncate">@${escapeHtml(s.username ?? '')}</span>
+        <span class="mono" style="color:var(--muted);font-size:20px">on ${s.lineCount} lines</span>
+      </div>`,
+    )
+    .join('')
+}
+
+function bingoPlaying() {
+  const armed = (state.squares ?? []).find((s) => s.id === state.currentSquareId)
+  const net = state.netPosition ?? 0
+  const matchPoint = (state.matchPointLines ?? []).length > 0
+
+  el('left').innerHTML = armed
+    ? `
+    <div class="card enter" style="border-top-color:${matchPoint ? 'var(--gold)' : 'var(--accent)'};margin-bottom:16px">
+      <div class="bloom" style="background:${matchPoint ? 'var(--gold)' : 'var(--accent)'}"></div>
+      <div class="label" style="margin-bottom:12px;color:${matchPoint ? 'var(--gold)' : 'var(--muted)'}">
+        ${matchPoint ? 'Match point · this buy can end it' : `Now playing · square ${escapeHtml(armed.id)}`}
+      </div>
+      <div style="display:flex;align-items:center;gap:18px">
+        ${slotTile(armed.slotName, armed.thumbnail, 'thumb-lg')}
+        <div class="grow" style="min-width:0">
+          <div class="display truncate" style="font-size:40px">@${escapeHtml(armed.username ?? 'House')}</div>
+          <div class="mono truncate" style="font-size:22px;font-weight:500;color:var(--muted);margin-top:6px">
+            ${escapeHtml(armed.slotName ?? '')}</div>
+        </div>
+      </div>
+      <div class="mono" style="font-size:20px;color:var(--muted);margin-top:16px">
+        on ${armed.lineCount ?? 0} lines${armed.manualPick ? " · streamer's pick" : ''}
+      </div>
+    </div>`
+    : stat('Squares played', `${state.squaresPlayed ?? 0}<span style="color:var(--muted);font-size:40px">/${state.squaresTotal ?? 0}</span>`,
+        'var(--primary)', 68)
+
+  el('left').innerHTML +=
+    stat('Lines alive', `${state.linesAlive ?? 0}<span style="color:var(--muted);font-size:40px">/${state.linesTotal ?? 0}</span>`,
+      state.linesAlive === 1 ? 'var(--gold)' : 'var(--accent)', 68) +
+    stat('Net', signed(net, currency), net >= 0 ? 'var(--win)' : 'var(--loss)', 56)
+
+  el('right').innerHTML = `<div class="panel" style="padding:20px">${bingoGrid(state.size ?? 5, 80)}</div>`
+  el('bottom').innerHTML = oneAwayRail()
+}
+
+/**
+ * The one-away rail — §7's tension meter.
+ *
+ * Only lines that are one square from completing, because a rail listing all
+ * twelve is a table and nobody reads a table on a stream. When none are close
+ * it falls back to the best line, so the strip is never an empty box.
+ */
+function oneAwayRail() {
+  const byId = new Map((state.squares ?? []).map((s) => [s.id, s]))
+  const close = (state.lines ?? []).filter((l) => l.state === 'oneAway')
+
+  if (close.length === 0) {
+    const best = (state.lines ?? []).find((l) => l.id === state.bestLineId)
+    if (!best) return ''
+    return `
+      <div class="panel" style="padding:22px 36px;display:flex;align-items:center;justify-content:center;gap:20px">
+        <span class="label">Best line</span>
+        <span class="display" style="font-size:34px">${escapeHtml(best.label)}</span>
+        <span class="display" style="font-size:34px;color:var(--win)">${multiplier(best.totalMultiplier)}</span>
+      </div>`
+  }
+
+  return `
+  <div class="panel enter" style="padding:20px 30px;display:flex;align-items:center;gap:28px;overflow:hidden">
+    <span class="label" style="color:var(--gold);flex-shrink:0">
+      ${close.length} line${close.length === 1 ? '' : 's'} · one away</span>
+    <div style="display:flex;gap:26px;flex:1;min-width:0;overflow:hidden">
+      ${close
+        .slice(0, 4)
+        .map((line) => {
+          const need = line.squareIds.find((id) => byId.get(id)?.status !== 'settled')
+          const holder = byId.get(need)
+          return `
+          <div style="display:flex;align-items:center;gap:12px;min-width:0">
+            <span class="mono" style="font-size:22px;color:var(--muted);flex-shrink:0">${escapeHtml(line.label)}</span>
+            <span class="mono" style="font-size:24px;font-weight:700;color:var(--gold);flex-shrink:0">${escapeHtml(need ?? '')}</span>
+            <span class="truncate" style="font-size:22px;font-weight:600">@${escapeHtml(holder?.username ?? 'house')}</span>
+          </div>`
+        })
+        .join('')}
+    </div>
+    <span class="display" style="font-size:30px;color:var(--win);flex-shrink:0">
+      ${multiplier(state.bestLineMultiplier)}</span>
+  </div>`
+}
+
+function bingoFinal() {
+  const bingo = (state.bingoLines ?? []).length > 0
+  const line = (state.lines ?? []).find((l) => l.id === state.winningLine)
+  const winners = state.winners ?? []
+
+  // §8 — always state how it was decided. An unexplained winning line reads as
+  // broken software to everyone watching.
+  const how = {
+    bingo: 'Completed line',
+    bestLine: 'Highest combined multiplier',
+    net: 'Highest net position',
+    payout: 'Tied on multiplier — decided on combined payout',
+    greenCount: 'Tied on payout — decided on green count',
+    attempts: 'Tied on greens — decided on fewer buys',
+    cost: 'Tied — decided on lower combined cost',
+    coinflip: 'Tied throughout — decided on a seeded coin flip',
+    settledEarly: 'Settled early — best fully-played line',
+    capped: 'Stopped on a cap — best line',
+  }[state.decidedBy] ?? ''
+
+  el('left').innerHTML = ''
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = ''
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="display:flex;align-items:center;gap:72px">
+      <div>${bingoGrid(state.size ?? 5, 132)}</div>
+      <div style="width:560px">
+        <div class="display ${bingo ? 'celebrate' : ''}"
+             style="font-size:${bingo ? 128 : 96}px;line-height:1;color:${bingo ? 'var(--gold)' : 'var(--primary)'}">
+          ${bingo ? 'BINGO' : 'BEST LINE'}
+        </div>
+        <div class="display" style="font-size:46px;margin-top:20px">${escapeHtml(line?.label ?? '—')}</div>
+        <div class="display" style="font-size:56px;color:var(--win);margin-top:8px">
+          ${multiplier(line?.totalMultiplier)} combined</div>
+        ${how ? `<div class="mono" style="font-size:22px;color:var(--muted);margin-top:14px">${escapeHtml(how)}</div>` : ''}
+
+        <div class="panel" style="padding:22px 26px;margin-top:34px">
+          <div class="label" style="margin-bottom:12px;color:var(--accent)">
+            ${winners.length === 0 ? 'No viewer squares on the line' : `Winner${winners.length === 1 ? '' : 's'}`}</div>
+          ${winners
+            .map(
+              (w) => `
+            <div class="row" style="padding:10px 0;font-size:26px">
+              <span class="mono" style="color:var(--gold);width:56px;flex-shrink:0">${escapeHtml(w.squareId)}</span>
+              <span class="grow truncate">@${escapeHtml(w.username)}</span>
+              <span class="mono truncate" style="color:var(--muted);font-size:21px">${escapeHtml(w.slotName ?? '')}</span>
+            </div>`,
+            )
+            .join('')}
+        </div>
+
+        <div class="mono" style="font-size:22px;color:var(--muted);margin-top:24px">
+          ${state.squaresPlayed ?? 0} squares played ·
+          ${money(state.totalSpent ?? 0, currency)} in ·
+          ${money(state.totalReturned ?? 0, currency)} out ·
+          <span style="color:${(state.netPosition ?? 0) >= 0 ? 'var(--win)' : 'var(--loss)'}">
+            ${signed(state.netPosition ?? 0, currency)}</span>
+        </div>
+      </div>
+    </div>`
+}
+
+// ─── Team Battles ───────────────────────────────────────────────────────────
+
+const BATTLE_TABS = [
+  ['joining', 'Joining'],
+  ['pick', 'The Draw'],
+  ['buying', 'Playing'],
+  ['complete', 'Result'],
+]
+
+/** flip/buying/result are one thing to a viewer: a bonus is being played. */
+function battleTab(phase) {
+  if (phase === 'joining' || phase === 'pick' || phase === 'complete') return phase
+  return 'buying'
+}
+
+/**
+ * Team colours come from the session, not the stylesheet — §3 lets a streamer
+ * run their own pair. Read once per render so a config change lands live.
+ */
+function teamColour(key) {
+  return state.teams?.[key]?.colour ?? (key === 'A' ? '#B44BFF' : '#FFC53D')
+}
+
+const teamName = (key) => (state.teams?.[key]?.name ?? key).toUpperCase()
+const teamEmoji = (key) => state.teams?.[key]?.emoji ?? ''
+
+function renderBattles() {
+  const phase = state.phase ?? 'joining'
+  renderTabs(battleTab(phase), BATTLE_TABS)
+
+  if (phase !== 'complete' && phase !== 'flip') el('takeover').className = 'hidden'
+
+  if (phase === 'joining') return battlesJoiningView()
+  if (phase === 'flip') return battlesFlip()
+  if (phase === 'complete') return battlesFinal()
+  battlesScoreboard()
+}
+
+/**
+ * The joining screen — §13.
+ *
+ * Both crests are on screen from the first second even though nobody is on them
+ * yet: they are the thing the session is about, and the two commands sit under
+ * them because allegiance is free to hand out and every viewer can take one.
+ */
+function battlesJoiningView() {
+  el('left').innerHTML = stat('In the pool', String(state.entrantCount ?? 0), 'var(--text)', 76)
+  el('right').innerHTML = state.joinWindowEndsAt
+    ? stat('Pick 1 in', '<span id="countdown">—</span>', 'var(--text)', 68)
+    : stat('Picks this session', String(state.maxPicks ?? 0), 'var(--text)', 68)
+
+  el('bottom').innerHTML = `
+    <div class="panel" style="padding:24px 36px;display:flex;align-items:center;justify-content:space-between;gap:48px">
+      ${crest('A', 96)}
+      <div style="text-align:center;flex:1">
+        <div style="font-size:30px;font-weight:700;margin-bottom:10px">
+          Type <span class="mono" style="color:var(--text)">!join &lt;slot&gt;</span> to enter
+        </div>
+        <div class="mono" style="font-size:24px;color:var(--muted)">
+          ${
+            // §7 can run on assignment alone; don't put a dead command on stream.
+            state.canDeclareSide === false
+              ? 'The draw puts you on a team'
+              : `<span style="color:${teamColour('A')}">!side ${teamName('A').toLowerCase()}</span>
+                 &nbsp;·&nbsp;
+                 <span style="color:${teamColour('B')}">!side ${teamName('B').toLowerCase()}</span>
+                 &nbsp;— pick who you're rooting for`
+          }
+        </div>
+      </div>
+      ${crest('B', 96)}
+    </div>`
+}
+
+function crest(key, size) {
+  const colour = teamColour(key)
+  return `
+  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0">
+    <div style="width:${size}px;height:${size}px;border-radius:24px;border:3px solid ${colour};
+                background:${colour}1a;display:flex;align-items:center;justify-content:center;
+                font-size:${Math.round(size * 0.42)}px;box-shadow:0 0 28px ${colour}59">
+      ${teamEmoji(key)}
+    </div>
+    <span class="label" style="color:${colour};font-size:22px">${escapeHtml(teamName(key))}</span>
+  </div>`
+}
+
+/**
+ * The standing scoreboard — the default state, on screen most of the session.
+ *
+ * Two columns, hard-split by colour, no shared elements between them. Team
+ * average is the largest figure on each side because it is the number that
+ * decides the session (§2); picks and total sit under it, small.
+ */
+function battlesScoreboard() {
+  el('takeover').className = 'hidden'
+  el('left').innerHTML = teamPanel('A')
+  el('right').innerHTML = teamPanel('B')
+  el('bottom').innerHTML = swingBar()
+}
+
+function teamPanel(key) {
+  const colour = teamColour(key)
+  const score = key === 'A' ? state.scoreA : state.scoreB
+  const total = key === 'A' ? state.totalA : state.totalB
+  const picks = key === 'A' ? state.picksA : state.picksB
+  const roster = (key === 'A' ? state.rosterA : state.rosterB) ?? []
+
+  const crowdA = state.crowdA ?? 0
+  const crowdB = state.crowdB ?? 0
+  const crowdTotal = crowdA + crowdB
+  const pct = crowdTotal === 0 ? 50 : Math.round((((key === 'A' ? crowdA : crowdB) / crowdTotal) * 100))
+
+  return `
+  <div class="panel enter" style="padding:26px 28px;border-color:${colour}66;border-top:5px solid ${colour}">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <span style="font-size:30px">${teamEmoji(key)}</span>
+      <span class="display" style="font-size:34px;color:${colour}">${escapeHtml(teamName(key))}</span>
+    </div>
+
+    <div class="display" style="font-size:82px;line-height:1;color:${colour}">
+      ${multiplier(score ?? 0)}</div>
+    <div class="label" style="margin-top:8px">average per pick</div>
+
+    <div class="mono" style="font-size:22px;color:var(--muted);margin-top:14px">
+      ${picks ?? 0} ${picks === 1 ? 'pick' : 'picks'} · ${multiplier(total ?? 0)} total
+    </div>
+
+    ${
+      // §7 — the crowd bar. No effect on scoring, which is exactly why it works.
+      crowdTotal > 0
+        ? `<div style="margin-top:18px">
+             <div class="label" style="font-size:20px;margin-bottom:8px">${pct}% of chat</div>
+             <div style="height:12px;border-radius:999px;background:var(--track);overflow:hidden">
+               <div style="height:100%;width:${pct}%;background:${colour};transition:width .5s ease-out"></div>
+             </div>
+           </div>`
+        : ''
+    }
+
+    <div style="margin-top:20px;border-top:2px solid var(--border);padding-top:12px">
+      ${
+        roster.length === 0
+          ? '<div class="mono" style="font-size:20px;color:var(--muted)">No picks yet</div>'
+          : roster
+              .slice(0, 5)
+              .map(
+                (m) => `
+        <div class="row" style="padding:9px 0;font-size:23px;border-bottom-width:0">
+          <span class="grow truncate">@${escapeHtml(m.username)}</span>
+          <span class="mono" style="color:${colour}">${multiplier(m.multiplier)}</span>
+        </div>`,
+              )
+              .join('')
+      }
+      ${
+        roster.length > 5
+          ? `<div class="mono" style="font-size:20px;color:var(--muted);padding-top:6px">
+               +${roster.length - 5} more</div>`
+          : ''
+      }
+    </div>
+  </div>`
+}
+
+/**
+ * The swing number — §9.3, and the largest thing on the overlay after the two
+ * team scores.
+ *
+ * Three honest states, because fake tension is worse than no tension: reachable
+ * pulses in the trailing team's colour, a long shot is stated plainly, and out
+ * of reach says so outright.
+ */
+function swingBar() {
+  const pickLine = `PICK ${state.pickNumber ?? 0} / ${state.maxPicks ?? 0}${
+    state.suddenDeathPicks ? ` +${state.suddenDeathPicks}` : ''
+  }`
+
+  const team = state.swingTeam ?? 'B'
+  const required = state.swing ?? 0
+  const colour = teamColour(team)
+
+  if (required <= 0) {
+    return `
+    <div class="panel" style="padding:22px 36px;display:flex;align-items:center;justify-content:space-between">
+      <span class="display" style="font-size:32px">${pickLine}</span>
+      <span class="label" style="font-size:24px">Level on average</span>
+    </div>`
+  }
+
+  const gone = required >= 100
+  const live = required < 20
+
+  return `
+  <div class="panel${live ? ' celebrate' : ''}" style="padding:22px 36px;display:flex;align-items:center;
+              justify-content:space-between;gap:36px;border-color:${gone ? 'var(--border)' : colour}">
+    <span class="display" style="font-size:32px;flex-shrink:0">${pickLine}</span>
+    <div style="display:flex;align-items:baseline;gap:18px;min-width:0">
+      <span class="label" style="font-size:24px;color:${gone ? 'var(--muted)' : colour};flex-shrink:0">
+        ${escapeHtml(teamName(team))} NEED</span>
+      <span class="display" style="font-size:56px;line-height:1;color:${gone ? 'var(--muted)' : colour}">
+        ${multiplier(required)}</span>
+      <span class="label" style="font-size:22px;flex-shrink:0">
+        ${gone ? 'on one pick — out of reach' : 'on this pick'}</span>
+    </div>
+  </div>`
+}
+
+/**
+ * The flip — §6.3, and the one moment the scoreboard is allowed to disappear.
+ *
+ * Everything here is **playback**. The result was committed at session creation
+ * and has been in the event log since before the first !join; this reads it and
+ * animates it. The overlay is never computing anything during those five
+ * seconds, which is what lets the timings be fixed rather than negotiated.
+ *
+ * The fake-out is scripted, not random: the false settle always lands on the
+ * losing colour so the snap is always a reversal. Chat is reacting to the false
+ * settle — half the channel already celebrating — when it flips.
+ */
+let flipShownFor = null
+
+function battlesFlip() {
+  const pick = state.currentPick
+  if (!pick || !pick.team) return battlesScoreboard()
+
+  /*
+   * Build and animate once per pick, not once per render.
+   *
+   * The overlay re-renders on every patch, and during a five-second flip the
+   * patches keep coming — every `!side` moves the crowd counter. Rebuilding the
+   * takeover on each one destroys the coin mid-spin and restarts the countdown
+   * from "3", so the animation would visibly stutter backwards whenever chat
+   * was busiest, which is exactly when it is being watched.
+   */
+  if (flipShownFor === pick.index) return
+  flipShownFor = pick.index
+
+  const winner = pick.team
+  const loser = winner === 'A' ? 'B' : 'A'
+  const total = state.animationMs ?? 5500
+
+  el('left').innerHTML = ''
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = ''
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:40px" id="flip-stage">
+      <div class="panel" style="padding:24px 44px;display:flex;align-items:center;gap:26px">
+        ${slotTile(pick.slotName, pick.thumbnail, 'thumb-lg')}
+        <div>
+          <div class="display" style="font-size:44px">@${escapeHtml(pick.username)}</div>
+          <div class="mono" style="font-size:24px;color:var(--muted);margin-top:6px">
+            ${escapeHtml(pick.slotName ?? '')}</div>
+        </div>
+      </div>
+
+      <div id="flip-coin" style="width:340px;height:340px;border-radius:50%;
+           border:8px solid var(--border);display:flex;align-items:center;justify-content:center;
+           font-size:150px;transition:background .12s linear,border-color .12s linear,box-shadow .3s ease-out">
+      </div>
+
+      <div id="flip-caption" class="display" style="font-size:44px;color:var(--muted);height:56px">
+        &nbsp;
+      </div>
+    </div>`
+
+  runFlipAnimation({ winner, loser, fakeOut: pick.fakeOut, total })
+}
+
+/**
+ * The animation itself, on the §6.3 schedule.
+ *
+ * Driven by timeouts against a wall clock rather than by frame counting,
+ * because a dropped frame in OBS must not desynchronise the snap from the
+ * caption. Any pending run is cancelled first: a reconnect mid-flip jumps to
+ * the settled state and never replays, since a flip that replays after an OBS
+ * hiccup looks exactly like a re-roll.
+ */
+let flipTimers = []
+
+/**
+ * Cancels any pending animation steps.
+ *
+ * Deliberately does NOT release `flipShownFor`. `runFlipAnimation` calls this
+ * on entry, so clearing the marker here would let every re-render start over —
+ * the guard that stops chat traffic restarting the coin would defeat itself,
+ * and the countdown would sit on "3" forever.
+ */
+function clearFlip() {
+  flipTimers.forEach(clearTimeout)
+  flipTimers = []
+}
+
+/**
+ * A reconnect: stop mid-animation and let the next render draw the settled
+ * state. §13 — an interrupted flip jumps to the result and is never replayed,
+ * because a re-run after an OBS hiccup looks exactly like a re-roll.
+ */
+function resetFlip() {
+  clearFlip()
+  flipShownFor = null
+}
+
+function runFlipAnimation({ winner, loser, fakeOut, total }) {
+  clearFlip()
+
+  if (!el('flip-coin')) return
+
+  const at = (ms, fn) => flipTimers.push(setTimeout(fn, (ms / 5500) * total))
+
+  /*
+   * Re-queried every call rather than closed over. A captured reference goes
+   * stale the moment anything rewrites the takeover, and a detached node
+   * accepts every style change in silence — the animation "runs" while the
+   * coin the viewer is looking at never moves.
+   */
+  const paint = (key, glow) => {
+    const node = el('flip-coin')
+    if (!node) return
+    const c = teamColour(key)
+    node.style.background = `${c}26`
+    node.style.borderColor = c
+    node.textContent = teamEmoji(key)
+    node.style.boxShadow = glow ? `0 0 90px ${c}` : 'none'
+  }
+  const say = (text, colour) => {
+    const node = el('flip-caption')
+    if (!node) return
+    node.textContent = text
+    node.style.color = colour
+  }
+
+  // 0.5s — the countdown, which is chat's window to shout.
+  let count = 3
+  say('3', 'var(--text)')
+  const tick = () => {
+    count -= 1
+    if (count > 0) say(String(count), 'var(--text)')
+  }
+  at(1000, tick)
+  at(1500, tick)
+
+  // 2.0s — alternating fast, colours blurred together.
+  at(2000, () => {
+    say('', 'var(--text)')
+    let i = 0
+    const spin = setInterval(() => paint(i++ % 2 === 0 ? 'A' : 'B', false), 70)
+    flipTimers.push(setTimeout(() => clearInterval(spin), (1400 / 5500) * total))
+    // Registering the interval id so clearFlip() can stop it too.
+    flipTimers.push(spin)
+  })
+
+  // 3.4s — deceleration, alternation becomes readable.
+  at(3400, () => {
+    let i = 0
+    const slow = setInterval(() => paint(i++ % 2 === 0 ? 'B' : 'A', false), 180)
+    flipTimers.push(setTimeout(() => clearInterval(slow), (800 / 5500) * total))
+    flipTimers.push(slow)
+  })
+
+  // 4.2s — the fake-out. Always onto the LOSING colour, so the snap is always a
+  // reversal; a near-miss that resolves where it was already pointing is an
+  // anticlimax with extra steps.
+  if (fakeOut) {
+    at(4200, () => {
+      paint(loser, false)
+      say(teamName(loser), teamColour(loser))
+    })
+  }
+
+  // 4.8s — the snap.
+  at(4800, () => {
+    paint(winner, true)
+    say(teamName(winner), teamColour(winner))
+    coin.classList.add('celebrate')
+
+    const stage = el('flip-stage')
+    if (stage) {
+      stage.style.transition = 'transform .4s cubic-bezier(.16,1,.3,1)'
+      stage.style.transform = 'scale(1.04)'
+    }
+  })
+}
+
+/**
+ * The final — §13's three sequential takeovers, then the scoreboard as a
+ * resting state because the stream will sit on it while the streamer talks.
+ */
+function battlesFinal() {
+  const r = state.result
+  if (!r) return battlesScoreboard()
+
+  const colour = teamColour(r.winner)
+
+  const how = {
+    average: 'Higher average per pick',
+    total: 'Tied on average — decided on total multiplier',
+    best: 'Tied on total — decided on the better single pull',
+    fewerPicks: 'Tied throughout — decided on fewer picks',
+    coinflip: 'Tied on everything — decided on a seeded coin flip',
+  }[r.decidedBy] ?? ''
+
+  const roster = (r.winner === 'A' ? state.rosterA : state.rosterB) ?? []
+
+  el('left').innerHTML = ''
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = ''
+  el('takeover').className = ''
+  el('takeover').innerHTML = `
+    <div style="display:flex;align-items:center;gap:72px;max-width:1700px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:20px;margin-bottom:18px">
+          <span style="font-size:64px">${teamEmoji(r.winner)}</span>
+          <div class="display celebrate" style="font-size:104px;line-height:1;color:${colour}">
+            ${escapeHtml(teamName(r.winner))} WIN</div>
+        </div>
+
+        <div class="display" style="font-size:52px;margin-bottom:10px">
+          ${multiplier(r.scoreA)}
+          <span style="color:var(--muted);font-size:34px"> vs </span>
+          ${multiplier(r.scoreB)}
+        </div>
+        ${how ? `<div class="mono" style="font-size:24px;color:var(--muted)">${escapeHtml(how)}</div>` : ''}
+
+        ${
+          // §16 — one team never getting a pick is a legendary session, not a
+          // bug, and saying nothing about it is what would look like one.
+          r.shutout
+            ? `<div class="panel" style="margin-top:24px;padding:18px 24px;border-color:var(--gold)">
+                 <span class="mono" style="font-size:22px;color:var(--gold)">
+                   One team never got a single pick.</span></div>`
+            : ''
+        }
+
+        <div class="panel" style="padding:22px 26px;margin-top:30px">
+          <div class="label" style="color:${colour};margin-bottom:12px">Winning team</div>
+          ${roster
+            .slice(0, 6)
+            .map(
+              (m) => `
+            <div class="row" style="padding:9px 0;font-size:25px">
+              <span class="grow truncate">@${escapeHtml(m.username)}</span>
+              <span class="mono" style="color:${colour}">${multiplier(m.multiplier)}</span>
+            </div>`,
+            )
+            .join('')}
+          ${
+            roster.length > 6
+              ? `<div class="mono" style="font-size:21px;color:var(--muted);padding-top:8px">
+                   and ${roster.length - 6} more</div>`
+              : ''
+          }
+        </div>
+      </div>
+
+      <div style="width:520px;display:flex;flex-direction:column;gap:22px">
+        ${awardCard('MVP', 'Biggest pull of the session', r.mvp, 'var(--gold)')}
+        ${r.anchor ? awardCard('The Anchor', 'Lowest of the session — it happens', r.anchor, 'var(--muted)') : ''}
+      </div>
+    </div>`
+}
+
+function awardCard(title, sub, winner, colour) {
+  if (!winner) return ''
+  return `
+  <div class="panel" style="padding:26px 30px;border-color:${colour}">
+    <div class="label" style="color:${colour};margin-bottom:12px">${escapeHtml(title)}</div>
+    <div class="display truncate" style="font-size:42px">@${escapeHtml(winner.username)}</div>
+    <div class="mono truncate" style="font-size:22px;color:var(--muted);margin-top:6px">
+      ${escapeHtml(winner.slotName ?? '')}</div>
+    <div class="display" style="font-size:64px;color:${colour};margin-top:14px">
+      ${multiplier(winner.multiplier)}</div>
+    <div class="mono" style="font-size:20px;color:var(--muted);margin-top:6px">${escapeHtml(sub)}</div>
+  </div>`
+}
+
+// ─── shared ─────────────────────────────────────────────────────────────────
+
+function stat(label, value, colour, size) {
+  return `
+  <div class="panel enter" style="padding:24px 28px;margin-bottom:18px">
+    <div class="label" style="margin-bottom:10px">${escapeHtml(label)}</div>
+    <div class="display" style="font-size:${size}px;color:${colour};line-height:1.05">${value}</div>
+  </div>`
+}
+
+/** Ephemeral cues — the only things that animate without a data change. */
+function cue(kind, payload) {
+  if (kind === 'flash' && payload.slotName && payload.win != null) {
+    banner(`${payload.slotName} · ${money(payload.win, currency)} · ${multiplier(payload.multiplier)}`,
+      payload.multiplier >= 100 ? 'var(--gold)' : 'var(--win)')
+  }
+  if (kind === 'matchResult') {
+    const w = payload.winner === 'a' ? payload.a : payload.b
+    banner(`@${w.username} advances · ${multiplier(w.multiplier)}`, 'var(--primary)',
+      // §14 — always state how a tiebreak was decided. An unexplained winner
+      // on stream reads as broken software.
+      payload.decidedBy !== 'multiplier' ? `decided on ${payload.decidedBy}` : null)
+  }
+}
+
+function banner(text, colour, sub) {
+  const node = document.createElement('div')
+  node.className = 'panel celebrate'
+  node.style.cssText = `position:absolute;left:50%;top:64px;transform:translateX(-50%);
+    padding:22px 44px;text-align:center;border-color:${colour};z-index:50`
+  node.innerHTML = `<div class="display" style="font-size:38px;color:${colour}">${escapeHtml(text)}</div>
+    ${sub ? `<div class="mono" style="font-size:20px;color:var(--muted);margin-top:8px">${escapeHtml(sub)}</div>` : ''}`
+  document.getElementById('stage').appendChild(node)
+  setTimeout(() => node.remove(), 6000)
+}
+
+// One shared clock for whichever countdown is on screen.
+setInterval(() => {
+  const node = document.getElementById('countdown')
+  if (!node) return
+  const ends = state.guessWindowEndsAt ?? state.votingEndsAt ?? state.joinWindowEndsAt
+  node.textContent = countdown(ends) ?? '00:00'
+}, 250)
+
+// ─── Giveaways ──────────────────────────────────────────────────────────────
+
+const GIVEAWAY_TABS = [
+  ['open', 'Entry Open'],
+  ['locked', 'Entries Closed'],
+  ['draw', 'The Draw'],
+  ['claim', 'Claim'],
+  ['complete', 'Winners'],
+]
+
+/**
+ * Giveaways §13.
+ *
+ * Two rules from the spec show up here as code rather than as layout, and both
+ * are the kind that only fail in front of an audience.
+ *
+ * **The entry count is monotonic.** It counts accepted entries and never
+ * anything else — rejections and mod removals move the dashboard figure and
+ * never this one. A hero number that drops by forty in front of the whole
+ * channel invites exactly one conclusion.
+ *
+ * **The reel settles exactly once and is never replayed.** A reconnect during
+ * the draw jumps to the settled frame, per the platform's never-replay law and
+ * for a sharper reason than usual: a replayed name reel is indistinguishable
+ * from a redraw.
+ */
+function renderGiveaways() {
+  const phase = state.phase ?? 'idle'
+  renderTabs(giveawayTab(phase), GIVEAWAY_TABS)
+
+  if (phase !== 'draw') el('takeover').className = 'hidden'
+
+  if (phase === 'draw') return giveawayReel()
+  if (phase === 'claim' || phase === 'passover' || phase === 'awarded') return giveawayClaim()
+  if (phase === 'complete') return giveawayBoard()
+  giveawayEntry()
+}
+
+const giveawayTab = (phase) =>
+  ({ idle: 'open', open: 'open', locked: 'locked', draw: 'draw',
+     claim: 'claim', passover: 'claim', awarded: 'claim', complete: 'complete' })[phase] ?? 'open'
+
+/**
+ * §13 — entry open, and the locked beat that follows it.
+ *
+ * "The entry count is the hero and it is enormous. The command sits beneath it
+ * at the largest size the layout allows, because a viewer arriving mid-window
+ * needs to know what to type before they need to know anything else. The
+ * countdown is third."
+ *
+ * That ordering is the whole design of this state and it is deliberately not
+ * the ordering intuition suggests — the clock feels like the urgent thing, and
+ * it is third.
+ */
+function giveawayEntry() {
+  const locked = state.phase === 'locked'
+  const count = state.entryCount ?? 0
+  const odds = state.oddsOneIn
+  const prize = state.prizes?.[state.currentPrizeIndex ?? 0]
+
+  el('left').innerHTML = `
+    <div class="card enter" style="border-top-color:var(--primary);margin-bottom:16px">
+      <div class="bloom" style="background:var(--primary)"></div>
+      <div style="position:relative">
+        <div class="label" style="margin-bottom:10px">${escapeHtml(prize?.title ?? 'Giveaway')}</div>
+        <div class="display mono" style="font-size:132px;line-height:.95;color:var(--text)">
+          ${count.toLocaleString()}</div>
+        <div class="label" style="margin-top:6px;font-size:22px;color:var(--muted)">entered</div>
+      </div>
+    </div>`
+
+  el('right').innerHTML = locked
+    ? /*
+       * §4 — the held beat. "Do not skip it; the number is the payoff for the
+       * window and the audience has been watching it climb." The clock leaves
+       * and nothing replaces it, which is what makes the frame still.
+       */
+      `<div class="panel" style="padding:34px 30px;text-align:center">
+         <div class="label" style="font-size:26px;color:var(--loss);margin-bottom:10px">Entries closed</div>
+         <div class="mono" style="font-size:24px;color:var(--muted);line-height:1.5">
+           Drawing from ${count.toLocaleString()} ${count === 1 ? 'entry' : 'entries'}
+         </div>
+       </div>`
+    : `<div class="panel" style="padding:34px 30px;text-align:center">
+         <div class="label" style="margin-bottom:14px">Type this in chat</div>
+         <div class="display" style="font-size:72px;line-height:1;color:var(--primary)">
+           !${escapeHtml(state.keyword ?? 'drop')}</div>
+         <div class="mono" id="ga-entry-clock" data-closes="${state.entryClosesAtMs ?? ''}"
+              style="font-size:44px;margin-top:26px;color:var(--text)">
+           ${state.entryClosesAtMs ? countdown(state.entryClosesAtMs) : '—'}</div>
+         <div class="label" style="margin-top:6px;color:var(--muted)">remaining</div>
+       </div>`
+
+  /*
+   * §13 — the joining feed. "It is doing more work than it looks like it is:
+   * the feed is the proof that entries are landing, and without it a viewer who
+   * typed has no confirmation of anything." Nothing is ever acked to them in
+   * chat, so this scroll is the entire receipt.
+   */
+  const recent = state.recentEntrants ?? []
+  el('bottom').innerHTML = `
+    <div class="panel" style="padding:16px 26px;display:flex;align-items:center;gap:26px">
+      <div class="mono truncate" style="flex:1;font-size:24px;color:var(--text);opacity:${locked ? '.45' : '1'}">
+        ${recent.length === 0
+          ? '<span style="color:var(--muted)">Waiting for the first entry…</span>'
+          : recent.map((e) => `@${escapeHtml(e.username)}`).join('  ·  ')}
+      </div>
+      <div class="label" style="flex-shrink:0;color:var(--muted);font-size:19px">
+        ${escapeHtml(state.gateLine ?? '')}${odds ? ` · you: 1 in ${odds.toLocaleString()}` : ''}
+      </div>
+    </div>`
+}
+
+/**
+ * §7 — the reel.
+ *
+ * A vertical reel of real usernames, accelerating, blurring, decelerating, and
+ * settling on one. Full-frame takeover: the one moment the entry count is
+ * allowed to leave the screen.
+ *
+ * **Team Battles' scripted fake-out is explicitly not reused, and the contrast
+ * is the design point.** There, the reel settles on the losing colour and
+ * snaps, and the trick works because a coin has two faces and neither belongs
+ * to anyone. Here the faces are people, and a reel that settles on somebody,
+ * holds long enough for them to believe it, then moves has shown a viewer they
+ * won a prize they did not win. There is no framing that makes that acceptable.
+ *
+ * So: one settle, and after it nothing moves. Every bit of tension this needs
+ * lives in the deceleration, where names pass slowly enough to read.
+ */
+let reelStarted = false
+
+function giveawayReel() {
+  const names = state.reelNames ?? []
+  const prize = state.prizes?.[state.currentPrizeIndex ?? 0]
+
+  el('left').innerHTML = ''
+  el('right').innerHTML = ''
+  el('bottom').innerHTML = ''
+  el('takeover').className = ''
+
+  if (reelStarted) return
+
+  reelStarted = true
+  const winner = names[names.length - 1] ?? ''
+
+  // Enough repetitions that the strip never runs out under acceleration, and
+  // the winner sits at a known index so the settle lands on a real name rather
+  // than on a copy of one.
+  const strip = []
+  for (let i = 0; i < 6; i++) strip.push(...names.slice(0, Math.max(1, names.length - 1)))
+  strip.push(winner)
+
+  el('takeover').innerHTML = `
+    <div style="text-align:center;width:100%">
+      <div class="label" style="font-size:26px;color:var(--primary);margin-bottom:8px">Drawing</div>
+      <div class="display" style="font-size:40px;color:var(--gold);margin-bottom:34px">
+        ${escapeHtml(prize?.title ?? 'the prize')}</div>
+      <div id="ga-reel-window">
+        <div id="ga-reel-strip">
+          ${strip.map((n) => `<div class="ga-reel-name">@${escapeHtml(n)}</div>`).join('')}
+        </div>
+        <div id="ga-reel-line"></div>
+      </div>
+    </div>`
+
+  runReel(strip.length - 1)
+}
+
+/**
+ * The physics — §7.2's timeline, as one rAF loop.
+ *
+ *   0.0s  the reel starts, names blurring upward
+ *   3.0s  deceleration, names become readable one at a time
+ *   4.3s  settle — the name lands and locks
+ *
+ * Eased with a single cubic ease-out over the whole distance rather than in
+ * scripted stages, because a stage boundary is visible as a hitch at 60fps and
+ * the one thing this animation cannot afford is looking like it was steered.
+ */
+function runReel(winnerIndex) {
+  const strip = el('ga-reel-strip')
+  const window_ = el('ga-reel-window')
+  if (!strip || !window_) return
+
+  const ROW = 96
+  const distance = winnerIndex * ROW - window_.clientHeight / 2 + ROW / 2
+  const duration = state.reelMs ?? 4500
+  const start = performance.now()
+
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / duration)
+    // Quintic ease-out: fast enough early to blur, slow enough late to read.
+    const eased = 1 - Math.pow(1 - t, 5)
+    strip.style.transform = `translateY(${-(distance * eased)}px)`
+
+    // The blur tracks velocity rather than the clock, so slowing down and
+    // becoming readable are the same event instead of two that nearly coincide.
+    const velocity = Math.pow(1 - t, 4)
+    strip.style.filter = velocity > 0.05 ? `blur(${Math.min(14, velocity * 26)}px)` : 'none'
+
+    if (t < 1) {
+      requestAnimationFrame(step)
+      return
+    }
+
+    // Settled. Nothing moves after this.
+    strip.style.filter = 'none'
+    window_.classList.add('settled')
+  }
+
+  requestAnimationFrame(step)
+}
+
+/**
+ * §8 — the claim window, and UI §1: "the main event, not the reveal."
+ *
+ * On screen for up to three minutes against the reveal's five seconds, so it
+ * gets the full frame rather than a badge on a winner card. The clock is the
+ * second-largest element and it counts down toward something bad — the one
+ * place in this product where a red countdown is correct.
+ */
+function giveawayClaim() {
+  const claim = state.claim
+  const prize = state.prizes?.[state.currentPrizeIndex ?? 0]
+  const window_ = state.claimWindowMs ?? 180_000
+
+  if (!claim) return giveawayBoard()
+
+  const remaining = Math.max(0, claim.expiresAtMs - Date.now())
+  const settled = state.awards?.find((a) => a.prizeIndex === claim.prizeIndex)
+
+  el('left').innerHTML = `
+    <div class="card enter" style="border-top-color:${settled ? 'var(--win)' : 'var(--gold)'};margin-bottom:16px">
+      <div class="bloom" style="background:${settled ? 'var(--win)' : 'var(--gold)'}"></div>
+      <div style="position:relative">
+        <div class="label" style="margin-bottom:10px;color:${settled ? 'var(--win)' : 'var(--muted)'}">
+          ${settled ? (settled.method === 'manual' ? 'Awarded by the streamer' : 'Claimed') : 'Winner'}</div>
+        <div class="display truncate" style="font-size:64px;line-height:1.05;color:var(--text)">
+          @${escapeHtml(claim.username)}</div>
+        <div class="display" style="font-size:34px;margin-top:14px;color:var(--gold)">
+          ${escapeHtml(prize?.title ?? '')}</div>
+      </div>
+    </div>
+    ${passoverStrip()}`
+
+  el('right').innerHTML = settled
+    ? `<div class="panel" style="padding:40px 30px;text-align:center">
+         <div style="color:var(--win);display:flex;justify-content:center;margin-bottom:14px">${ICON.check}</div>
+         <div class="display" style="font-size:40px;color:var(--win)">
+           ${settled.method === 'manual' ? 'Awarded' : 'Claimed'}</div>
+       </div>`
+    : `<div class="panel" style="padding:34px 30px;text-align:center">
+         <div class="label" style="margin-bottom:12px">Type <span style="color:var(--primary)">!claim</span></div>
+         <div class="mono" id="ga-claim-clock"
+              data-expires="${claim.expiresAtMs}" data-window="${window_}"
+              style="font-size:104px;line-height:1;color:${claimColour(remaining, window_)}">
+           ${countdown(claim.expiresAtMs)}</div>
+         <div class="label" style="margin-top:8px;color:var(--muted)">to claim it</div>
+       </div>`
+
+  el('bottom').innerHTML = winnersStrip()
+}
+
+/** UI's two-clocks note: gold, then amber past halfway, then red under 30s. */
+function claimColour(remaining, window_) {
+  if (remaining <= 30_000) return 'var(--loss)'
+  if (remaining <= window_ / 2) return '#FF9F3D'
+  return 'var(--gold)'
+}
+
+/**
+ * §8.3 — the passed-over names, struck through, labelled, still on screen.
+ *
+ * "Openly, every time. A silent substitution is the single most suspicious
+ * thing this product could do, and the whole construction in §3 exists so that
+ * this moment can be shown rather than hidden."
+ */
+function passoverStrip() {
+  const passed = (state.passovers ?? []).filter((p) => p.prizeIndex === state.currentPrizeIndex)
+  if (passed.length === 0) return ''
+
+  return `
+    <div class="panel" style="padding:18px 24px">
+      ${passed
+        .map(
+          (p) => `
+        <div class="row" style="padding:6px 0;font-size:24px">
+          <span class="grow truncate mono" style="color:var(--muted);text-decoration:line-through">
+            @${escapeHtml(p.username)}</span>
+          <span class="label" style="color:var(--loss);flex-shrink:0">
+            ${p.reason === 'expired' ? "didn't claim in time" : 'passed over'}</span>
+        </div>`,
+        )
+        .join('')}
+    </div>`
+}
+
+/** §13 — the winners strip at the edge, with strike-throughs that persist. */
+function winnersStrip() {
+  const awards = state.awards ?? []
+  const prizes = state.prizes ?? []
+  if (awards.length === 0 && prizes.length <= 1) return ''
+
+  return `
+    <div class="panel" style="padding:16px 26px;display:flex;align-items:center;gap:22px;flex-wrap:wrap">
+      ${prizes
+        .map((p) => {
+          const award = awards.find((a) => a.prizeIndex === p.index)
+          const colour =
+            award?.method === 'voided'
+              ? 'var(--loss)'
+              : award
+                ? 'var(--win)'
+                : p.index === state.currentPrizeIndex
+                  ? 'var(--gold)'
+                  : 'var(--muted)'
+          return `
+          <span class="mono" style="font-size:21px;color:${colour}">
+            ${escapeHtml(p.title)}${award && award.username ? ` · @${escapeHtml(award.username)}` : ''}
+            ${award?.method === 'manual' ? ' <span class="label" style="color:var(--gold)">awarded</span>' : ''}
+          </span>`
+        })
+        .join('<span style="color:var(--border)">|</span>')}
+    </div>`
+}
+
+/**
+ * §13's resting state — the winners board.
+ *
+ * "This is what the stream sits on while the streamer talks, so it is a real
+ * design surface and not a placeholder." Every prize with its winner, the
+ * claim status, and the passed-over names still visible. The fingerprint and
+ * the verification URL live in its footer.
+ */
+function giveawayBoard() {
+  const prizes = state.prizes ?? []
+  const awards = state.awards ?? []
+  const passovers = state.passovers ?? []
+
+  if (prizes.length === 0 && (state.entryCount ?? 0) === 0) {
+    // §16 — a giveaway nobody entered is information. Say it plainly.
+    el('left').innerHTML = `
+      <div class="panel" style="padding:40px 30px;text-align:center">
+        <div class="display" style="font-size:38px;color:var(--muted)">Nobody entered</div>
+      </div>`
+    el('right').innerHTML = ''
+    el('bottom').innerHTML = ''
+    return
+  }
+
+  el('left').innerHTML = `
+    <div class="panel" style="padding:26px 28px">
+      <div class="label" style="margin-bottom:18px">Winners</div>
+      ${prizes
+        .map((p) => {
+          const award = awards.find((a) => a.prizeIndex === p.index)
+          const passed = passovers.filter((x) => x.prizeIndex === p.index)
+          return `
+          <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+            <div class="row" style="font-size:26px">
+              <span class="grow truncate" style="color:var(--gold)">${escapeHtml(p.title)}</span>
+              <span class="mono truncate" style="flex-shrink:0;color:${
+                award?.method === 'voided' ? 'var(--loss)' : 'var(--text)'
+              }">
+                ${award && award.username ? `@${escapeHtml(award.username)}` : 'unclaimed'}</span>
+            </div>
+            ${
+              award?.method === 'manual'
+                ? `<div class="label" style="color:var(--gold);margin-top:4px">awarded by the streamer</div>`
+                : ''
+            }
+            ${
+              passed.length > 0
+                ? `<div class="mono" style="font-size:19px;color:var(--muted);margin-top:6px;text-decoration:line-through">
+                     ${passed.map((x) => `@${escapeHtml(x.username)}`).join(', ')}</div>`
+                : ''
+            }
+          </div>`
+        })
+        .join('')}
+    </div>`
+
+  const rate = state.claimRate
+  el('right').innerHTML = `
+    <div class="panel" style="padding:30px 28px">
+      <div class="label" style="margin-bottom:12px">Entries</div>
+      <div class="display mono" style="font-size:64px;color:var(--text)">
+        ${(state.entryCount ?? 0).toLocaleString()}</div>
+      ${
+        rate === null || rate === undefined
+          ? ''
+          : `<div class="label" style="margin-top:22px">Claim rate</div>
+             <div class="display mono" style="font-size:44px;color:${rate < 0.5 ? 'var(--loss)' : 'var(--win)'}">
+               ${Math.round(rate * 100)}%</div>`
+      }
+    </div>`
+
+  /*
+   * §3 — the commitment, closed. The fingerprint was published before anyone
+   * entered; the seed is published here. Anyone can hash the one and check it
+   * against the other, which is the whole of the fairness argument in one line
+   * of overlay-legal text.
+   */
+  el('bottom').innerHTML = `
+    <div class="panel" style="padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:26px">
+      <span class="mono truncate" style="font-size:20px;color:var(--muted)">
+        Seed committed before the first entry: ${escapeHtml(state.seedHash ?? '—')}
+        ${state.seed ? ` · published: ${escapeHtml(state.seed)}` : ''}
+      </span>
+      <span class="label" style="flex-shrink:0;color:var(--muted)">No re-draws, ever</span>
+    </div>`
+}
+
+/**
+ * Both clocks, resynced from their absolute timestamps every tick.
+ *
+ * §16 — "resync the clock from `expiresAtMs`, never from elapsed time on the
+ * client. A clock that drifts a few seconds across an OBS reconnect and then
+ * jumps is worse than a clock that pauses." Whole seconds only: a 1920×1080
+ * source re-encoded at low bitrate turns a fast-updating digit into mush.
+ */
+function tickGiveawayClocks() {
+  const entry = el('ga-entry-clock')
+  if (entry?.dataset.closes) {
+    const closesAt = Number(entry.dataset.closes)
+    entry.textContent = countdown(closesAt) ?? '0:00'
+    /*
+     * §2 and the UI's two-clocks note — the entry clock counts down toward
+     * something good, so it never turns red. Gold under thirty seconds is as
+     * urgent as it is allowed to get: a red clock at ninety seconds reads as
+     * "too late" to somebody who just arrived, and the whole point of this
+     * phase is getting people to type.
+     */
+    entry.style.color = closesAt - Date.now() <= 30_000 ? 'var(--gold)' : 'var(--text)'
+  }
+
+  const claim = el('ga-claim-clock')
+  if (claim) {
+    const expiresAt = Number(claim.dataset.expires)
+    const remaining = Math.max(0, expiresAt - Date.now())
+    claim.textContent = countdown(expiresAt) ?? '0:00'
+    claim.style.color = claimColour(remaining, Number(claim.dataset.window))
+  }
+}
+
+/* Both giveaway clocks tick locally; every tick recomputes from an absolute
+   timestamp, so a reconnect lands on the right second (§16). */
+setInterval(() => { if (gameId === 'giveaways') tickGiveawayClocks() }, 500)
+
+</script>
+</body>
+</html>

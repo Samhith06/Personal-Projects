@@ -1,0 +1,122 @@
+/* ==========================================================================
+   FGDR design tokens
+   Near-black + midnight navy grounds, metallic champagne gold as the primary
+   accent, electric cyan used sparingly as a secondary light source.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Grounds */
+  --ink-0: #030407;
+  --ink-1: #06070b;
+  --ink-2: #0a0c12;
+  --ink-3: #10131b;
+  --ink-4: #171b25;
+  --navy-1: #070b16;
+  --navy-2: #0b1224;
+  --navy-3: #121b33;
+
+  /* Lines */
+  --line-1: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.1);
+  --line-3: rgba(255, 255, 255, 0.16);
+  --line-gold: rgba(217, 182, 95, 0.28);
+  --line-gold-strong: rgba(233, 200, 120, 0.55);
+
+  /* Text */
+  --text-1: #f4f1ea;
+  --text-2: #bdb8ad;
+  --text-3: #8a867d;
+  --text-4: #5f5c56;
+
+  /* Gold */
+  --gold-0: #fff4d6;
+  --gold-1: #f3dfa2;
+  --gold-2: #e2c275;
+  --gold-3: #c9a24a;
+  --gold-4: #9c7630;
+  --gold-5: #5e4519;
+  --gold-metal: linear-gradient(176deg, #fff3cf 0%, #efd593 22%, #c9a24a 48%, #8f6a26 62%, #d9b865 80%, #f6e3ab 100%);
+  --gold-sheen: linear-gradient(100deg, #b98f3e 0%, #f3dfa2 38%, #fff6dc 50%, #e2c275 62%, #a97f33 100%);
+  --gold-button: linear-gradient(180deg, #f6e3ab 0%, #dcb862 46%, #b88c38 100%);
+
+  /* Cyan */
+  --cyan-1: #9eeaff;
+  --cyan-2: #4fd8ff;
+  --cyan-3: #1aa7d8;
+  --cyan-glow: rgba(79, 216, 255, 0.35);
+
+  /* Accents per creator */
+  --accent-gold: #e2c275;
+  --accent-cyan: #4fd8ff;
+  --accent-steel: #b7c3d6;
+  --accent-ruby: #e0526b;
+
+  /* Status */
+  --live: #ff3b54;
+  --live-glow: rgba(255, 59, 84, 0.45);
+  --success: #58d6a0;
+  --danger: #ff6b7d;
+
+  /* Surfaces */
+  --surface-1: linear-gradient(180deg, rgba(23, 27, 37, 0.72), rgba(10, 12, 18, 0.72));
+  --surface-2: linear-gradient(180deg, #11141c 0%, #0a0c12 100%);
+  --glass: rgba(10, 12, 18, 0.62);
+
+  /* Type */
+  --font-display: var(--font-archivo), 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+  --font-body: var(--font-manrope), 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-jetbrains), 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+  --fs-2xl: clamp(1.6rem, 1.3rem + 1.2vw, 2.25rem);
+  --fs-3xl: clamp(2.2rem, 1.6rem + 2.6vw, 3.75rem);
+  --fs-4xl: clamp(2.8rem, 1.8rem + 4.4vw, 5.75rem);
+  --fs-hero: clamp(3rem, 1.4rem + 7vw, 8.5rem);
+
+  /* Space */
+  --space-section: clamp(6rem, 5rem + 6vw, 11rem);
+  --space-section-sm: clamp(4.5rem, 3.5rem + 4vw, 7.5rem);
+  --gutter: clamp(1.25rem, 0.8rem + 2vw, 2.5rem);
+  --container: 1280px;
+  --container-narrow: 960px;
+
+  /* Shape */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  /* Depth */
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  --shadow-md: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.85);
+  --shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 40px 100px -40px rgba(0, 0, 0, 0.95);
+  --glow-gold: 0 0 0 1px rgba(233, 200, 120, 0.35), 0 18px 60px -18px rgba(217, 182, 95, 0.45);
+  --glow-cyan: 0 0 0 1px rgba(79, 216, 255, 0.35), 0 18px 60px -18px rgba(79, 216, 255, 0.35);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 160ms;
+  --dur-2: 320ms;
+  --dur-3: 640ms;
+  --dur-4: 1100ms;
+
+  --header-h: 76px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+    --dur-4: 0ms;
+  }
+}

@@ -1,0 +1,503 @@
+/* ==========================================================================
+   Bonus hunt stream overlays (OBS browser sources)
+   Transparent page, fixed pixel sizes: OBS captures the page at the size the
+   streamer gives the source, so nothing here responds to the viewport.
+   ========================================================================== */
+
+html:has(.ovl-root),
+html:has(.ovl-root) body {
+  min-height: 0;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* Paired with the page's `colorScheme: 'normal'` viewport; see the overlay page for why. */
+html:has(.ovl-root) {
+  color-scheme: normal;
+}
+
+html:has(.ovl-root) .page-texture {
+  display: none;
+}
+
+.ovl-root {
+  padding: 12px;
+  font-family: var(--font-body);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.ovl {
+  background: linear-gradient(180deg, rgba(16, 19, 27, 0.92), rgba(6, 7, 11, 0.92));
+  border: 1px solid var(--line-gold);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.ovl-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+}
+
+.ovl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.ovl-dot--opening {
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger);
+  animation: ovl-pulse 1.6s ease-in-out infinite;
+}
+
+.ovl-dot--collecting {
+  background: var(--cyan-2);
+}
+
+.ovl-dot--guessing {
+  background: var(--gold-2);
+  box-shadow: 0 0 10px var(--gold-2);
+  animation: ovl-pulse 1.6s ease-in-out infinite;
+}
+
+.ovl-dot--complete {
+  background: var(--gold-2);
+}
+
+@keyframes ovl-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.ovl-kind {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
+
+.ovl-kind--super {
+  color: var(--gold-1);
+  background: rgba(217, 182, 95, 0.14);
+  border: 1px solid var(--line-gold-strong);
+}
+
+.ovl-kind--hidden {
+  color: var(--cyan-1);
+  background: rgba(79, 216, 255, 0.1);
+  border: 1px solid rgba(79, 216, 255, 0.4);
+}
+
+/* What chat can do ---------------------------------------------------------- */
+
+.ovl-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(79, 216, 255, 0.35);
+  background: rgba(79, 216, 255, 0.08);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ovl-prompt span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan-1);
+}
+
+.ovl-prompt code,
+.ovl-cmd {
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.45);
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--text-1);
+}
+
+.ovl-prompt em {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.ovl-prompt--gtb,
+.ovl-prompt--win {
+  border-color: var(--line-gold-strong);
+  background: rgba(217, 182, 95, 0.12);
+}
+
+.ovl-prompt--gtb span,
+.ovl-prompt--win span {
+  color: var(--gold-1);
+}
+
+.ovl-prompt--quiet {
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-2);
+}
+
+.ovl-prompt--quiet span {
+  color: var(--text-3);
+}
+
+.ovl-bar__now .ovl-prompt {
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+/* Figures ----------------------------------------------------------------- */
+
+.ovl-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+
+.ovl-fig {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ovl-fig dt {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.ovl-fig dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ovl-fig--up dd {
+  color: var(--success);
+}
+
+.ovl-fig--down dd {
+  color: var(--danger);
+}
+
+/* Board ------------------------------------------------------------------- */
+
+.ovl--board {
+  display: grid;
+  gap: 10px;
+  width: 396px;
+  padding: 14px;
+}
+
+.ovl-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl--board .ovl-fig dd {
+  font-size: 15px;
+}
+
+.ovl--board .ovl-fig {
+  padding: 7px 8px;
+}
+
+.ovl-progress {
+  position: relative;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.ovl-progress__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--gold-sheen);
+  transition: width 0.6s ease;
+}
+
+.ovl-progress__label {
+  position: relative;
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+  color: var(--text-1);
+  /* Sits on the gold fill as well as the dark track, so it needs a heavy halo to read on both. */
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.95),
+    0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.ovl-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ovl-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 54px 58px;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  color: var(--text-3);
+  transition: background 0.4s ease;
+}
+
+.ovl-row.is-open {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ovl-row.is-best {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.18), transparent 70%);
+}
+
+.ovl-row.is-focus {
+  color: var(--text-1);
+  background: rgba(79, 216, 255, 0.08);
+  box-shadow: inset 3px 0 0 var(--cyan-2);
+}
+
+.ovl-row.is-fresh {
+  animation: ovl-flash 1.2s ease-out 2;
+}
+
+@keyframes ovl-flash {
+  0% {
+    background: rgba(243, 223, 162, 0.35);
+  }
+}
+
+.ovl-row__no {
+  font-size: 11px;
+  color: var(--text-4);
+}
+
+.ovl-row__game {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The name gives way to the badge: a long title truncates, "Super" never does. */
+.ovl-row__line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ovl-row__line .ovl-kind {
+  flex: none;
+}
+
+.ovl-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ovl-row__by {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.ovl-row__bet,
+.ovl-row__x {
+  text-align: right;
+}
+
+.ovl-row__x {
+  font-weight: 800;
+}
+
+.ovl-row.is-open .ovl-row__x {
+  color: var(--gold-1);
+}
+
+.ovl-empty {
+  margin: 0;
+  padding: 12px 0;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.ovl-foot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ovl-foot span {
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+}
+
+.ovl-foot strong {
+  color: var(--gold-1);
+}
+
+/* Bar --------------------------------------------------------------------- */
+
+.ovl--bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  padding: 8px 14px;
+}
+
+.ovl-bar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+  white-space: nowrap;
+}
+
+.ovl-stats--inline {
+  display: flex;
+  gap: 6px;
+}
+
+.ovl-bar__now {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 1px solid var(--line-2);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ovl-bar__now > span:first-child,
+.ovl-current__prev span {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* Current ----------------------------------------------------------------- */
+
+.ovl--current {
+  display: grid;
+  gap: 6px;
+  width: 456px;
+  padding: 16px 18px;
+}
+
+.ovl--current.is-fresh {
+  animation: ovl-glow 1.2s ease-out 2;
+}
+
+@keyframes ovl-glow {
+  0% {
+    box-shadow: 0 0 0 2px var(--gold-2), 0 0 40px rgba(243, 223, 162, 0.45);
+  }
+}
+
+.ovl-current__game {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.ovl-current__game .ovl-kind {
+  font-size: 11px;
+  vertical-align: 6px;
+}
+
+.ovl-current__meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.ovl-current__stats {
+  margin-top: 4px;
+}
+
+.ovl-current__prev {
+  margin: 4px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-1);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.ovl-current__prev strong {
+  color: var(--gold-1);
+}
+
+.ovl-current__result {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
+}
+
+.ovl-current__result.is-up {
+  color: var(--success);
+}
+
+.ovl-current__result.is-down {
+  color: var(--danger);
+}

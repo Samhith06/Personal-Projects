@@ -1,0 +1,553 @@
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { prisma } from '@/config/database';
+import { RedisService } from '@/config/redis';
+import { validateEnv } from '@/config/env';
+import { logger } from '@/utils/logger';
+import { createError } from '@/middleware/errorHandler';
+import { RazedService } from '@/services/RazedService';
+import { RazedWagerSyncService } from '@/services/RazedWagerSyncService';
+
+const env = validateEnv();
+
+export interface DiscordUser {
+  id: string;
+  username: string;
+  discriminator: string;
+  global_name?: string | null;
+  avatar: string | null;
+  email?: string;
+  verified?: boolean;
+}
+
+export interface KickUser {
+  id: string;
+  username: string;
+  avatar?: string;
+  verified?: boolean;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface UserSession {
+  id: string;
+  discordId: string;
+  displayName: string;
+  avatar: string | null;
+  points: number;
+  totalEarned?: number;
+  totalSpent?: number;
+  isAdmin: boolean;
+  isModerator: boolean;
+  isVip: boolean;
+  isDepositor: boolean;
+  kickUsername?: string;
+  kickVerified?: boolean;
+  rainbetUsername?: string;
+  rainbetVerified?: boolean;
+  totalWagered?: number;
+  createdAt?: string;
+}
+
+export class AuthService {
+  // Generate JWT tokens
+  static generateTokens(user: UserSession): AuthTokens {
+    const payload = {
+      id: user.id,
+      discordId: user.discordId,
+      isAdmin: user.isAdmin,
+      isModerator: user.isModerator,
+    };
+
+    const accessToken = jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    });
+
+    const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    });
+
+    // Parse expiration time
+    const decoded = jwt.decode(accessToken) as any;
+    const expiresIn = decoded.exp - decoded.iat;
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn,
+    };
+  }
+
+  // Verify and decode JWT token
+  static verifyToken(token: string, isRefreshToken: boolean = false): any {
+    const secret = isRefreshToken ? env.JWT_REFRESH_SECRET : env.JWT_SECRET;
+
+    try {
+      return jwt.verify(token, secret);
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw createError.unauthorized('Token expired');
+      } else if (error instanceof jwt.JsonWebTokenError) {
+        throw createError.unauthorized('Invalid token');
+      }
+      throw createError.unauthorized('Token verification failed');
+    }
+  }
+
+  // Create or update user from Discord data
+  static async createOrUpdateUserFromDiscord(
+    discordUser: DiscordUser
+  ): Promise<UserSession> {
+    try {
+      const displayName = discordUser.global_name || discordUser.username;
+      const avatarUrl = discordUser.avatar
+        ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+        : null;
+
+      // Check if user is admin
+      const isAdmin = env.ADMIN_DISCORD_IDS.includes(discordUser.id);
+
+      const user = await prisma.user.upsert({
+        where: { discordId: discordUser.id },
+        // displayName is intentionally NOT re-synced here on every login — once a
+        // user exists, their name (whether left as the Discord default or manually
+        // customized via the admin panel) is theirs to keep. Re-syncing it from
+        // Discord on every login was silently reverting admin-edited display names.
+        update: {
+          avatarUrl,
+          isAdmin,
+          lastActiveAt: new Date(),
+        },
+        create: {
+          discordId: discordUser.id,
+          displayName,
+          avatarUrl,
+          isAdmin,
+          points: 0,
+          totalEarned: 0,
+          totalSpent: 0,
+        },
+      });
+
+      // Create user statistics if they don't exist
+      await prisma.userStatistics.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: {
+          userId: user.id,
+        },
+      });
+
+      logger.info(
+        `User authenticated via Discord: ${user.displayName} (${user.discordId})`
+      );
+
+      return {
+        id: user.id,
+        discordId: user.discordId,
+        displayName: user.displayName,
+        avatar: user.avatarUrl,
+        points: user.points,
+        totalEarned: user.totalEarned,
+        totalSpent: user.totalSpent,
+        isAdmin: user.isAdmin,
+        isModerator: user.isModerator,
+        isVip: user.isVip,
+        isDepositor: user.isDepositor,
+        kickUsername: user.kickUsername || undefined,
+        kickVerified: user.kickVerified,
+        rainbetUsername: user.rainbetUsername || undefined,
+        rainbetVerified: user.rainbetVerified,
+        totalWagered: Number(user.totalWagered ?? 0),
+        createdAt: user.createdAt.toISOString(),
+      };
+    } catch (error) {
+      logger.error('Error creating/updating user from Discord:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw createError.internal('Failed to process Discord authentication');
+    }
+  }
+
+  // Verify Kick user and merge with existing user
+  static async verifyAndMergeKickUser(
+    userId: string,
+    kickUser: KickUser
+  ): Promise<UserSession> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw createError.notFound('User not found');
+      }
+
+      // Update user with Kick information
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          kickUsername: kickUser.username,
+          lastActiveAt: new Date(),
+        },
+      });
+
+      logger.info(
+        `User verified with Kick: ${updatedUser.displayName} -> ${kickUser.username}`
+      );
+
+      return {
+        id: updatedUser.id,
+        discordId: updatedUser.discordId,
+        displayName: updatedUser.displayName,
+        avatar: updatedUser.avatarUrl,
+        points: updatedUser.points,
+        isAdmin: updatedUser.isAdmin,
+        isModerator: updatedUser.isModerator,
+        isVip: updatedUser.isVip,
+        isDepositor: updatedUser.isDepositor,
+        kickUsername: updatedUser.kickUsername || undefined,
+      };
+    } catch (error) {
+      logger.error('Error verifying Kick user:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw createError.internal('Failed to verify Kick user');
+    }
+  }
+
+  // Store session in database and Redis
+  static async storeSession(
+    user: UserSession,
+    tokens: AuthTokens,
+    userAgent?: string,
+    ipAddress?: string
+  ): Promise<void> {
+    try {
+      const tokenHash = await bcrypt.hash(tokens.accessToken, 10);
+      const refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
+
+      // Calculate expiration time
+      const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000);
+
+      // Store in database
+      await prisma.userSession.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          refreshTokenHash,
+          expiresAt,
+          userAgent,
+          ipAddress,
+        },
+      });
+
+      // Store in Redis for fast access
+      await RedisService.setSession(tokens.accessToken, user, tokens.expiresIn);
+
+      logger.info(`Session stored for user: ${user.displayName}`);
+    } catch (error) {
+      logger.error('Error storing session:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw createError.internal('Failed to store session');
+    }
+  }
+
+  // Refresh access token
+  static async refreshToken(refreshToken: string): Promise<AuthTokens> {
+    try {
+      const decoded = this.verifyToken(refreshToken, true);
+
+      // Find user session
+      const session = await prisma.userSession.findFirst({
+        where: {
+          userId: decoded.id,
+          expiresAt: { gt: new Date() },
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      if (!session) {
+        throw createError.unauthorized('Invalid refresh token');
+      }
+
+      // Verify refresh token hash
+      const isValidRefreshToken = await bcrypt.compare(
+        refreshToken,
+        session.refreshTokenHash || ''
+      );
+      if (!isValidRefreshToken) {
+        throw createError.unauthorized('Invalid refresh token');
+      }
+
+      // Generate new tokens
+      const userSession: UserSession = {
+        id: session.user.id,
+        discordId: session.user.discordId,
+        displayName: session.user.displayName,
+        avatar: session.user.avatarUrl,
+        points: session.user.points,
+        isAdmin: session.user.isAdmin,
+        isModerator: session.user.isModerator,
+        isVip: session.user.isVip,
+        isDepositor: session.user.isDepositor,
+        kickUsername: session.user.kickUsername || undefined,
+        kickVerified: session.user.kickVerified,
+        rainbetUsername: session.user.rainbetUsername || undefined,
+        rainbetVerified: session.user.rainbetVerified,
+        totalWagered: Number(session.user.totalWagered ?? 0),
+      };
+
+      const newTokens = this.generateTokens(userSession);
+
+      // Update session in database
+      const newTokenHash = await bcrypt.hash(newTokens.accessToken, 10);
+      const newRefreshTokenHash = await bcrypt.hash(newTokens.refreshToken, 10);
+      const newExpiresAt = new Date(Date.now() + newTokens.expiresIn * 1000);
+
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: {
+          tokenHash: newTokenHash,
+          refreshTokenHash: newRefreshTokenHash,
+          expiresAt: newExpiresAt,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      // Update Redis session
+      await RedisService.setSession(
+        newTokens.accessToken,
+        userSession,
+        newTokens.expiresIn
+      );
+
+      logger.info(`Token refreshed for user: ${userSession.displayName}`);
+
+      return newTokens;
+    } catch (error) {
+      logger.error('Error refreshing token:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw createError.unauthorized('Failed to refresh token');
+    }
+  }
+
+  // Logout user (invalidate all sessions)
+  static async logout(userId: string, accessToken?: string): Promise<void> {
+    try {
+      if (accessToken) {
+        // Clear the cached session (stored under the access token itself by
+        // storeSession/getUserSession — session:${session.id} was never the
+        // right key here, so this delete used to be a silent no-op).
+        await RedisService.deleteSession(accessToken);
+
+        // Block this specific token for whatever time it had left, so a
+        // logged-out (or leaked) token can't keep being used until it
+        // naturally expires.
+        const decoded = jwt.decode(accessToken) as { exp?: number } | null;
+        const remainingSeconds = decoded?.exp
+          ? decoded.exp - Math.floor(Date.now() / 1000)
+          : 0;
+        if (remainingSeconds > 0) {
+          await RedisService.set(`revoked:${accessToken}`, '1', remainingSeconds);
+        }
+      }
+
+      // Remove from database (also invalidates refresh tokens)
+      await prisma.userSession.deleteMany({
+        where: { userId },
+      });
+
+      logger.info(`User logged out: ${userId}`);
+    } catch (error) {
+      logger.error('Error during logout:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw createError.internal('Failed to logout');
+    }
+  }
+
+  // Get user session from token
+  static async getUserSession(token: string): Promise<UserSession | null> {
+    try {
+      // Try Redis first, but skip cache if an admin recently updated this user
+      const cachedSession = await RedisService.getSession<UserSession>(token);
+      if (cachedSession) {
+        const invalidated = await RedisService.get(`invalidate:${cachedSession.id}`);
+        if (!invalidated) {
+          return cachedSession;
+        }
+        // Cache busted — delete the signal and fall through to DB fetch
+        await RedisService.del(`invalidate:${cachedSession.id}`);
+        await RedisService.deleteSession(token);
+      }
+
+      // Fallback to database
+      const decoded = this.verifyToken(token);
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      const userSession: UserSession = {
+        id: user.id,
+        discordId: user.discordId,
+        displayName: user.displayName,
+        avatar: user.avatarUrl,
+        points: user.points,
+        totalEarned: user.totalEarned,
+        totalSpent: user.totalSpent,
+        isAdmin: user.isAdmin,
+        isModerator: user.isModerator,
+        isVip: user.isVip,
+        isDepositor: user.isDepositor,
+        kickUsername: user.kickUsername || undefined,
+        kickVerified: user.kickVerified,
+        rainbetUsername: user.rainbetUsername || undefined,
+        rainbetVerified: user.rainbetVerified,
+        totalWagered: Number(user.totalWagered ?? 0),
+        createdAt: user.createdAt.toISOString(),
+      };
+
+      // Cache in Redis
+      await RedisService.setSession(token, userSession, 3600); // 1 hour
+
+      return userSession;
+    } catch (error) {
+      logger.error('Error getting user session:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return null;
+    }
+  }
+
+  // Validate user session and update last active
+  static async validateAndUpdateSession(userId: string): Promise<void> {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: new Date() },
+      });
+    } catch (error) {
+      logger.error('Error updating user session:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Don't throw error as this is not critical
+    }
+  }
+
+  // Update (or change) a user's linked Rainbet/Razed username, auto-verified via the Razed API
+  static async updateRainbetUsername(
+    userId: string,
+    rainbetUsername: string
+  ): Promise<{ verified: boolean }> {
+    try {
+      const existing = await prisma.user.findUnique({
+        where: { rainbetUsername },
+        select: { id: true },
+      });
+      if (existing && existing.id !== userId) {
+        throw createError.badRequest(
+          'That Razed username is already linked to another account.'
+        );
+      }
+
+      // Auto-verify against the Razed API when configured; if the username isn't a real
+      // referral under our code, reject the submission outright instead of saving it as
+      // pending. Falls back to manual admin review when the API key isn't configured.
+      let verified = false;
+      if (RazedService.isConfigured()) {
+        verified = await RazedService.isValidReferral(rainbetUsername);
+        if (!verified) {
+          throw createError.badRequest(
+            "We couldn't find that username under our Razed referral code. Double-check the spelling and make sure you signed up using our link, then try again."
+          );
+        }
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          rainbetUsername,
+          rainbetVerified: verified,
+          updatedAt: new Date(),
+        },
+      });
+
+      if (verified) {
+        await RazedWagerSyncService.migrateUnlinkedWagersToUser(userId, rainbetUsername).catch((err) =>
+          logger.error('Failed to migrate orphaned Razed wagers on link:', err)
+        );
+      }
+
+      logger.info(
+        `Rainbet username set for user ${userId}: ${rainbetUsername} (verified=${verified})`
+      );
+
+      return { verified };
+    } catch (error) {
+      logger.error('Error updating Rainbet username:', {
+        userId,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
+  }
+
+  // Update Kick username (can only be done once by user)
+  static async updateKickUsername(
+    userId: string,
+    kickUsername: string
+  ): Promise<void> {
+    try {
+      // Check if user already has a Kick username
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { kickUsername: true },
+      });
+
+      if (user?.kickUsername) {
+        throw createError.badRequest(
+          'Kick username already set. Contact an admin to change it.'
+        );
+      }
+
+      // Update user's Kick username
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          kickUsername,
+          updatedAt: new Date(),
+        },
+      });
+
+      logger.info(`Kick username set for user ${userId}: ${kickUsername}`);
+    } catch (error) {
+      logger.error('Error updating Kick username:', {
+        userId,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
+  }
+}

@@ -1,0 +1,2219 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Live Session · StreamArena</title>
+<link href="/tailwind.css" rel="stylesheet"/>
+<script src="/theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  .input-dark { background:rgb(var(--surface-container-lowest)); border:1px solid rgb(var(--outline-variant)); color:rgb(var(--on-surface)); }
+  .input-dark:focus { border-color:rgb(var(--tertiary)); box-shadow:0 0 0 1px rgb(var(--tertiary)); outline:none; }
+  .glass { background:rgb(var(--surface-container)/.6); backdrop-filter:blur(12px); border:1px solid rgb(var(--outline-variant)); }
+  @keyframes flashIn { 0% { opacity:0; transform:scale(.96) } 100% { opacity:1; transform:none } }
+  .flash-card { animation: flashIn .25s cubic-bezier(.16,1,.3,1); }
+  /* Glow-only pulse: the colour must stay put, or "critical" reads as a fade. */
+  @keyframes pulseRed { 0%,100% { text-shadow:0 0 8px rgb(var(--loss)/.5) } 50% { text-shadow:0 0 22px rgb(var(--loss)/.95) } }
+  .critical { color: rgb(var(--loss)); animation: pulseRed 1s infinite; }
+</style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased flex">
+<main class="flex-1 ml-64 min-h-screen pb-32">
+  <div class="p-lg max-w-[1600px] mx-auto" id="root">
+    <div class="text-on-surface-variant font-data-mono py-xl text-center">Connecting…</div>
+  </div>
+</main>
+
+<!-- Sticky phase-advance bar -->
+<div id="actionbar" class="hidden fixed bottom-0 left-64 right-0 glass border-t border-outline-variant p-md
+     flex justify-between items-center z-40"></div>
+
+<!-- Confirm dialog -->
+<div id="dialog" class="hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50 items-center justify-center p-md"></div>
+
+<script type="module">
+import { api, control, connect, attempt, toast, money, signed, multiplier, countdown, copy, $, escapeHtml, slotTile, requireSessionId } from './app.js'
+import { mountShell } from './shell.js'
+import { bingoBoard, bingoJoining, bingoResult, lineRail, participantList } from './bingo-view.js'
+import { battlesJoining, battlesResult, ledger, pickCard, swingHero, teamColumns } from './battles-view.js'
+import {
+  claimHero, clock as gaClock, currentPrize, entryFeed, entryHero, exhaustedPanel,
+  lockedPanel, oddsPanel, orderPanel, prizeQueue, reelMirror, rejectionStrip,
+  sessionStats, verificationCard, winnersTable,
+} from './giveaways-view.js'
+
+const sessionId = requireSessionId()
+const me = await mountShell({ active: '/session' })
+if (!me) throw new Error('unauthorized')
+
+const detail = await api(`/api/sessions/${sessionId}`)
+
+/*
+ * This page is a control surface: editable bets and wins, close entries, end
+ * session. Pointed at a session that already finished it would invite edits to
+ * a result chat has been told, and the sidebar would call an old hunt the
+ * active one. Finished sessions belong on the read-only recap.
+ *
+ * `created` still lands here — that session has not started but is about to.
+ */
+if (detail.status === 'ended' || detail.status === 'abandoned') {
+  location.replace(`/recap?id=${sessionId}`)
+}
+
+const gameId = detail.gameId
+setGameTheme(gameId)
+// §3 — a streamer can run their own pair, so the two hues follow the session.
+window.setTeamColours?.(detail.config?.teamAColour, detail.config?.teamBColour)
+const currency = detail.config.currency ?? 'EUR'
+let state = detail.state ?? {}
+// Held in a variable rather than written straight to the DOM: onStatus can fire
+// before the first render, and every re-render rebuilds the header.
+let connection = 'connecting'
+
+// The dashboard socket carries the fuller projection — unresolved queue, raw
+// pool, per-viewer detail — that the overlay never sees (§19).
+/** The four states an entry moves through (§21): badge, dot, label. */
+const STATUS_BADGE = {
+  pending: ['bg-surface-variant text-on-surface-variant border-outline-variant', 'bg-outline', 'Matching…'],
+  queued: ['bg-surface-variant text-on-surface-variant border-outline-variant', 'bg-outline', 'Pending'],
+  collected: ['bg-primary/20 text-primary border-primary/30', 'bg-primary', 'Collected'],
+  opened: ['bg-win/15 text-win border-win/30', 'bg-win', 'Opened'],
+}
+
+const socket = connect({
+  url: `${location.origin.replace(/^http/, 'ws')}/ws/session/${sessionId}`,
+  onState: (next) => { state = next; draw() },
+  onCue: showCue,
+  onStatus: (status) => {
+    connection = status
+    paintConnection()
+    if (status === 'ended') setTimeout(() => (location.href = '/history'), 2500)
+  },
+})
+
+draw()
+setInterval(() => { const el = $('#timer'); if (el) tickTimer(el) }, 250)
+/*
+ * Giveaways' two clocks tick locally between server patches — a countdown that
+ * only moved when an event arrived would sit still for whole seconds during the
+ * quietest part of the entry window and jump when someone finally typed.
+ */
+setInterval(() => { if (gameId === 'giveaways') tickGiveawayClocks() }, 500)
+
+// ─── render ─────────────────────────────────────────────────────────────────
+
+function draw() {
+  $('#root').innerHTML =
+    gameId === 'bonus-hunt'
+      ? hunt()
+      : gameId === 'slot-bingo'
+        ? bingo()
+        : gameId === 'team-battles'
+          ? battles()
+          : gameId === 'giveaways'
+            ? giveaways()
+            : tournament()
+  drawActionBar()
+  wire()
+  paintConnection()
+}
+
+function paintConnection() {
+  const dot = $('#conn')
+  const label = $('#conn-label')
+  if (!dot || !label) return
+
+  const [colour, text] = {
+    connected: ['bg-win live-dot', 'Synced'],
+    ended: ['bg-outline', 'Ended'],
+    reconnecting: ['bg-tertiary live-dot', 'Reconnecting…'],
+  }[connection] ?? ['bg-error', 'Connecting…']
+
+  dot.className = `w-2 h-2 rounded-full ${colour}`
+  label.textContent = text
+}
+
+function statTile(label, value, opts = {}) {
+  // A whole class, not a colour name: Tailwind's build-time scanner reads
+  // source text, so an interpolated `text-${x}` would compile to nothing.
+  const accent = opts.accent ?? 'text-on-surface'
+  return `
+  <div class="bg-surface-container p-md rounded-xl border ${opts.border ?? 'border-outline-variant'} flex flex-col justify-center">
+    <span class="text-on-surface-variant font-label-caps text-label-caps uppercase mb-xs flex items-center gap-xs">
+      ${opts.icon ? `<span class="material-symbols-outlined text-[16px]">${opts.icon}</span>` : ''}${escapeHtml(label)}
+    </span>
+    <span class="font-data-mono text-[22px] ${accent}">${value}</span>
+    ${opts.sub ? `<span class="text-[12px] text-on-surface-variant mt-1">${opts.sub}</span>` : ''}
+  </div>`
+}
+
+function header(phases, current) {
+  return `
+  <header class="flex flex-wrap justify-between items-center gap-md mb-lg">
+    <div class="flex items-center gap-lg">
+      <div class="flex items-center gap-xs">
+        <span id="conn" class="w-2 h-2 rounded-full bg-error"></span>
+        <span id="conn-label" class="font-data-mono text-[12px] text-on-surface-variant">Connecting…</span>
+        <span class="sr-only" aria-live="polite"></span>
+      </div>
+      <div class="hidden lg:flex items-center gap-xs">
+        ${phases.map((p, i) => `
+          <div class="flex items-center font-label-caps text-label-caps uppercase tracking-wider
+                      ${p === current ? 'text-primary' : 'text-on-surface-variant opacity-50'}">
+            <span class="w-6 h-6 rounded-full ${p === current ? 'bg-primary text-on-primary' : 'border border-outline-variant'}
+                         flex items-center justify-center mr-2">${i + 1}</span>${p}
+          </div>
+          ${i < phases.length - 1 ? '<div class="w-8 h-px bg-outline-variant mx-sm"></div>' : ''}`).join('')}
+      </div>
+    </div>
+    <div class="flex items-center gap-sm">
+      <button data-copy="${escapeHtml(detail.overlayUrl)}"
+        class="border border-secondary text-secondary hover:bg-secondary/10 px-md py-xs rounded-lg font-data-mono text-[13px]
+               flex items-center gap-xs transition-colors">
+        <span class="material-symbols-outlined text-[16px]">content_copy</span> Copy overlay URL
+      </button>
+      <button data-end
+        class="border border-error text-error hover:bg-error/10 px-md py-xs rounded-lg font-data-mono text-[13px] transition-colors">
+        End session
+      </button>
+    </div>
+  </header>`
+}
+
+// ─── Bonus Hunt ─────────────────────────────────────────────────────────────
+
+function hunt() {
+  const phase = state.phase ?? 'collecting'
+  const phases = ['Collecting', 'Guessing', 'Opening', 'Results']
+  const current = { collecting: 'Collecting', guessing: 'Guessing', opening: 'Opening', complete: 'Results' }[phase]
+
+  const banked = state.collectedCount ?? 0
+  const target = state.targetBonuses ?? 0
+  const profit = state.profit ?? 0
+
+  return `
+  ${header(phases, current)}
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-sm mb-lg">
+    ${statTile('Starting balance', money(state.startBalance, currency))}
+    ${statTile('Bonuses banked', `${banked}<span class="text-on-surface-variant text-[14px]"> / ${target}</span>`,
+      { accent: 'text-primary', border: 'border-primary/30', sub: `${state.suggestionCount ?? 0} suggested` })}
+    ${statTile('Break-even average', breakEven(),
+      { accent: 'text-tertiary', border: 'border-tertiary/50', icon: 'stars',
+        sub: 'per remaining bonus' })}
+    ${statTile('Participants', String(state.participantCount ?? 0), { icon: 'group' })}
+  </div>
+
+  ${phase === 'guessing' ? guessingHero() : ''}
+  ${phase === 'opening' || phase === 'complete' ? openingStats(profit) : ''}
+  ${phase === 'complete' ? resultHero(profit) : ''}
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-lg">
+    <div class="xl:col-span-2 flex flex-col gap-lg">
+      ${unresolved()}
+      ${phase === 'collecting' ? collectingBoard() : phase === 'opening' ? openingBoard() : entryTable(phase)}
+    </div>
+    <div class="flex flex-col gap-lg">
+      ${phase === 'collecting' ? manualAdd() : ''}
+      ${guessPanel(phase)}
+    </div>
+  </div>`
+}
+
+function unresolved() {
+  /*
+   * Bonus Hunt queues entries and the pool games queue people, so the same
+   * panel arrives with two different shapes. Normalise here rather than at four
+   * call sites: the id is whatever the game's resolve action keys on, and the
+   * endpoint accepts it under `entryId` for both.
+   */
+  const items = (state.unresolved ?? []).map((item) => ({
+    ...item,
+    key: item.entryId ?? item.userId,
+    by: item.requestedBy?.username ?? item.username ?? 'someone',
+  }))
+  if (items.length === 0) return ''
+
+  // §20 — the most valuable component in the dashboard. Keyboard shortcuts
+  // because it gets worked in bursts.
+  return `
+  <div class="bg-surface-container-high rounded-xl border border-tertiary/60 p-md">
+    <div class="flex justify-between items-center mb-md">
+      <h3 class="font-body-lg font-bold text-tertiary flex items-center gap-sm">
+        <span class="material-symbols-outlined">warning</span>
+        ${items.length} request${items.length === 1 ? '' : 's'} we couldn't match
+      </h3>
+      <span class="font-data-mono text-[11px] text-on-surface-variant">1/2/3 pick · D discard</span>
+    </div>
+    <div class="flex gap-sm overflow-x-auto pb-xs">
+      ${items.map((item, index) => `
+        <div class="bg-surface-container p-sm rounded-lg min-w-[260px] border ${index === 0 ? 'border-tertiary' : 'border-outline-variant'} flex flex-col gap-xs"
+             data-unresolved="${escapeHtml(item.key)}">
+          <span class="font-data-mono text-on-surface">"${escapeHtml(item.rawText)}"</span>
+          <span class="text-sm text-on-surface-variant">by ${escapeHtml(item.by)}</span>
+          <div class="flex flex-col gap-1 mt-xs">
+            ${(item.suggestions ?? []).slice(0, 3).map((s, i) => `
+              <button data-resolve="${escapeHtml(item.key)}" data-slot="${escapeHtml(s.slotId)}"
+                      data-raw="${escapeHtml(item.rawText)}"
+                class="text-left bg-surface-variant hover:bg-primary hover:text-on-primary px-2 py-1 rounded text-xs
+                       font-bold transition-colors flex justify-between">
+                <span>${i + 1}. ${escapeHtml(s.name)}</span>
+                <span class="opacity-60">${Math.round((s.confidence ?? 0) * 100)}%</span>
+              </button>`).join('') || '<span class="text-[11px] text-on-surface-variant/60">No suggestions</span>'}
+            <div class="flex gap-1 mt-1">
+              <input data-custom="${escapeHtml(item.key)}" placeholder="Type a slot name…"
+                     class="input-dark flex-1 rounded px-2 py-1 text-xs font-data-mono">
+              <button data-discard="${escapeHtml(item.key)}"
+                class="bg-surface-variant hover:bg-error hover:text-on-error px-2 py-1 rounded text-xs font-bold transition-colors">D</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`
+}
+
+/**
+ * Collecting, in two columns: what chat has asked for, and what has landed.
+ *
+ * One mixed list was fine at ten entries and stopped being fine at forty. The
+ * two halves are read at different moments and answer different questions —
+ * "what do I play next" while hunting, "how far in am I" between bonuses — and
+ * a status badge in a long table makes you scan for the answer to both. Split,
+ * each column is countable at a glance, which is what the streamer is doing
+ * with it mid-hunt while also playing.
+ *
+ * Collecting only. Opening reads as a ledger, top to bottom in the order the
+ * bonuses were banked, and splitting it there would be actively worse — so
+ * `entryTable` keeps that phase.
+ */
+function collectingBoard() {
+  const entries = state.entries ?? []
+  // `opened` cannot occur this phase; it sits with collected if it ever does,
+  // since it has certainly been banked.
+  const requested = entries.filter((e) => e.status === 'pending' || e.status === 'queued')
+  const collected = entries.filter((e) => e.status === 'collected' || e.status === 'opened')
+  const target = state.targetBonuses ?? 0
+
+  return `
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-lg items-start">
+    ${huntColumn({
+      title: 'Requested',
+      icon: 'format_list_bulleted',
+      count: `${requested.length}`,
+      accent: 'text-on-surface',
+      rows: requested.map(requestedRow).join(''),
+      empty: `No slots yet. Viewers add them with <span class="font-data-mono text-primary">!sr &lt;slot&gt;</span>`,
+      emptyIcon: 'casino',
+    })}
+    ${huntColumn({
+      title: 'Collected',
+      icon: 'savings',
+      count: target ? `${collected.length} / ${target}` : `${collected.length}`,
+      accent: 'text-primary',
+      border: 'border-primary/30',
+      rows: collected.map(collectedRow).join(''),
+      empty: 'Nothing banked yet. Mark a slot collected when the bonus lands.',
+      emptyIcon: 'hourglass_empty',
+    })}
+  </div>`
+}
+
+function huntColumn({ title, icon, count, accent, border, rows, empty, emptyIcon }) {
+  return `
+  <div class="bg-surface-container rounded-xl border ${border ?? 'border-outline-variant'} overflow-hidden flex flex-col">
+    <div class="p-md border-b ${border ?? 'border-outline-variant'} flex justify-between items-center bg-surface-container-high">
+      <h2 class="font-headline-md text-headline-md font-bold flex items-center gap-sm ${accent}">
+        <span class="material-symbols-outlined">${icon}</span> ${title}
+      </h2>
+      <span class="font-data-mono text-[12px] ${accent}">${count}</span>
+    </div>
+    <div class="overflow-y-auto max-h-[540px] divide-y divide-outline-variant/40">
+      ${rows || `
+        <div class="p-xl text-center text-on-surface-variant">
+          <span class="material-symbols-outlined text-[40px] opacity-40">${emptyIcon}</span>
+          <p class="mt-sm text-sm">${empty}</p>
+        </div>`}
+    </div>
+  </div>`
+}
+
+/** Waiting to be played. The question it answers is "what's next". */
+function requestedRow(e) {
+  const matching = e.status === 'pending'
+
+  return `
+  <div class="p-sm flex items-center gap-sm hover:bg-surface-container-high transition-colors group">
+    ${slotTile(e.slotName, e.thumbnail, 'w-10 h-10 rounded object-cover border border-outline-variant/40 text-[13px] shrink-0')}
+    <div class="min-w-0 flex-1">
+      <div class="font-data-mono text-sm font-bold text-on-surface truncate">${escapeHtml(e.slotName)}</div>
+      <div class="text-[11px] text-on-surface-variant truncate">
+        ${e.provider ? `${escapeHtml(e.provider)} · ` : ''}${escapeHtml(e.requestedBy)}
+      </div>
+    </div>
+    ${matching
+      // The only status worth a badge here: it is the one row the streamer
+      // cannot act on yet, and the unresolved panel above is where it gets
+      // dealt with.
+      ? `<span class="inline-flex items-center gap-1 ${STATUS_BADGE.pending[0]} px-2 py-1 rounded-full text-xs font-bold border shrink-0">
+           <span class="w-2 h-2 rounded-full ${STATUS_BADGE.pending[1]}"></span> ${STATUS_BADGE.pending[2]}
+         </span>`
+      : `<button data-collect="${escapeHtml(e.id)}"
+           class="bg-primary/20 text-primary border border-primary/50 hover:bg-primary hover:text-on-primary
+                  px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap shrink-0">Mark collected</button>`}
+    <button data-remove="${escapeHtml(e.id)}" title="Remove"
+      class="text-on-surface-variant hover:text-error transition-colors shrink-0">
+      <span class="material-symbols-outlined text-[18px]">close</span></button>
+  </div>`
+}
+
+/** Banked. The question it answers is "how far in am I, and at what stake". */
+function collectedRow(e) {
+  return `
+  <div class="p-sm flex items-center gap-sm hover:bg-surface-container-high transition-colors group">
+    ${slotTile(e.slotName, e.thumbnail, 'w-10 h-10 rounded object-cover border border-primary/30 text-[13px] shrink-0')}
+    <div class="min-w-0 flex-1">
+      <div class="font-data-mono text-sm font-bold text-on-surface truncate flex items-center gap-xs">
+        ${escapeHtml(e.slotName)}${bonusBadge(e.bonusType)}
+      </div>
+      <div class="text-[11px] text-on-surface-variant truncate">
+        ${e.provider ? `${escapeHtml(e.provider)} · ` : ''}${escapeHtml(e.requestedBy)}
+      </div>
+    </div>
+    <input data-bet="${escapeHtml(e.id)}" type="number" step="0.01" value="${e.bet ?? 0}" title="Bet"
+           class="input-dark w-20 rounded px-2 py-1 text-sm font-data-mono shrink-0">
+    <button data-uncollect="${escapeHtml(e.id)}" title="Put it back in the queue"
+      class="text-on-surface-variant hover:text-tertiary transition-colors shrink-0">
+      <span class="material-symbols-outlined text-[18px]">undo</span></button>
+    <button data-remove="${escapeHtml(e.id)}" title="Remove"
+      class="text-on-surface-variant hover:text-error transition-colors shrink-0">
+      <span class="material-symbols-outlined text-[18px]">close</span></button>
+  </div>`
+}
+
+/**
+ * Opening, in the same two columns: what is left, and what has landed.
+ *
+ * The split falls out of the state machine rather than being imposed on it —
+ * `entry.setWin` with a figure moves an entry to `opened`, and clearing that
+ * figure moves it back — so a row crosses the board as the streamer types, and
+ * crosses back if they mistyped. The left column is the work remaining and
+ * empties as the hunt finishes; the right is the run so far.
+ *
+ * Opening only, not `complete`. Once the last win is in, the left column is
+ * empty by definition and the interesting thing is the whole run in banking
+ * order, which is what `entryTable` already is.
+ */
+function openingBoard() {
+  const entries = state.entries ?? []
+  const toOpen = entries.filter((e) => e.status !== 'opened')
+  const opened = entries.filter((e) => e.status === 'opened')
+
+  return `
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-lg items-start">
+    ${huntColumn({
+      title: 'To open',
+      icon: 'inventory_2',
+      count: `${toOpen.length}`,
+      accent: 'text-on-surface',
+      rows: toOpen.map(toOpenRow).join(''),
+      empty: 'Every bonus is open. Close the hunt to see the result.',
+      emptyIcon: 'done_all',
+    })}
+    ${huntColumn({
+      title: 'Opened',
+      icon: 'emoji_events',
+      count: entries.length ? `${opened.length} / ${entries.length}` : `${opened.length}`,
+      accent: 'text-primary',
+      border: 'border-primary/30',
+      rows: opened.map(openedRow).join(''),
+      empty: 'Nothing opened yet. Enter a win to start the run.',
+      emptyIcon: 'hourglass_empty',
+    })}
+  </div>`
+}
+
+/** Banked, not yet opened. Typing a win here moves it to the other column. */
+function toOpenRow(e) {
+  return `
+  <div class="p-sm flex items-center gap-sm hover:bg-surface-container-high transition-colors group">
+    ${slotTile(e.slotName, e.thumbnail, 'w-10 h-10 rounded object-cover border border-outline-variant/40 text-[13px] shrink-0')}
+    <div class="min-w-0 flex-1">
+      <div class="font-data-mono text-sm font-bold text-on-surface truncate flex items-center gap-xs">
+        ${escapeHtml(e.slotName)}${bonusBadge(e.bonusType)}
+      </div>
+      <div class="text-[11px] text-on-surface-variant truncate">${escapeHtml(e.requestedBy)}</div>
+    </div>
+    <input data-bet="${escapeHtml(e.id)}" type="number" step="0.01" value="${e.bet ?? 0}" title="Bet"
+           class="input-dark w-16 rounded px-2 py-1 text-sm font-data-mono shrink-0">
+    <input data-win="${escapeHtml(e.id)}" type="number" step="0.01" placeholder="win"
+           value="${e.win ?? ''}" title="Win — entering one opens this bonus"
+           class="input-dark w-24 rounded px-2 py-1 text-sm font-data-mono shrink-0">
+    <button data-remove="${escapeHtml(e.id)}" title="Remove"
+      class="text-on-surface-variant hover:text-error transition-colors shrink-0">
+      <span class="material-symbols-outlined text-[18px]">close</span></button>
+  </div>`
+}
+
+/**
+ * Opened. The multiplier is the number being read aloud, so it leads.
+ *
+ * Bet and win both stay editable: a mistyped bet is only ever noticed once the
+ * multiplier it produces looks wrong, which is after the row has moved here.
+ * Clearing the win sends the row back to the left column, which is the undo.
+ */
+function openedRow(e) {
+  return `
+  <div class="p-sm flex items-center gap-sm hover:bg-surface-container-high transition-colors group">
+    ${slotTile(e.slotName, e.thumbnail, 'w-10 h-10 rounded object-cover border border-primary/30 text-[13px] shrink-0')}
+    <div class="min-w-0 flex-1">
+      <div class="font-data-mono text-sm font-bold text-on-surface truncate flex items-center gap-xs">
+        ${escapeHtml(e.slotName)}${bonusBadge(e.bonusType)}
+      </div>
+      <div class="text-[11px] ${e.multiplier >= 100 ? 'text-tertiary font-bold' : 'text-on-surface-variant'}">
+        ${multiplier(e.multiplier)}
+      </div>
+    </div>
+    <input data-bet="${escapeHtml(e.id)}" type="number" step="0.01" value="${e.bet ?? 0}" title="Bet"
+           class="input-dark w-16 rounded px-2 py-1 text-sm font-data-mono shrink-0">
+    <input data-win="${escapeHtml(e.id)}" type="number" step="0.01" placeholder="—" value="${e.win ?? ''}"
+           title="Win — clearing it puts the bonus back"
+           class="input-dark w-24 rounded px-2 py-1 text-sm font-data-mono text-win shrink-0">
+  </div>`
+}
+
+function entryTable(phase) {
+  const entries = state.entries ?? []
+
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant flex-1 overflow-hidden flex flex-col">
+    <div class="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-high">
+      <h2 class="font-headline-md text-headline-md font-bold">
+        ${phase === 'opening' || phase === 'complete' ? 'Opening' : 'Slots'}
+      </h2>
+      <span class="font-data-mono text-[12px] text-on-surface-variant">${entries.length} entries</span>
+    </div>
+    <div class="overflow-y-auto max-h-[540px]">
+      ${entries.length === 0
+        ? `<div class="p-xl text-center text-on-surface-variant">
+             <span class="material-symbols-outlined text-[40px] opacity-40">casino</span>
+             <p class="mt-sm">No slots yet. Viewers add them with <span class="font-data-mono text-primary">!sr &lt;slot&gt;</span></p>
+           </div>`
+        : `<table class="w-full text-left border-collapse">
+            <thead class="sticky top-0 bg-surface-container-high z-10 border-b border-outline-variant">
+              <tr class="font-label-caps text-label-caps uppercase text-on-surface-variant">
+                <th class="p-sm">Slot</th><th class="p-sm">By</th><th class="p-sm w-28">Bet</th>
+                ${phase === 'opening' || phase === 'complete' ? '<th class="p-sm w-32">Win</th><th class="p-sm w-20 text-right">Mult</th>' : ''}
+                <th class="p-sm">Status</th><th class="p-sm text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="font-data-mono text-sm divide-y divide-outline-variant/40">
+              ${entries.map((e) => entryRow(e, phase)).join('')}
+            </tbody>
+          </table>`}
+    </div>
+  </div>`
+}
+
+function entryRow(e, phase) {
+  const [badge, dot, text] = STATUS_BADGE[e.status] ?? STATUS_BADGE.queued
+  const opening = phase === 'opening' || phase === 'complete'
+  const done = phase === 'complete'
+
+  return `
+  <tr class="hover:bg-surface-container-high transition-colors group ${e.status === 'opened' ? 'opacity-70' : ''}">
+    <td class="p-sm">
+      <div class="flex items-center gap-sm">
+        ${slotTile(e.slotName, e.thumbnail, 'w-10 h-10 rounded object-cover border border-outline-variant/40 text-[13px]')}
+        <div>
+          <div class="font-bold text-on-surface flex items-center gap-xs">
+            ${escapeHtml(e.slotName)}${bonusBadge(e.bonusType)}
+          </div>
+          ${e.provider ? `<div class="text-[11px] text-on-surface-variant">${escapeHtml(e.provider)}</div>` : ''}
+        </div>
+      </div>
+    </td>
+    <td class="p-sm text-on-surface-variant">${escapeHtml(e.requestedBy)}</td>
+    <td class="p-sm">
+      <input data-bet="${escapeHtml(e.id)}" type="number" step="0.01" value="${e.bet ?? 0}" ${done ? 'disabled' : ''}
+             class="input-dark w-24 rounded px-2 py-1 text-sm font-data-mono">
+    </td>
+    ${opening ? `
+      <td class="p-sm">
+        <input data-win="${escapeHtml(e.id)}" type="number" step="0.01" placeholder="—"
+               value="${e.win ?? ''}" ${done ? 'disabled' : ''}
+               class="input-dark w-28 rounded px-2 py-1 text-sm font-data-mono ${e.status === 'opened' ? 'text-win' : ''}">
+      </td>
+      <td class="p-sm text-right ${e.multiplier >= 100 ? 'text-tertiary font-bold' : 'text-on-surface-variant'}">
+        ${multiplier(e.multiplier)}
+      </td>` : ''}
+    <td class="p-sm">
+      <span class="inline-flex items-center gap-1 ${badge} px-2 py-1 rounded-full text-xs font-bold border">
+        <span class="w-2 h-2 rounded-full ${dot}"></span> ${text}
+      </span>
+    </td>
+    <td class="p-sm text-right">
+      <div class="flex items-center justify-end gap-xs">
+        ${e.status === 'queued'
+          ? `<button data-collect="${escapeHtml(e.id)}"
+               class="bg-primary/20 text-primary border border-primary/50 hover:bg-primary hover:text-on-primary
+                      px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap">Mark collected</button>`
+          : e.status === 'collected'
+            ? `<button data-uncollect="${escapeHtml(e.id)}" title="Put it back in the queue"
+                 class="text-on-surface-variant hover:text-tertiary transition-colors">
+                 <span class="material-symbols-outlined text-[18px]">undo</span></button>`
+            : ''}
+        ${!done ? `<button data-remove="${escapeHtml(e.id)}" title="Remove"
+             class="text-on-surface-variant hover:text-error transition-colors">
+             <span class="material-symbols-outlined text-[18px]">close</span></button>` : ''}
+      </div>
+    </td>
+  </tr>`
+}
+
+function manualAdd() {
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant p-md">
+    <h3 class="font-body-lg font-bold mb-md flex items-center gap-sm">
+      <span class="material-symbols-outlined text-primary">add_box</span> Add a slot yourself
+    </h3>
+    <div class="relative">
+      <input id="slot-search" placeholder="Search the catalog…" autocomplete="off"
+             class="input-dark w-full rounded px-md py-sm font-data-mono">
+      <div id="slot-results" class="hidden absolute z-30 left-0 right-0 mt-1 bg-surface-container-high
+           border border-outline-variant rounded-lg shadow-2xl max-h-64 overflow-y-auto"></div>
+    </div>
+    <p class="text-[11px] text-on-surface-variant/70 mt-xs">
+      Nothing matching? Press Enter to add it as a custom slot — the catalog never blocks a hunt.
+    </p>
+  </div>`
+}
+
+function guessingHero() {
+  return `
+  <section class="glass rounded-xl p-lg mb-lg flex flex-col items-center relative overflow-hidden">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-container
+                rounded-full opacity-10 blur-3xl pointer-events-none"></div>
+    <h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Guessing closes in</h2>
+    <div id="timer" data-ends="${state.guessWindowEndsAt ?? ''}"
+         class="font-display-lg text-[72px] font-bold text-primary leading-none mb-lg tabular">—</div>
+    <div class="flex gap-md z-10">
+      <button data-extend
+        class="border border-secondary text-secondary hover:bg-secondary/10 px-6 py-3 rounded-full font-data-mono
+               transition-colors flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">timer</span> Extend 1 min
+      </button>
+      <button data-lock
+        class="bg-primary text-on-primary hover:brightness-110 px-8 py-3 rounded-full font-data-mono font-bold
+               shadow-[0_0_15px_rgb(var(--primary)/.4)] transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">lock</span> Lock guesses &amp; start opening
+      </button>
+    </div>
+  </section>`
+}
+
+function openingStats(profit) {
+  const best = state.bestEntry
+  return `
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-sm mb-lg">
+    ${statTile('Total won', money(state.won, currency), { accent: 'text-primary' })}
+    ${statTile('Best win', best ? money(best.win, currency) : '—',
+      { accent: 'text-tertiary', border: 'border-tertiary/50', icon: 'stars',
+        sub: best ? `${escapeHtml(best.slotName)} · ${multiplier(best.multiplier)}` : '' })}
+    ${statTile('To break even', money(state.toBreakEven, currency))}
+    ${statTile('Profit / loss', signed(profit, currency), { accent: profit >= 0 ? 'text-win' : 'text-error' })}
+  </div>`
+}
+
+function resultHero(profit) {
+  const w = state.winner
+  return `
+  <section class="flex flex-col items-center justify-center py-xl mb-lg">
+    <h2 class="font-label-caps ${profit >= 0 ? 'text-win' : 'text-error'} tracking-widest mb-sm uppercase">
+      ${profit >= 0 ? 'Profit' : 'Loss'}
+    </h2>
+    <div class="text-[72px] font-display-lg ${profit >= 0 ? 'text-win' : 'text-error'} leading-none mb-md tabular">
+      ${signed(profit, currency)}
+    </div>
+    <div class="font-data-mono text-body-lg text-on-surface-variant bg-surface-container px-lg py-xs rounded-full border border-outline-variant">
+      ${money(state.startBalance, currency)}
+      <span class="material-symbols-outlined align-middle mx-xs text-outline text-[18px]">arrow_forward</span>
+      ${money(state.finalBalance, currency)}
+    </div>
+    ${w ? `
+      <div class="mt-lg bg-surface-container border border-primary rounded-xl p-lg text-center
+                  shadow-[0_0_20px_rgb(var(--primary)/.2)]">
+        <div class="font-label-caps text-primary tracking-widest mb-sm">GUESS THE BALANCE WINNER</div>
+        <div class="font-display-lg-mobile text-display-lg-mobile">@${escapeHtml(w.username)}</div>
+        <div class="font-data-mono text-on-surface-variant mt-xs">
+          guessed ${money(w.amount, currency)} · off by ${money(w.difference, currency)}
+        </div>
+      </div>` : ''}
+    <div class="flex gap-sm mt-lg">
+      <a href="/api/sessions/${sessionId}/export.csv"
+         class="border border-outline-variant hover:border-primary px-md py-sm rounded-lg font-data-mono text-sm flex items-center gap-xs">
+        <span class="material-symbols-outlined text-[18px]">download</span> Export CSV
+      </a>
+      <a href="/games" class="bg-primary text-on-primary font-bold px-md py-sm rounded-lg flex items-center gap-xs">
+        <span class="material-symbols-outlined text-[18px]">replay</span> Run another
+      </a>
+    </div>
+  </section>`
+}
+
+function guessPanel(phase) {
+  if (phase === 'collecting') return ''
+
+  // §20 — the five guesses closest to the running total. The streamer's
+  // narration fuel for the whole opening phase.
+  const closest = state.closestGuesses ?? []
+  const recent = state.recentGuesses ?? []
+  const dist = state.guessDistribution ?? {}
+  const showClosest = phase === 'opening' || phase === 'complete'
+
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant flex flex-col overflow-hidden">
+    <div class="p-md border-b border-outline-variant flex justify-between items-center">
+      <h3 class="font-body-lg font-bold flex items-center gap-xs">
+        <span class="material-symbols-outlined text-secondary">monitoring</span>
+        ${showClosest ? 'Closest guesses' : 'Live guesses'}
+      </h3>
+      <span class="font-data-mono text-[12px] text-on-surface-variant">${state.guessCount ?? 0} total</span>
+    </div>
+
+    ${showClosest ? `
+      <div class="flex flex-col gap-xs p-sm">
+        ${closest.length === 0 ? '<p class="text-on-surface-variant text-sm p-sm">Nobody guessed.</p>'
+          : closest.map((g, i) => `
+          <div class="flex items-center justify-between p-sm rounded border
+                      ${i === 0 ? 'bg-surface-container-highest border-secondary/40' : 'bg-surface-container-low border-outline-variant/40'}">
+            <div class="flex items-center gap-sm">
+              <span class="font-data-mono ${i === 0 ? 'text-secondary font-bold' : 'text-on-surface-variant'}">${i + 1}.</span>
+              <span class="font-data-mono text-on-surface">${escapeHtml(g.username)}</span>
+            </div>
+            <div class="text-right">
+              <div class="font-data-mono ${i === 0 ? 'text-secondary' : 'text-on-surface'}">${money(g.amount, currency)}</div>
+              <div class="font-data-mono text-[11px] text-on-surface-variant">off by ${money(g.difference, currency)}</div>
+            </div>
+          </div>`).join('')}
+      </div>`
+    : `
+      <div class="p-md border-b border-outline-variant grid grid-cols-3 gap-sm text-center">
+        <div><span class="block font-label-caps text-[10px] text-on-surface-variant">Lowest</span>
+          <span class="font-data-mono text-sm">${dist.lowest != null ? money(dist.lowest, currency) : '—'}</span></div>
+        <div><span class="block font-label-caps text-[10px] text-on-surface-variant">Median</span>
+          <span class="font-data-mono text-sm">${dist.median != null ? money(dist.median, currency) : '—'}</span></div>
+        <div><span class="block font-label-caps text-[10px] text-on-surface-variant">Highest</span>
+          <span class="font-data-mono text-sm">${dist.highest != null ? money(dist.highest, currency) : '—'}</span></div>
+      </div>
+      <div class="flex-1 overflow-y-auto max-h-72 p-sm flex flex-col gap-1">
+        ${recent.length === 0 ? '<p class="text-on-surface-variant text-sm p-sm">Waiting for guesses…</p>'
+          : recent.map((g) => `
+          <div class="flex items-center justify-between p-2 rounded bg-surface-container-low border border-outline-variant/30">
+            <div class="flex items-center gap-xs">
+              <span class="text-sm">${escapeHtml(g.username)}</span>
+              ${g.edited ? '<span class="text-[10px] text-on-surface-variant/60">(edited)</span>' : ''}
+            </div>
+            <span class="font-data-mono text-sm text-primary">${money(g.amount, currency)}</span>
+          </div>`).join('')}
+      </div>`}
+  </div>`
+}
+
+// ─── Slot Tournament ────────────────────────────────────────────────────────
+
+// ─── Slot Bingo ─────────────────────────────────────────────────────────────
+
+function bingo() {
+  const phase = state.phase ?? 'joining'
+  const phases = ['Joining', 'Draw', 'Playing', 'Results']
+  const current =
+    { joining: 'Joining', draw: 'Draw', placement: 'Draw', pick: 'Playing',
+      buying: 'Playing', result: 'Playing', complete: 'Results' }[phase] ?? 'Playing'
+
+  const net = state.netPosition ?? 0
+
+  return `
+  ${header(phases, current)}
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-sm mb-lg">
+    ${statTile('Total spent', money(state.totalSpent ?? 0, currency))}
+    ${statTile('Returned', money(state.totalReturned ?? 0, currency), { accent: 'text-win' })}
+    ${statTile('Net', signed(net, currency), {
+      accent: net >= 0 ? 'text-win' : 'text-loss',
+      border: net >= 0 ? 'border-win/30' : 'border-loss/30',
+    })}
+    ${statTile(
+      'Lines alive',
+      `${state.linesAlive ?? 0}<span class="text-on-surface-variant text-[14px]"> / ${state.linesTotal ?? 0}</span>`,
+      { accent: 'text-primary', border: 'border-primary/30', icon: 'timeline',
+        sub: `${state.squaresPlayed ?? 0} of ${state.squaresTotal ?? 0} squares played` },
+    )}
+  </div>
+
+  ${phase === 'joining' ? bingoJoining(state) : ''}
+  ${phase === 'complete' ? bingoResult(state) : ''}
+
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+    <div class="xl:col-span-7">${bingoBoard(state, { manualPick: detail.config.allowManualPick !== false })}</div>
+    <div class="xl:col-span-5 flex flex-col gap-lg">${lineRail(state)}${unresolved()}${
+      // The roster is only an answer once the squares have owners — before the
+      // draw the joining panel above is already counting entrants.
+      state.drawCompleted ? participantList(state) : ''
+    }</div>
+  </div>`
+}
+
+// ─── Team Battles ───────────────────────────────────────────────────────────
+
+function battles() {
+  const phase = state.phase ?? 'joining'
+  const phases = ['Joining', 'Pick', 'Flip', 'Result']
+  const current =
+    { joining: 'Joining', pick: 'Pick', flip: 'Flip', buying: 'Flip',
+      result: 'Result', final: 'Result', complete: 'Result' }[phase] ?? 'Pick'
+
+  const showSwing = phase === 'flip' || phase === 'buying'
+
+  return `
+  ${header(phases, current)}
+
+  ${phase === 'joining' ? battlesJoining(state) : ''}
+  ${phase === 'complete' ? battlesResult(state) : ''}
+  ${state.currentPick ? pickCard(state) : ''}
+  ${showSwing ? swingHero(state) : ''}
+
+  ${teamColumns(state)}
+
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+    <div class="xl:col-span-7 flex flex-col gap-lg">
+      ${unresolved()}
+      ${battlesMeta()}
+    </div>
+    <div class="xl:col-span-5">${ledger(state)}</div>
+  </div>`
+}
+
+/** The facts a streamer gets asked about mid-session and shouldn't have to guess. */
+function battlesMeta() {
+  const rows = [
+    ['Pick', `${state.pickNumber ?? 0} of ${state.maxPicks ?? 0}${
+      state.suddenDeathPicks ? ` (+${state.suddenDeathPicks} sudden death)` : ''
+    }`],
+    ['In the pool', String(state.entrantCount ?? 0)],
+    ['Backing a side', `${(state.crowdA ?? 0) + (state.crowdB ?? 0)}${state.sidesLocked ? ' · locked' : ''}`],
+    // §6.1 — the commitment, visible from the first second so the streamer can
+    // point at it when someone claims the flips are rigged.
+    ['Flip commitment', state.flipSequenceHash ?? '—'],
+  ]
+
+  if (state.bagRemaining) {
+    // §2 — a bag whose contents are secret while chat can count them anyway is
+    // the worst of both, so it is shown openly.
+    rows.push([
+      'Chips left',
+      `${state.teams?.A?.name ?? 'A'} ${state.bagRemaining.A} · ${state.teams?.B?.name ?? 'B'} ${state.bagRemaining.B}`,
+    ])
+  }
+
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant p-md">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-md">
+      ${rows
+        .map(
+          ([k, v]) => `
+        <div>
+          <div class="font-label-caps text-label-caps uppercase text-on-surface-variant">${escapeHtml(k)}</div>
+          <div class="font-data-mono text-[15px] mt-xs truncate">${escapeHtml(String(v))}</div>
+        </div>`,
+        )
+        .join('')}
+    </div>
+  </div>`
+}
+
+function tournament() {
+  const phase = state.phase ?? 'joining'
+  const phases = ['Joining', 'Draw', 'Voting', 'Playing', 'Results']
+  const current = { joining: 'Joining', draw: 'Draw', seeding: 'Draw', voting: 'Voting',
+                    playing: 'Playing', complete: 'Results' }[phase]
+
+  return `
+  ${header(phases, current)}
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-sm mb-lg">
+    ${statTile('Entrants joined', String(state.poolCount ?? 0), { accent: 'text-primary' })}
+    ${statTile('Seats', String(state.seats ?? 0))}
+    ${statTile('Drawn', `${(state.entrants ?? []).length} / ${state.seats ?? 0}`)}
+    ${statTile('Predictions', String((state.leaderboard ?? []).length), { icon: 'group' })}
+  </div>
+
+  ${phase === 'joining' ? joiningPanel() : ''}
+  ${phase === 'draw' ? drawPanel() : ''}
+  ${['seeding', 'voting', 'playing'].includes(phase) ? matchPanel(phase) : ''}
+  ${phase === 'complete' ? tournamentResult() : ''}
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-lg mt-lg">
+    <div class="xl:col-span-2">${bracket()}</div>
+    <div class="flex flex-col gap-lg">${unresolved()}${leaderboard()}</div>
+  </div>`
+}
+
+function joiningPanel() {
+  const pool = state.pool ?? []
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant p-md mb-lg">
+    <div class="flex justify-between items-center mb-md">
+      <h3 class="font-body-lg font-bold">Live joins</h3>
+      <span class="font-data-mono text-[12px] text-on-surface-variant">
+        ${pool.length} joined · ${state.seats} seats
+      </span>
+    </div>
+    ${pool.length < (state.seats ?? 0)
+      ? `<div class="mb-md p-sm rounded bg-tertiary/10 border border-tertiary/30 text-tertiary text-sm">
+           Only ${pool.length} joined for ${state.seats} seats. Drawing now creates BYE rounds.
+         </div>` : ''}
+    <div class="max-h-72 overflow-y-auto flex flex-col gap-1">
+      ${pool.length === 0
+        ? `<p class="text-on-surface-variant text-sm p-sm">Waiting — viewers join with
+             <span class="font-data-mono text-primary">!join &lt;slot&gt;</span></p>`
+        : pool.map((p) => `
+        <div class="flex items-center justify-between p-sm rounded bg-surface-container-low border border-outline-variant/30">
+          <div class="flex flex-col">
+            <span class="font-body-md">${escapeHtml(p.username)}</span>
+            <span class="font-data-mono text-[11px] ${p.slotId ? 'text-secondary' : 'text-tertiary'}">
+              ${escapeHtml(p.slotName ?? p.rawText)}${p.slotId ? '' : ' · unmatched'}
+            </span>
+          </div>
+          <button data-reserve="${escapeHtml(p.userId)}"
+            class="border border-primary/50 text-primary hover:bg-primary hover:text-on-primary px-3 py-1 rounded
+                   text-xs font-bold transition-colors">
+            ${(state.reservedUserIds ?? []).includes(p.userId) ? 'Reserved ✓' : 'Reserve'}
+          </button>
+        </div>`).join('')}
+    </div>
+  </div>`
+}
+
+function drawPanel() {
+  const reserved = (state.reservedUserIds ?? []).length
+  return `
+  <section class="glass rounded-xl p-lg mb-lg text-center">
+    <div class="w-16 h-16 rounded-full bg-primary-container/20 flex items-center justify-center mx-auto mb-md border border-primary/30">
+      <span class="material-symbols-outlined text-[32px] text-primary" style="font-variation-settings:'FILL' 1">casino</span>
+    </div>
+    <h2 class="font-headline-md text-headline-md mb-xs">Ready to draw</h2>
+    <p class="font-body-lg text-on-surface-variant mb-lg">
+      Drawing <strong class="text-on-surface">${Math.max(0, (state.seats ?? 0) - reserved)} of ${state.seats}</strong>
+      seats from <strong class="text-on-surface">${state.poolCount ?? 0}</strong> entrants.
+      ${reserved > 0 ? `<span class="text-tertiary">${reserved} reserved.</span>` : ''}
+    </p>
+    <button data-draw class="bg-primary text-on-primary font-headline-md text-headline-md px-xl py-md rounded-lg
+      shadow-[0_0_15px_rgb(var(--primary)/.3)] hover:shadow-[0_0_25px_rgb(var(--primary)/.6)] transition-all">
+      Run the draw
+    </button>
+    <p class="font-label-caps text-label-caps text-on-surface-variant/70 mt-md flex items-center justify-center gap-1">
+      <span class="material-symbols-outlined text-[14px]">warning</span>
+      The draw runs once and can't be re-rolled.
+    </p>
+  </section>`
+}
+
+function matchPanel(phase) {
+  const m = state.currentMatch
+  if (!m || !m.a || !m.b || m.b === 'bye') {
+    return `<div class="glass rounded-xl p-lg mb-lg text-center text-on-surface-variant">
+      No match ready. <button data-advance class="text-primary underline">Advance</button></div>`
+  }
+
+  const split = m.split ?? { aPct: 50, bPct: 50, total: 0 }
+  const voting = m.status === 'voting'
+
+  return `
+  <section class="glass rounded-xl p-lg mb-lg">
+    ${voting ? `
+      <div class="text-center mb-lg">
+        <div class="font-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Voting closes in</div>
+        <div id="timer" data-ends="${state.votingEndsAt ?? ''}"
+             class="font-display-lg text-[56px] font-bold text-primary leading-none tabular">—</div>
+      </div>` : ''}
+
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-md items-center">
+      ${side('a', m.a)}
+      <div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-outline-variant
+                  flex items-center justify-center font-headline-md italic mx-auto">VS</div>
+      ${side('b', m.b)}
+    </div>
+
+    <div class="mt-lg">
+      <div class="flex justify-between font-label-caps text-label-caps mb-xs">
+        <span class="text-primary">${split.aPct}% (${split.a ?? 0})</span>
+        <span class="text-on-surface-variant">${split.total} votes</span>
+        <span class="text-secondary">${split.bPct}% (${split.b ?? 0})</span>
+      </div>
+      <div class="h-3 w-full bg-surface-container-high rounded-full overflow-hidden flex">
+        <div class="h-full bg-primary transition-all duration-500" style="width:${split.aPct}%"></div>
+        <div class="h-full bg-secondary transition-all duration-500" style="width:${split.bPct}%"></div>
+      </div>
+    </div>
+
+    <div class="flex gap-md justify-center mt-lg">
+      ${m.status === 'pending'
+        ? `<button data-startvote class="bg-primary text-on-primary font-bold px-8 py-3 rounded-lg">Open voting</button>`
+        : voting
+          ? `<button data-lockvote class="bg-primary text-on-primary font-bold px-8 py-3 rounded-lg">Lock votes &amp; play</button>`
+          : `<button data-result class="bg-primary text-on-primary font-bold px-8 py-3 rounded-lg flex items-center gap-xs">
+               Confirm result &amp; advance <span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>
+             <button data-revert="${escapeHtml(m.id)}" class="border border-error text-error px-6 py-3 rounded-lg">
+               Revert last match</button>`}
+    </div>
+  </section>`
+}
+
+function side(key, s) {
+  return `
+  <div class="bg-surface rounded-lg p-md border border-outline-variant">
+    <div class="mb-md">
+      <!-- §20 — username above slot name. The viewer is the contender. -->
+      <div class="font-headline-md text-headline-md">@${escapeHtml(s.username)}</div>
+      <div class="font-data-mono text-data-mono text-on-surface-variant">${escapeHtml(s.slotName)}</div>
+    </div>
+    <div class="grid grid-cols-2 gap-sm">
+      <div>
+        <label class="block font-label-caps text-[10px] text-on-surface-variant mb-1">Buy cost</label>
+        <input data-cost="${key}" type="number" step="0.01" value="${s.buyCost ?? ''}" placeholder="0.00"
+               class="input-dark w-full rounded px-2 py-2 font-data-mono">
+      </div>
+      <div>
+        <label class="block font-label-caps text-[10px] text-on-surface-variant mb-1">Payout</label>
+        <input data-payout="${key}" type="number" step="0.01" value="${s.payout ?? ''}" placeholder="0.00"
+               class="input-dark w-full rounded px-2 py-2 font-data-mono">
+      </div>
+    </div>
+    <div class="mt-sm text-center font-data-mono text-tertiary text-[20px]" data-mult="${key}">
+      ${multiplier(s.multiplier)}
+    </div>
+  </div>`
+}
+
+function bracket() {
+  const rounds = state.rounds ?? []
+  if (rounds.length === 0) return ''
+
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant p-md overflow-x-auto">
+    <h3 class="font-body-lg font-bold mb-md flex items-center gap-xs">
+      <span class="material-symbols-outlined">account_tree</span> Bracket
+    </h3>
+    <div class="flex gap-lg min-w-max">
+      ${rounds.map((r) => `
+        <div class="flex flex-col gap-sm justify-around min-w-[200px]">
+          <div class="font-label-caps text-[10px] text-on-surface-variant uppercase">Round ${r.roundIndex + 1}</div>
+          ${r.matches.map((m) => `
+            <div class="bg-surface-container-low rounded-lg border ${
+              m.winner ? 'border-outline-variant/40' : 'border-primary/40'} p-sm text-xs">
+              ${[['a', m.a], ['b', m.b]].map(([k, s]) => {
+                if (s === 'bye') return `<div class="text-on-surface-variant/50 italic py-1">BYE</div>`
+                if (!s) return `<div class="text-on-surface-variant/30 py-1">—</div>`
+                const won = m.winner === k
+                return `<div class="flex justify-between py-1 ${won ? 'text-primary font-bold' : 'text-on-surface-variant'}">
+                  <span class="truncate">@${escapeHtml(s.username)}</span>
+                  <span class="font-data-mono">${s.multiplier != null ? multiplier(s.multiplier) : ''}</span>
+                </div>`
+              }).join('')}
+              ${m.decidedBy && m.decidedBy !== 'multiplier' && m.decidedBy !== 'bye'
+                ? `<div class="mt-1 text-[10px] text-tertiary">decided on ${escapeHtml(m.decidedBy)}</div>` : ''}
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>
+  </div>`
+}
+
+function leaderboard() {
+  const rows = state.leaderboard ?? []
+  return `
+  <div class="bg-surface-container rounded-xl border border-outline-variant p-md">
+    <h3 class="font-body-lg font-bold mb-md">Top predictors</h3>
+    ${rows.length === 0 ? '<p class="text-on-surface-variant text-sm">No predictions scored yet.</p>'
+      : rows.map((r) => `
+      <div class="flex items-center justify-between p-2 rounded hover:bg-surface-container-high">
+        <div class="flex items-center gap-sm">
+          <span class="font-data-mono text-xs ${r.rank === 1 ? 'text-tertiary' : 'text-on-surface-variant'} w-5">#${r.rank}</span>
+          <span class="text-sm">${escapeHtml(r.username)}</span>
+        </div>
+        <span class="font-data-mono text-xs text-on-surface-variant">${r.correct}/${r.total}</span>
+      </div>`).join('')}
+  </div>`
+}
+
+function tournamentResult() {
+  const c = state.champion
+  const t = state.topPredictor
+  return `
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-md mb-lg">
+    <div class="bg-surface p-lg rounded-xl border border-primary shadow-[0_0_20px_rgb(var(--primary)/.2)]">
+      <div class="font-label-caps text-primary tracking-widest mb-md">TOURNAMENT CHAMPION</div>
+      ${c ? `<div class="font-display-lg-mobile text-display-lg-mobile">@${escapeHtml(c.username)}</div>
+             <div class="font-body-md text-on-surface-variant mt-xs">with ${escapeHtml(c.slotName)}</div>`
+          : '<div class="text-on-surface-variant">No champion — the bracket was abandoned.</div>'}
+    </div>
+    <div class="bg-surface p-lg rounded-xl border border-tertiary/60">
+      <div class="font-label-caps text-tertiary tracking-widest mb-md">TOP PREDICTOR</div>
+      ${t ? `<div class="font-display-lg-mobile text-display-lg-mobile">@${escapeHtml(t.username)}</div>
+             <div class="font-data-mono text-on-surface-variant mt-xs">${t.correct}/${t.total} called correctly</div>`
+          : '<div class="text-on-surface-variant">Nobody voted.</div>'}
+    </div>
+  </div>`
+}
+
+// ─── action bar ─────────────────────────────────────────────────────────────
+
+/**
+ * Team Battles' controls, which are phase-gated rather than all-at-once.
+ *
+ * §6.2 is the reason: the veto disappears the moment the flip runs, and it has
+ * to disappear from the screen as well as from the state machine. A disabled
+ * button the streamer can see and hover invites "why can't I", where a control
+ * that is simply gone reads as a rule.
+ *
+ * Nothing here wears a team colour — §3.
+ */
+function battlesActionBar(phase) {
+  const pick = state.currentPick
+
+  if (phase === 'complete') return ''
+
+  if (phase === 'final') {
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        All ${state.maxPicks ?? 0} picks played. Ending announces the winner, the MVP and the Anchor.
+      </div>
+      <button data-tbend class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps">
+        End battle &amp; announce</button>`
+  }
+
+  // Drawn, not yet flipped — the only window where a veto is legal.
+  if (pick && !pick.team) {
+    return `
+      <div class="flex items-center gap-md min-w-0">
+        <div class="min-w-0">
+          <div class="font-bold truncate">@${escapeHtml(pick.username)}</div>
+          <div class="text-[12px] text-on-surface-variant truncate">${escapeHtml(pick.slotName ?? '')}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button data-tbveto class="border border-outline-variant hover:border-loss hover:text-loss
+          text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+          Veto this slot</button>
+        <button data-tbflip class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+          font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+          Run the flip <span class="material-symbols-outlined text-[18px]">shuffle</span></button>
+      </div>`
+  }
+
+  // Flipped — the team is locked and the only way out is the result.
+  if (pick) {
+    const team = state.teams?.[pick.team]
+    return `
+      <div class="flex items-center gap-md min-w-0">
+        <span class="font-label-caps text-label-caps uppercase px-sm py-xs rounded shrink-0
+                     ${pick.team === 'A' ? 'text-team-a bg-team-a/10 border border-team-a/40'
+                                         : 'text-team-b bg-team-b/10 border border-team-b/40'}">
+          ${escapeHtml(team?.name ?? '')}</span>
+        <div class="min-w-0">
+          <div class="font-bold truncate">@${escapeHtml(pick.username)}</div>
+          <div class="text-[12px] text-on-surface-variant truncate">${escapeHtml(pick.slotName ?? '')}</div>
+        </div>
+      </div>
+      <button data-tbresult class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+        font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+        Enter result <span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>`
+  }
+
+  // Between picks.
+  const waiting = state.waitingForEntries
+  return `
+    <div class="text-on-surface-variant font-data-mono text-sm flex items-center gap-sm">
+      ${
+        waiting
+          ? `<span class="material-symbols-outlined text-[18px] text-gold">hourglass_empty</span>
+             Pool is empty — waiting for !join`
+          : `${state.picksRemaining ?? 0} ${state.picksRemaining === 1 ? 'pick' : 'picks'} left`
+      }
+    </div>
+    <div class="flex items-center gap-sm">
+      ${
+        (state.picks ?? []).some((p) => p.multiplier !== null)
+          ? `<button data-tbrevert class="border border-outline-variant hover:border-gold hover:text-gold
+               text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+               Revert last</button>`
+          : ''
+      }
+      <button data-tbdraw ${waiting ? 'disabled' : ''}
+        class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps
+               flex items-center gap-sm hover:brightness-110 transition-all
+               disabled:opacity-40 disabled:cursor-not-allowed">
+        Draw next entrant <span class="material-symbols-outlined text-[18px]">casino</span></button>
+    </div>`
+}
+
+function drawActionBar() {
+  const bar = $('#actionbar')
+  const phase = state.phase
+  let html = ''
+
+  if (gameId === 'bonus-hunt' && phase === 'collecting') {
+    const banked = state.collectedCount ?? 0
+    html = `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${banked} bonus${banked === 1 ? '' : 'es'} banked. Close entries when you're done collecting.
+      </div>
+      <button data-close class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+        font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+        Close entries &amp; ${state.guessEnabled === false ? 'start opening' : 'open guessing'}
+        <span class="material-symbols-outlined">arrow_forward</span>
+      </button>`
+  } else if (gameId === 'bonus-hunt' && phase === 'opening') {
+    const left = state.remainingBonuses ?? 0
+    html = `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${left} bonus${left === 1 ? '' : 'es'} left to open. The hunt finishes automatically on the last one.
+      </div>
+      <button data-finish ${left > 0 ? 'disabled' : ''}
+        class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps
+               disabled:opacity-40 disabled:cursor-not-allowed">Finish hunt</button>`
+  } else if (gameId === 'slot-bingo' && phase === 'joining') {
+    html = `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${state.entrantCount ?? 0} joined. Closing runs the draw and fills the board.
+      </div>
+      <button data-bingodraw class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps">
+        Close joining &amp; fill the board</button>`
+  } else if (gameId === 'slot-bingo' && phase !== 'complete' && state.drawCompleted !== false) {
+    const armed = (state.squares ?? []).find((s) => s.id === state.currentSquareId)
+    const remaining = (state.squares ?? []).filter(
+      (s) => s.owner !== 'open' && s.status !== 'settled',
+    ).length
+
+    html = armed
+      ? `
+      <div class="flex items-center gap-md min-w-0">
+        <span class="font-label-caps text-label-caps uppercase text-primary bg-primary/15
+                     border border-primary/40 px-sm py-xs rounded shrink-0">${escapeHtml(armed.id)}</span>
+        <div class="min-w-0">
+          <div class="font-bold truncate">${escapeHtml(armed.slotName ?? 'Slot')}</div>
+          <div class="text-[12px] text-on-surface-variant truncate">@${escapeHtml(armed.username ?? 'house')}</div>
+        </div>
+        ${
+          // §7.1 — the loudest thing on the bar when it applies: this buy can
+          // end the board right now.
+          (state.matchPointLines ?? []).length > 0
+            ? `<span class="font-label-caps text-label-caps uppercase text-gold bg-gold/10
+                           border border-gold/40 px-sm py-xs rounded shrink-0">Match point</span>`
+            : ''
+        }
+      </div>
+      <button data-bingoresult="${escapeHtml(armed.id)}"
+        class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps
+               flex items-center gap-sm hover:brightness-110 transition-all">
+        Enter result <span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>`
+      : `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${remaining} ${remaining === 1 ? 'square' : 'squares'} left to play.
+      </div>
+      <div class="flex items-center gap-sm">
+        ${
+          detail.config.allowSettleEarly === false
+            ? ''
+            : `<button data-bingosettle class="border border-outline-variant hover:border-loss hover:text-loss
+                 text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+                 Settle early</button>`
+        }
+        <button data-bingopick class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+          font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+          Play next square <span class="material-symbols-outlined text-[18px]">play_arrow</span></button>
+      </div>`
+  } else if (gameId === 'team-battles') {
+    html = battlesActionBar(phase)
+  } else if (gameId === 'giveaways') {
+    html = giveawaysActionBar(phase)
+  } else if (gameId === 'slot-tournament' && phase === 'joining') {
+    html = `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${state.poolCount ?? 0} joined. Close joining when you're ready to draw.
+      </div>
+      <button data-closejoin class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps">
+        Close joining &amp; run draw</button>`
+  }
+
+  bar.innerHTML = html
+  bar.classList.toggle('hidden', html === '')
+  bar.classList.toggle('flex', html !== '')
+}
+
+// ─── timers ─────────────────────────────────────────────────────────────────
+
+function tickTimer(el) {
+  const ends = Number(el.dataset.ends)
+  if (!ends) return
+  const text = countdown(ends)
+  el.textContent = text ?? '00:00'
+  el.classList.toggle('critical', ends - Date.now() < 30_000)
+}
+
+// ─── cues ───────────────────────────────────────────────────────────────────
+
+function showCue(kind, payload) {
+  if (kind === 'inputError') return toast(payload, 'error')
+
+  if (kind === 'flash' && payload.slotName) {
+    toast(`${payload.slotName} paid ${money(payload.win, currency)} · ${multiplier(payload.multiplier)}`, 'success')
+  }
+  if (kind === 'matchResult') {
+    const winner = payload.winner === 'a' ? payload.a : payload.b
+    toast(`@${winner.username} advances · ${multiplier(winner.multiplier)} (${payload.decidedBy})`, 'success')
+  }
+}
+
+// ─── wiring ─────────────────────────────────────────────────────────────────
+
+function wire() {
+  const on = (sel, event, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener(event, fn))
+
+  if (gameId === 'giveaways') wireGiveaways()
+
+  on('[data-copy]', 'click', (e) => copy(e.currentTarget.dataset.copy, 'Overlay URL copied'))
+
+  on('[data-end]', 'click', () =>
+    confirmDialog('End this session?', 'The Kick subscription is released and the game closes.', async () => {
+      await attempt(() => api(`/api/sessions/${sessionId}/end`, { method: 'POST', body: { reason: 'abandoned' } }))
+    }))
+
+  // Entry actions
+  on('[data-collect]', 'click', (e) => collectDialog(e.currentTarget.dataset.collect))
+  on('[data-tbdraw]', 'click', () => act('pick.draw'))
+  on('[data-tbflip]', 'click', () =>
+    confirmDialog(
+      'Run the flip?',
+      'The coin decides the team and the result is final — the veto is gone once this starts. The outcome was committed when the session was created; this only plays it.',
+      () => act('flip.run'),
+    ))
+  on('[data-tbveto]', 'click', () => vetoDialog())
+  on('[data-tbresult]', 'click', () => battlesResultDialog())
+  on('[data-tbrevert]', 'click', () =>
+    confirmDialog(
+      'Revert the last result?',
+      'The numbers are cleared so you can re-enter them. The flip is not re-rolled — same person, same team. The correction is logged and shown on the overlay.',
+      () => act('pick.revert'),
+    ))
+  on('[data-tbend]', 'click', () =>
+    confirmDialog(
+      'End the battle?',
+      'This announces the winning team, the MVP and the Anchor, and publishes the committed flip sequence so anyone can check it.',
+      () => act('battle.end'),
+    ))
+
+  on('[data-bingodraw]', 'click', () => act('draw.run'))
+  on('[data-bingopick]', 'click', () => act('square.pick'))
+  on('[data-pickmanual]', 'click', (e) => act('square.pickManual', { squareId: e.currentTarget.dataset.pickmanual }))
+  on('[data-bingoresult]', 'click', (e) => squareResultDialog(e.currentTarget.dataset.bingoresult))
+  on('[data-bingosettle]', 'click', () =>
+    confirmDialog(
+      'Settle the board here?',
+      'The best fully-played line wins. Lines still holding an unplayed square are not eligible. This is announced as settled early, never silently.',
+      () => act('board.settleEarly'),
+    ))
+
+  on('[data-uncollect]', 'click', (e) => act('entry.uncollect', { entryId: e.currentTarget.dataset.uncollect }))
+  on('[data-remove]', 'click', (e) => act('entry.remove', { entryId: e.currentTarget.dataset.remove }))
+
+  on('[data-bet]', 'change', (e) =>
+    act('entry.setBet', { entryId: e.currentTarget.dataset.bet, bet: Number(e.currentTarget.value) }))
+  on('[data-win]', 'change', (e) =>
+    act('entry.setWin', { entryId: e.currentTarget.dataset.win, win: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) }))
+
+  // Unresolved queue
+  on('[data-resolve]', 'click', (e) => {
+    const { resolve, slot, raw } = e.currentTarget.dataset
+    attempt(() => api(`/api/sessions/${sessionId}/resolve`, {
+      method: 'POST', body: { entryId: resolve, slotId: slot, rawText: raw },
+    }), { success: 'Matched' })
+  })
+  on('[data-discard]', 'click', (e) =>
+    attempt(() => api(`/api/sessions/${sessionId}/resolve`, {
+      method: 'POST', body: { entryId: e.currentTarget.dataset.discard, action: 'discard' },
+    })))
+  on('[data-custom]', 'keydown', (e) => {
+    if (e.key !== 'Enter' || !e.currentTarget.value.trim()) return
+    attempt(() => api(`/api/sessions/${sessionId}/resolve`, {
+      method: 'POST', body: { entryId: e.currentTarget.dataset.custom, customName: e.currentTarget.value.trim() },
+    }), { success: 'Added as a custom slot' })
+  })
+
+  // Phase advance
+  on('[data-close]', 'click', () => closeCollection())
+  on('[data-lock]', 'click', () => act('guesses.lock'))
+  on('[data-extend]', 'click', () => act('guesses.extend', { ms: 60_000 }))
+  on('[data-finish]', 'click', () => act('hunt.complete'))
+
+  // Tournament
+  on('[data-closejoin]', 'click', () => act('join.close'))
+  on('[data-draw]', 'click', () =>
+    confirmDialog('Run the draw?', 'This runs once and cannot be re-rolled.', () => act('draw.run')))
+  on('[data-reserve]', 'click', (e) => act('reserve.add', { userId: e.currentTarget.dataset.reserve }))
+  on('[data-startvote]', 'click', () => act('match.startVoting'))
+  on('[data-lockvote]', 'click', () => act('match.lockVoting'))
+  on('[data-revert]', 'click', (e) => act('match.revert', { matchId: e.currentTarget.dataset.revert }))
+  on('[data-advance]', 'click', () => act('match.startVoting'))
+  on('[data-result]', 'click', () => {
+    const num = (sel) => Number(document.querySelector(sel)?.value ?? 0)
+    act('match.result', {
+      aBuyCost: num('[data-cost="a"]'), aPayout: num('[data-payout="a"]'),
+      bBuyCost: num('[data-cost="b"]'), bPayout: num('[data-payout="b"]'),
+    })
+  })
+
+  // Live multiplier as the streamer types (§16.4).
+  for (const key of ['a', 'b']) {
+    const recompute = () => {
+      const cost = Number(document.querySelector(`[data-cost="${key}"]`)?.value)
+      const payout = Number(document.querySelector(`[data-payout="${key}"]`)?.value)
+      const out = document.querySelector(`[data-mult="${key}"]`)
+      if (out) out.textContent = cost > 0 ? multiplier(payout / cost) : '—'
+    }
+    document.querySelector(`[data-cost="${key}"]`)?.addEventListener('input', recompute)
+    document.querySelector(`[data-payout="${key}"]`)?.addEventListener('input', recompute)
+  }
+
+  slotSearch()
+}
+
+async function closeCollection() {
+  const banked = state.collectedCount ?? 0
+  if (banked === 0 && !confirm('No bonuses banked yet. Close anyway?')) return
+
+  // §13 — spent is captured once, here, because it's the moment the streamer
+  // would naturally look at their balance.
+  confirmDialog(
+    'Close entries',
+    `<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">What's your balance now?</label>
+     <input id="balance-now" type="number" step="0.01" autofocus
+            class="input-dark w-full rounded px-md py-sm font-data-mono text-[20px]">
+     <p class="text-[12px] text-on-surface-variant mt-xs">
+       We use this to work out what the hunt cost — ${banked} bonus${banked === 1 ? '' : 'es'} banked.
+     </p>`,
+    async () => {
+      const value = Number(document.getElementById('balance-now').value)
+      if (!Number.isFinite(value)) return toast('Enter your current balance', 'error')
+      await attempt(() => control(sessionId, 'collection.close', { balanceNow: value }))
+    },
+    { html: true },
+  )
+}
+
+function slotSearch() {
+  const input = $('#slot-search')
+  const results = $('#slot-results')
+  if (!input) return
+
+  let timer
+  input.addEventListener('input', () => {
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      const q = input.value.trim()
+      if (q.length < 2) return results.classList.add('hidden')
+
+      const { slots } = await api(`/api/catalog/slots?q=${encodeURIComponent(q)}&limit=8`)
+      results.innerHTML = slots.length === 0
+        ? `<div class="p-sm text-on-surface-variant text-sm">No match — press Enter to add "${escapeHtml(q)}" as custom.</div>`
+        : slots.map((s) => `
+          <button data-pick='${escapeHtml(JSON.stringify({ slotId: s.slotId, slotName: s.name, provider: s.provider, thumbnail: s.thumbnail }))}'
+            class="w-full text-left px-sm py-2 hover:bg-primary hover:text-on-primary transition-colors flex justify-between">
+            <span>${escapeHtml(s.name)}</span>
+            <span class="text-[11px] opacity-60">${escapeHtml(s.provider ?? '')}</span>
+          </button>`).join('')
+      results.classList.remove('hidden')
+
+      results.querySelectorAll('[data-pick]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          const slot = JSON.parse(btn.dataset.pick)
+          await attempt(() => control(sessionId, 'entry.add', { ...slot, rawText: slot.slotName }),
+            { success: `${slot.slotName} added` })
+          input.value = ''
+          results.classList.add('hidden')
+        }))
+    }, 200)
+  })
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const name = input.value.trim()
+    if (!name) return
+    const { slot } = await attempt(() => api('/api/catalog/slots/custom', { method: 'POST', body: { name } }))
+    await attempt(() => control(sessionId, 'entry.add',
+      { slotId: slot.slotId, slotName: slot.name, rawText: name }), { success: `${slot.name} added` })
+    input.value = ''
+    results.classList.add('hidden')
+  })
+}
+
+// ─── dialog ─────────────────────────────────────────────────────────────────
+
+/**
+ * The required average multiplier, or an honest dash.
+ *
+ * null means no stake has been recorded yet, which is different from zero —
+ * zero would read as "already home" when in fact nothing is known.
+ */
+function breakEven() {
+  const x = state.breakEvenMultiplier
+  return x === null || x === undefined
+    ? '<span class="text-on-surface-variant">—</span>'
+    : `${x.toFixed(2)}x`
+}
+
+const BONUS_TYPES = [
+  ['regular', 'Regular', 'Landed in normal play'],
+  ['super', 'Super', 'Bought or super version'],
+  ['five_scatter', '5 Scatter', 'Five-scatter trigger'],
+]
+
+/**
+ * Asked at the moment of banking a bonus, because that is the one point where
+ * the streamer knows both the bet they were on and how it triggered. The bet is
+ * not optional book-keeping: the break-even multiplier is computed from the
+ * stakes, so a bonus banked without one silently weakens the headline number.
+ */
+/**
+ * Every dashboard mutation goes through one endpoint (§10).
+ *
+ * A declaration at module scope, not a const inside wire(): dialogs and other
+ * handlers defined outside wire() need it too, and a const would also be in its
+ * temporal dead zone during the first draw().
+ */
+
+// ─── Giveaways ──────────────────────────────────────────────────────────────
+
+/**
+ * §4's phases, as the streamer's screen.
+ *
+ * The layout changes completely between them, which is unusual for this product
+ * — every other game keeps one shape and changes what is in it. It is right
+ * here because the phases have nothing in common: three minutes of a climbing
+ * counter, then a held still frame, then a reel, then a named person and a
+ * clock. One layout covering all four would be worst at the two that are on
+ * screen longest.
+ */
+function giveaways() {
+  const phase = state.phase ?? 'idle'
+  const phases = ['Open', 'Locked', 'Draw', 'Claim', 'Complete']
+  const current =
+    { idle: 'Open', open: 'Open', locked: 'Locked', draw: 'Draw',
+      claim: 'Claim', passover: 'Claim', awarded: 'Claim', complete: 'Complete' }[phase] ?? 'Open'
+
+  if (phase === 'complete') {
+    return `
+    ${header(phases, current)}
+    ${sessionStats(state)}
+    ${winnersTable(state)}
+    ${verificationCard(state, sessionId)}`
+  }
+
+  if (phase === 'claim' || phase === 'passover' || phase === 'awarded') {
+    return `
+    ${header(phases, current)}
+    ${state.passoversExhausted ? exhaustedPanel(state) : claimHero(state)}
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+      <div class="xl:col-span-7">${winnersTable(state)}</div>
+      <div class="xl:col-span-5 flex flex-col gap-lg">
+        ${orderPanel(state)}
+        ${prizeQueue(state)}
+      </div>
+    </div>`
+  }
+
+  if (phase === 'locked' || phase === 'draw') {
+    return `
+    ${header(phases, current)}
+    ${lockedPanel(state)}
+    ${phase === 'draw' ? reelMirror(state) : ''}
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+      <div class="xl:col-span-7">${entryFeed(state)}</div>
+      <div class="xl:col-span-5 flex flex-col gap-lg">
+        ${oddsPanel(state)}
+        ${prizeQueue(state)}
+      </div>
+    </div>`
+  }
+
+  return `
+  ${header(phases, current)}
+  ${entryHero(state)}
+  ${rejectionStrip(state)}
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+    <div class="xl:col-span-7">${entryFeed(state)}</div>
+    <div class="xl:col-span-5 flex flex-col gap-lg">
+      ${oddsPanel(state)}
+      ${prizeQueue(state)}
+      ${verificationCard(state, sessionId)}
+    </div>
+  </div>`
+}
+
+/**
+ * The action bar — and the one place a spec rule shows up as an *absence*.
+ *
+ * §11: "there is no re-draw action, at any privilege level, in any phase. Its
+ * absence is a feature." There is no control here that re-runs a draw, and
+ * adding one would require deleting the commitment §3 is built on.
+ */
+function giveawaysActionBar(phase) {
+  if (phase === 'idle') {
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        Ready. Opening entry commits the seed and posts its fingerprint to chat.
+      </div>
+      <button data-ga-open class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+        font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+        Open entry <span class="material-symbols-outlined text-[18px]">how_to_reg</span></button>`
+  }
+
+  if (phase === 'open') {
+    /*
+     * §2 rule 3 — "there is no snap close". This starts a fifteen-second
+     * visible countdown, and the hidden grace runs after that. The button
+     * disables for the duration rather than pretending entries stopped.
+     */
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${(state.entryCount ?? 0).toLocaleString()} in. Closing runs a fifteen-second countdown first — entries never stop instantly.
+      </div>
+      <div class="flex items-center gap-sm">
+        <button data-ga-extend class="border border-outline-variant hover:border-primary hover:text-primary
+          text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+          +60 seconds</button>
+        <button data-ga-close ${state.closing ? 'disabled' : ''}
+          class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase font-label-caps
+                 disabled:opacity-40 disabled:cursor-not-allowed">
+          ${state.closing ? 'Closing…' : 'Close entry'}</button>
+      </div>`
+  }
+
+  if (phase === 'locked') {
+    const prize = currentPrize(state)
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        Hold this frame for a beat — that count is what chat just spent three minutes producing.
+      </div>
+      <button data-ga-draw class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+        font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+        Draw ${escapeHtml(prize?.title ?? 'the prize')}
+        <span class="material-symbols-outlined text-[18px]">casino</span></button>`
+  }
+
+  if (phase === 'draw') {
+    // UI §3 — "every control on the page disables for the duration", replaced
+    // by the one button that jumps to the settle frame.
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">Reel running.</div>
+      <button data-ga-skip class="border border-outline-variant text-on-surface-variant px-md py-sm
+        rounded-lg font-bold uppercase font-label-caps">Skip animation</button>`
+  }
+
+  if ((phase === 'claim' || phase === 'passover') && !state.passoversExhausted) {
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        Each of these is recorded with your reason and shown on the overlay.
+      </div>
+      <div class="flex items-center gap-sm">
+        <button data-ga-claim-extend class="border border-outline-variant hover:border-primary hover:text-primary
+          text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+          +60 seconds</button>
+        <button data-ga-award class="border border-outline-variant hover:border-gold hover:text-gold
+          text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+          Award manually</button>
+        <button data-ga-pass class="border border-outline-variant hover:border-loss hover:text-loss
+          text-on-surface-variant px-md py-sm rounded-lg font-bold uppercase font-label-caps transition-colors">
+          Pass over now</button>
+      </div>`
+  }
+
+  if (phase === 'awarded') {
+    const remaining = (state.prizes ?? []).filter((p) => p.status === 'pending').length
+    if (remaining === 0) return ''
+    return `
+      <div class="text-on-surface-variant font-data-mono text-sm">
+        ${remaining} ${remaining === 1 ? 'prize' : 'prizes'} left. The order carries on from where it stopped.
+      </div>
+      <button data-ga-next class="bg-primary text-on-primary px-xl py-sm rounded-lg font-bold uppercase
+        font-label-caps flex items-center gap-sm hover:brightness-110 transition-all">
+        Next prize <span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>`
+  }
+
+  return ''
+}
+
+/**
+ * §8.4 — "every intervention on this screen carries a required reason and
+ * appears on the overlay."
+ *
+ * A select rather than a free-text box, for the same reason the veto dialog
+ * uses one: the streamer is mid-broadcast and a required field they have to
+ * compose a sentence for is a field they will fill with a full stop. Fixed
+ * options are answerable in one click and stay legible on a public record.
+ */
+function reasonDialog({ title, body, options, confirm, tone = 'primary', onConfirm }) {
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-${tone}"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-base">${escapeHtml(title)}</h2>
+      <p class="text-on-surface-variant mb-lg">${escapeHtml(body)}</p>
+
+      <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Reason</label>
+      <select id="ga-reason" class="input-dark w-full rounded-lg px-sm py-sm mb-lg">
+        ${options.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+      </select>
+
+      <p class="text-[12px] text-on-surface-variant/70 mb-lg leading-relaxed">
+        Recorded in the winners record, badged on the overlay, and shown on the public verification page.
+        Visible discretion is the point — a silent version of this button would undo more than it enables.
+      </p>
+
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant
+          hover:bg-surface-variant transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-${tone} text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          ${escapeHtml(confirm)}</button>
+      </div>
+    </div>`
+
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const close = () => {
+    dialog.classList.add('hidden')
+    dialog.classList.remove('flex')
+  }
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => {
+    await onConfirm($('#ga-reason').value)
+    close()
+  }
+}
+
+/** Handlers for everything the giveaway screens expose. */
+function wireGiveaways() {
+  const on = (sel, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener('click', fn))
+
+  on('[data-ga-open]', () => act('entry.open'))
+  on('[data-ga-close]', () => act('entry.close'))
+  on('[data-ga-extend]', () => act('entry.extend', { ms: 60_000 }))
+  on('[data-ga-draw]', () => act('prize.draw'))
+  on('[data-ga-skip]', () => act('draw.skip'))
+  on('[data-ga-next]', () => act('prize.next'))
+  on('[data-ga-claim-extend]', () => act('claim.extend', { ms: 60_000 }))
+
+  on('[data-ga-award]', () => {
+    const username = state.claim?.username
+    if (!username) return
+    reasonDialog({
+      title: 'Award it by hand',
+      body: `${currentPrize(state)?.title ?? 'This prize'} goes to @${username} without them typing the command.`,
+      options: ["Replied in Discord", "Typo'd the command", 'I know them', 'Other'],
+      confirm: 'Award',
+      tone: 'gold',
+      onConfirm: (reason) => act('prize.award', { username, reason }),
+    })
+  })
+
+  on('[data-ga-award-last]', () => {
+    const last = state.passovers?.[state.passovers.length - 1]
+    if (!last) return
+    reasonDialog({
+      title: 'Award it anyway',
+      body: `@${last.username} ran out of time, but you can still give it to them.`,
+      options: ["Replied in Discord", 'I know them', 'They came back', 'Other'],
+      confirm: 'Award',
+      tone: 'gold',
+      onConfirm: (reason) => act('prize.award', { username: last.username, reason }),
+    })
+  })
+
+  on('[data-ga-pass]', () => {
+    reasonDialog({
+      title: 'Pass over now',
+      body:
+        `@${state.claim?.username ?? 'They'} loses this prize and it moves to the next name. ` +
+        'This is recorded as your decision, not as an expiry — the overlay shows the difference.',
+      options: ['They have left the stream', 'They said to pass', 'Other'],
+      confirm: 'Pass over',
+      tone: 'loss',
+      onConfirm: (reason) => act('prize.passover', { reason }),
+    })
+  })
+
+  on('[data-ga-void]', () => {
+    reasonDialog({
+      title: 'Void this prize',
+      body: 'Nobody gets it. This is announced in chat and recorded against the prize.',
+      options: ['Nobody claimed it', 'No longer available', 'Other'],
+      confirm: 'Void',
+      tone: 'loss',
+      onConfirm: (reason) => act('prize.void', { reason }),
+    })
+  })
+
+  /*
+   * §8.4's third option, and the shape is the argument: the only way to get a
+   * second draw is one that is visibly a second draw. This prize is voided here
+   * and the streamer lands on setup for a new session with a new seed.
+   */
+  on('[data-ga-fresh]', () =>
+    confirmDialog(
+      'Run a fresh giveaway for it?',
+      'This prize is voided here and you start a new session with a new seed. Everyone enters again, and it is obvious to chat that they are.',
+      async () => {
+        await act('prize.void', { reason: 'running a fresh giveaway for it' })
+        location.href = '/setup?game=giveaways'
+      },
+    ))
+
+  on('[data-ga-loosen]', (event) => {
+    const reason = event.currentTarget.dataset.gaLoosen
+    confirmDialog(
+      'Open entry up?',
+      'These viewers still have to type again — nothing is applied retroactively, and the overlay footer updates to say the gate has changed.',
+      () => act('gate.loosen', { reason }),
+    )
+  })
+
+  const verify = $('[data-ga-copy-verify]')
+  verify?.addEventListener('click', () => copy(verify.dataset.gaCopyVerify, 'Verification link copied'))
+}
+
+/**
+ * Both clocks, ticking between patches.
+ *
+ * §16 — "resync the clock from `expiresAtMs`, never from elapsed time on the
+ * client." Every tick recomputes from the absolute timestamp the server sent,
+ * so a throttled tab or a reconnect lands on the right second rather than
+ * drifting and then jumping.
+ */
+function tickGiveawayClocks() {
+  const entry = document.querySelector('[data-ga-clock]')
+  if (entry?.dataset.gaClock) {
+    entry.textContent = gaClock(Number(entry.dataset.gaClock) - Date.now())
+  }
+
+  const claim = document.querySelector('[data-ga-claim]')
+  if (claim) {
+    claim.textContent = gaClock(Math.max(0, Number(claim.dataset.gaClaim) - Date.now()))
+  }
+}
+
+function act(action, payload) {
+  return attempt(() => control(sessionId, action, payload))
+}
+
+/**
+ * A badge only for the types that change how a win reads. A regular bonus is
+ * the default, and labelling every row would make the badge noise rather than
+ * a signal — which is the whole reason to record the type.
+ */
+function bonusBadge(type) {
+  if (type === 'five_scatter') {
+    return `<span class="bg-tertiary text-on-tertiary text-[10px] font-bold px-2 py-0.5
+              rounded-full whitespace-nowrap">5-Scatter</span>`
+  }
+  if (type === 'super') {
+    return `<span class="bg-gradient-to-r from-primary to-loss text-on-primary text-[10px] font-bold
+              px-2 py-0.5 rounded-full whitespace-nowrap">Super</span>`
+  }
+  return ''
+}
+
+/**
+ * The two numbers a square settles on — §6.
+ *
+ * The multiplier is computed and shown as you type, never entered: it is
+ * payout divided by buy cost, and letting it be typed separately is an
+ * invitation for the three numbers to disagree on stream.
+ */
+function squareResultDialog(squareId) {
+  const square = (state.squares ?? []).find((s) => s.id === squareId)
+  const suggested = detail.config?.typicalBuy || ''
+
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-base">
+        ${escapeHtml(squareId)}</h2>
+      <p class="text-on-surface-variant mb-lg">
+        ${escapeHtml(square?.slotName ?? 'Slot')} · @${escapeHtml(square?.username ?? 'house')}</p>
+
+      <div class="grid grid-cols-2 gap-md mb-lg">
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Buy cost</label>
+          <input id="sq-buy" type="number" step="0.01" min="0.01" value="${escapeHtml(String(suggested))}"
+                 class="input-dark w-full rounded-lg px-sm py-xs font-data-mono text-[18px]" autocomplete="off">
+        </div>
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Payout</label>
+          <input id="sq-payout" type="number" step="0.01" min="0" value=""
+                 class="input-dark w-full rounded-lg px-sm py-xs font-data-mono text-[18px]" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="bg-surface-container-low rounded-lg border border-outline-variant/40 p-md mb-lg
+                  flex items-center justify-between">
+        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Multiplier</span>
+        <span id="sq-multi" class="font-data-mono text-[26px] text-on-surface-variant">—</span>
+      </div>
+
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant
+          hover:bg-surface-variant transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-primary text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          Confirm result</button>
+      </div>
+    </div>`
+
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const paint = () => {
+    const buy = Number($('#sq-buy').value)
+    const payout = Number($('#sq-payout').value)
+    const el = $('#sq-multi')
+
+    if (!Number.isFinite(buy) || buy <= 0 || !Number.isFinite(payout) || payout < 0) {
+      el.textContent = '—'
+      el.className = 'font-data-mono text-[26px] text-on-surface-variant'
+      return
+    }
+
+    const x = payout / buy
+    el.textContent = multiplier(Math.round(x * 100) / 100)
+    // Show the tier it will land on before it lands, since the colour is what
+    // the board and every line will be read in.
+    el.className =
+      'font-data-mono text-[26px] ' +
+      (x >= (state.bigWinThresholdX ?? 50)
+        ? 'text-gold'
+        : x >= (state.greenThresholdX ?? 1)
+          ? 'text-win'
+          : 'text-loss')
+  }
+
+  const close = () => {
+    dialog.classList.add('hidden')
+    dialog.classList.remove('flex')
+  }
+
+  $('#sq-buy').oninput = paint
+  $('#sq-payout').oninput = paint
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => {
+    const buyCost = Number($('#sq-buy').value)
+    const payout = Number($('#sq-payout').value)
+    // §6 — buy cost must exceed zero. A payout of zero is valid and common.
+    if (!Number.isFinite(buyCost) || buyCost <= 0) return toast('Buy cost must be more than zero', 'error')
+    if (!Number.isFinite(payout) || payout < 0) return toast('Enter the payout — zero is fine', 'error')
+
+    await act('square.result', { squareId, buyCost, payout })
+    close()
+  }
+
+  $('#sq-payout').onkeydown = (e) => {
+    if (e.key === 'Enter') $('#dlg-ok').click()
+  }
+  setTimeout(() => $('#sq-payout')?.focus(), 50)
+}
+
+/**
+ * The veto — §6.2, and the reason it asks for a reason.
+ *
+ * A veto is the streamer removing somebody's entry, so it goes on the record
+ * with a stated cause. "Curation happens before the coin, or it doesn't happen."
+ */
+function vetoDialog() {
+  const pick = state.currentPick
+  if (!pick) return
+
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-loss"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-base">Veto this slot</h2>
+      <p class="text-on-surface-variant mb-lg">
+        ${escapeHtml(pick.slotName ?? 'This slot')} · @${escapeHtml(pick.username)}</p>
+
+      <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Reason</label>
+      <select id="veto-reason" class="input-dark w-full rounded-lg px-sm py-sm mb-md">
+        <option value="Not on this casino">Not on this casino</option>
+        <option value="Buy is outside the session bounds">Buy is outside the session bounds</option>
+        <option value="Troll entry">Troll entry</option>
+        <option value="Manual override">Manual override</option>
+      </select>
+
+      <label class="flex items-center gap-sm mb-lg cursor-pointer">
+        <input id="veto-remove" type="checkbox" class="accent-primary w-4 h-4">
+        <span class="text-[14px]">Remove them from the pool as well</span>
+      </label>
+
+      <p class="text-[12px] text-on-surface-variant/70 mb-lg leading-relaxed">
+        This uses up pick ${(pick.index ?? 0) + 1} and its committed flip. The sequence is not reshuffled —
+        the next entrant takes the next flip, whoever they turn out to be.
+      </p>
+
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant
+          hover:bg-surface-variant transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-loss text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          Veto</button>
+      </div>
+    </div>`
+
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const close = () => {
+    dialog.classList.add('hidden')
+    dialog.classList.remove('flex')
+  }
+
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => {
+    await act('pick.veto', {
+      reason: $('#veto-reason').value,
+      removeFromPool: $('#veto-remove').checked,
+    })
+    close()
+  }
+}
+
+/**
+ * Cost and payout — §8.1.
+ *
+ * The multiplier is computed as you type rather than entered, and the panel
+ * also answers the question the streamer actually cares about: does this take
+ * the lead? The swing figure is on screen while they are loading the bonus, so
+ * showing whether the number they just typed clears it costs nothing and is the
+ * whole point of §9.3.
+ */
+function battlesResultDialog() {
+  const pick = state.currentPick
+  if (!pick) return
+
+  const team = state.teams?.[pick.team]
+  const isTrailing = state.swingTeam === pick.team
+  const required = state.swing ?? 0
+  const suggested = detail.config?.typicalBuy || ''
+
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 ${pick.team === 'A' ? 'bg-team-a' : 'bg-team-b'}"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-xs">
+        @${escapeHtml(pick.username)}</h2>
+      <p class="text-on-surface-variant mb-lg">
+        ${escapeHtml(pick.slotName ?? 'Slot')} · banking to
+        <span class="${pick.team === 'A' ? 'text-team-a' : 'text-team-b'} font-bold">${escapeHtml(
+          team?.name ?? '',
+        )}</span></p>
+
+      <div class="grid grid-cols-2 gap-md mb-lg">
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Buy cost</label>
+          <input id="tb-buy" type="number" step="0.01" min="0.01" value="${escapeHtml(String(suggested))}"
+                 class="input-dark w-full rounded-lg px-sm py-xs font-data-mono text-[18px]" autocomplete="off">
+        </div>
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Payout</label>
+          <input id="tb-payout" type="number" step="0.01" min="0" value=""
+                 class="input-dark w-full rounded-lg px-sm py-xs font-data-mono text-[18px]" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="bg-surface-container-low rounded-lg border border-outline-variant/40 p-md mb-lg">
+        <div class="flex items-center justify-between">
+          <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Multiplier</span>
+          <span id="tb-multi" class="font-data-mono text-[26px] text-on-surface-variant">—</span>
+        </div>
+        <div id="tb-verdict" class="text-[13px] text-on-surface-variant/70 mt-xs">
+          ${
+            isTrailing && required > 0
+              ? `${escapeHtml((team?.name ?? '').toUpperCase())} need ${multiplier(required)} to take the lead`
+              : 'Extends the lead'
+          }
+        </div>
+      </div>
+
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant
+          hover:bg-surface-variant transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-primary text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          Bank it</button>
+      </div>
+    </div>`
+
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const paint = () => {
+    const buy = Number($('#tb-buy').value)
+    const payout = Number($('#tb-payout').value)
+    const el = $('#tb-multi')
+    const verdict = $('#tb-verdict')
+
+    if (!Number.isFinite(buy) || buy <= 0 || !Number.isFinite(payout) || payout < 0) {
+      el.textContent = '—'
+      el.className = 'font-data-mono text-[26px] text-on-surface-variant'
+      return
+    }
+
+    const x = Math.round((payout / buy) * 100) / 100
+    el.textContent = multiplier(x)
+    el.className =
+      'font-data-mono text-[26px] ' + (x >= 1 ? 'text-win' : 'text-loss')
+
+    if (isTrailing && required > 0) {
+      verdict.textContent =
+        x >= required
+          ? `Takes the lead for ${team?.name ?? ''}`
+          : `${multiplier(required - x)} short of the lead`
+      verdict.className = `text-[13px] mt-xs ${x >= required ? 'text-win' : 'text-on-surface-variant/70'}`
+    }
+  }
+
+  const close = () => {
+    dialog.classList.add('hidden')
+    dialog.classList.remove('flex')
+  }
+
+  $('#tb-buy').oninput = paint
+  $('#tb-payout').oninput = paint
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => {
+    const buyCost = Number($('#tb-buy').value)
+    const payout = Number($('#tb-payout').value)
+    // §8.1 — buy cost must exceed zero. A payout of zero is valid and common.
+    if (!Number.isFinite(buyCost) || buyCost <= 0) return toast('Buy cost must be more than zero', 'error')
+    if (!Number.isFinite(payout) || payout < 0) return toast('Enter the payout — zero is fine', 'error')
+
+    await act('pick.result', { buyCost, payout })
+    close()
+  }
+
+  $('#tb-payout').onkeydown = (e) => {
+    if (e.key === 'Enter') $('#dlg-ok').click()
+  }
+  setTimeout(() => $('#tb-payout')?.focus(), 50)
+}
+
+function collectDialog(entryId) {
+  const entry = (state.entries ?? []).find((e) => e.id === entryId)
+  const suggested = entry?.bet || detail.config?.defaultBet || ''
+
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-base">Bank this bonus</h2>
+      <p class="text-on-surface-variant mb-lg">${escapeHtml(entry?.slotName ?? entry?.rawText ?? 'Slot')}</p>
+
+      <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Base bet</label>
+      <input id="collect-bet" type="number" step="0.01" min="0" value="${escapeHtml(String(suggested))}"
+             class="input-dark w-full rounded-lg px-sm py-xs font-data-mono text-[18px] mb-lg" autocomplete="off">
+
+      <label class="block font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Bonus type</label>
+      <div class="grid grid-cols-3 gap-xs mb-lg" id="collect-type">
+        ${BONUS_TYPES.map(([value, label, hint], i) => `
+          <button data-type="${value}" title="${escapeHtml(hint)}"
+            class="type-btn px-sm py-sm rounded-lg border font-bold text-sm transition-colors
+                   ${i === 0 ? 'border-primary bg-primary/20 text-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary/50'}">
+            ${label}</button>`).join('')}
+      </div>
+
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant hover:bg-surface-variant
+          transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-primary text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          Bank it</button>
+      </div>
+    </div>`
+
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const BASE = 'type-btn px-sm py-sm rounded-lg border font-bold text-sm transition-colors'
+  const SELECTED = `${BASE} border-primary bg-primary/20 text-primary`
+  const UNSELECTED = `${BASE} border-outline-variant text-on-surface-variant hover:border-primary/50`
+
+  let bonusType = 'regular'
+  const paintTypes = () => {
+    for (const button of dialog.querySelectorAll('.type-btn')) {
+      button.className = button.dataset.type === bonusType ? SELECTED : UNSELECTED
+    }
+  }
+  for (const button of dialog.querySelectorAll('.type-btn')) {
+    button.onclick = () => { bonusType = button.dataset.type; paintTypes() }
+  }
+  paintTypes()
+
+  const close = () => { dialog.classList.add('hidden'); dialog.classList.remove('flex') }
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => {
+    const bet = Number($('#collect-bet').value)
+    if (!Number.isFinite(bet) || bet < 0) return toast('Enter the base bet', 'error')
+    await act('entry.markCollected', { entryId, bet, bonusType })
+    close()
+  }
+
+  // Enter banks it; the streamer is mid-hunt and should not need the mouse.
+  $('#collect-bet').onkeydown = (e) => { if (e.key === 'Enter') $('#dlg-ok').click() }
+  setTimeout(() => $('#collect-bet')?.select(), 50)
+}
+
+function confirmDialog(title, body, onConfirm, { html = false } = {}) {
+  const dialog = $('#dialog')
+  dialog.innerHTML = `
+    <div class="bg-surface-container rounded-xl border border-outline-variant shadow-xl max-w-md w-full p-xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+      <h2 class="font-display-lg-mobile text-display-lg-mobile font-bold mb-sm">${escapeHtml(title)}</h2>
+      <div class="text-on-surface-variant mb-lg">${html ? body : escapeHtml(body)}</div>
+      <div class="flex gap-md justify-end">
+        <button id="dlg-cancel" class="px-md py-sm rounded-lg font-bold text-on-surface-variant hover:bg-surface-variant
+          transition-colors font-label-caps uppercase">Cancel</button>
+        <button id="dlg-ok" class="bg-primary text-on-primary px-md py-sm rounded-lg font-bold font-label-caps uppercase">
+          Confirm</button>
+      </div>
+    </div>`
+  dialog.classList.remove('hidden')
+  dialog.classList.add('flex')
+
+  const close = () => { dialog.classList.add('hidden'); dialog.classList.remove('flex') }
+  $('#dlg-cancel').onclick = close
+  $('#dlg-ok').onclick = async () => { await onConfirm(); close() }
+  setTimeout(() => dialog.querySelector('input')?.focus(), 50)
+}
+
+// §20 — the unresolved queue is worked in bursts, so it gets real shortcuts.
+document.addEventListener('keydown', (e) => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return
+  const card = document.querySelector('[data-unresolved]')
+  if (!card) return
+
+  if (['1', '2', '3'].includes(e.key)) {
+    card.querySelectorAll('[data-resolve]')[Number(e.key) - 1]?.click()
+  } else if (e.key.toLowerCase() === 'd') {
+    card.querySelector('[data-discard]')?.click()
+  }
+})
+</script>
+</body>
+</html>

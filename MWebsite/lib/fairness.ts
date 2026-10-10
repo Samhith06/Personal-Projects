@@ -1,0 +1,240 @@
+/**
+ * The fairness engine — UI Spec §36, Master Plan §9.
+ *
+ * Built first, and not because it is the exciting part: every game sits on it,
+ * and retrofitting provable fairness to a game that already shipped means
+ * invalidating every round played before it. The same machinery draws the
+ * giveaway winners, so it is built once and paid for twice.
+ *
+ * Commit–reveal:
+ *   1. The server generates a seed and publishes only its SHA-256 hash.
+ *   2. The player sets their own client seed.
+ *   3. A nonce increments once per round.
+ *   4. The outcome derives deterministically from the three, and from nothing
+ *      else. No timestamp, no balance, no bet size.
+ *
+ * Rotating a seed reveals the old one, at which point every round played on it
+ * can be recomputed by anybody — that is what the /verify page does.
+ */
+import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { DECKS } from './blackjack';
+import { BACCARAT_DECKS, playCoup, type Coup } from './baccarat';
+import { freshShoe, type Card } from './cards';
+import { WHEEL_SEGMENTS } from './games';
+
+export const HOUSE_EDGE = 0.99; // 99% RTP, stated on every paytable.
+
+export function generateServerSeed(): string {
+  return randomBytes(32).toString('hex');
+}
+
+export function hashServerSeed(serverSeed: string): string {
+  return createHash('sha256').update(serverSeed).digest('hex');
+}
+
+/**
+ * The byte stream. HMAC-SHA256 keyed on the server seed over
+ * `clientSeed:nonce:cursor`, with the cursor advancing to produce as many
+ * bytes as a game needs.
+ */
+function* byteStream(serverSeed: string, clientSeed: string, nonce: number): Generator<number> {
+  let cursor = 0;
+  while (true) {
+    const digest = createHmac('sha256', serverSeed)
+      .update(`${clientSeed}:${nonce}:${cursor}`)
+      .digest();
+    for (const byte of digest) yield byte;
+    cursor += 1;
+  }
+}
+
+/**
+ * Floats in [0, 1). Four bytes each, in the standard big-endian base-256
+ * arrangement, so a third party reimplementing the check gets the same answer.
+ */
+export function floats(serverSeed: string, clientSeed: string, nonce: number, count: number): number[] {
+  const stream = byteStream(serverSeed, clientSeed, nonce);
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    let value = 0;
+    for (let j = 0; j < 4; j++) {
+      value += stream.next().value / 256 ** (j + 1);
+    }
+    out.push(value);
+  }
+  return out;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Per-game outcome derivation                                                */
+/* -------------------------------------------------------------------------- */
+
+export type KenoOutcome = { drawn: number[] };
+export type DiceOutcome = { roll: number };
+export type LimboOutcome = { result: number };
+export type WheelOutcome = { index: number };
+
+/** Ten distinct numbers from 1–40, by partial Fisher–Yates over the stream. */
+/**
+ * A fresh shoe, shuffled deterministically from the round's seed. Fisher-Yates
+ * over the same byte stream keno draws from, so the whole shoe is reproducible
+ * by anyone holding the three values — and by nobody beforehand, since the
+ * server seed is only revealed on rotation.
+ *
+ * The deck count is a parameter because the two card games disagree: blackjack
+ * deals from six and baccarat from eight, as both are played. Six is the
+ * default so every existing blackjack round still rebuilds byte for byte.
+ *
+ * It lives here rather than in the rules files because it needs `crypto`, and
+ * those are imported by the table components: a rules file that drags
+ * `node:crypto` into the browser bundle does not build.
+ */
+export function buildShoe(
+  serverSeed: string,
+  clientSeed: string,
+  nonce: number,
+  decks = DECKS,
+): Card[] {
+  const shoe = freshShoe(decks);
+  const swaps = floats(serverSeed, clientSeed, nonce, shoe.length - 1);
+  for (let i = shoe.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(swaps[shoe.length - 1 - i] * (i + 1));
+    const t = shoe[i];
+    shoe[i] = shoe[j];
+    shoe[j] = t;
+  }
+  return shoe;
+}
+
+/**
+ * One baccarat coup, drawn off a freshly shuffled eight-deck shoe.
+ *
+ * A new shoe per coup rather than one carried between rounds, for the same
+ * reason blackjack gets one per hand: a shoe with a history would make a coup's
+ * outcome depend on the rounds before it, and verifying a single round would
+ * mean replaying a whole session.
+ */
+export function baccaratCoup(serverSeed: string, clientSeed: string, nonce: number): Coup {
+  return playCoup(buildShoe(serverSeed, clientSeed, nonce, BACCARAT_DECKS));
+}
+
+export function kenoDraw(serverSeed: string, clientSeed: string, nonce: number, board = 40, draw = 10): KenoOutcome {
+  const pool = Array.from({ length: board }, (_, i) => i + 1);
+  const f = floats(serverSeed, clientSeed, nonce, draw);
+  const drawn: number[] = [];
+  for (let i = 0; i < draw; i++) {
+    const remaining = pool.length - i;
+    const pick = i + Math.floor(f[i] * remaining);
+    [pool[i], pool[pick]] = [pool[pick], pool[i]];
+    drawn.push(pool[i]);
+  }
+  return { drawn };
+}
+
+/** 0.00 – 100.00, two decimal places. */
+export function diceRoll(serverSeed: string, clientSeed: string, nonce: number): DiceOutcome {
+  const [f] = floats(serverSeed, clientSeed, nonce, 1);
+  return { roll: Math.floor(f * 10_001) / 100 };
+}
+
+/**
+ * Which segment the pointer lands on.
+ *
+ * One float across the segment count, and nothing else — the edge lives in the
+ * paytable rather than here, so the wheel is a fair spin over an unfair set of
+ * prizes. That split is what makes it checkable: anyone can recompute the index
+ * from the seeds, then read the multiplier off a published table.
+ */
+export function wheelSpin(
+  serverSeed: string,
+  clientSeed: string,
+  nonce: number,
+  segments: number,
+): WheelOutcome {
+  const [f] = floats(serverSeed, clientSeed, nonce, 1);
+  return { index: Math.min(segments - 1, Math.floor(f * segments)) };
+}
+
+/** The unbounded multiplier, edge applied, floored to two decimals, min 1.00. */
+export function limboResult(serverSeed: string, clientSeed: string, nonce: number): LimboOutcome {
+  const [f] = floats(serverSeed, clientSeed, nonce, 1);
+  const raw = (1 / (1 - f)) * HOUSE_EDGE;
+  return { result: Math.max(1, Math.floor(raw * 100) / 100) };
+}
+
+
+/**
+ * The giveaway draw (§8 of the plan). The winning index derives from the seed
+ * over the giveaway id, across the final entry count — the same commitment, so
+ * anyone who can verify a keno round can verify a draw.
+ */
+export function giveawayWinnerIndex(serverSeed: string, giveawayId: string, entryCount: number): number {
+  const digest = createHmac('sha256', serverSeed).update(giveawayId).digest();
+  let value = 0;
+  for (let j = 0; j < 4; j++) value += digest[j] / 256 ** (j + 1);
+  return Math.floor(value * entryCount);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The verifier                                                               */
+/* -------------------------------------------------------------------------- */
+
+export type VerifyInput = {
+  game: 'keno' | 'dice' | 'limbo' | 'wheel' | 'baccarat';
+  serverSeed: string;
+  clientSeed: string;
+  nonce: number;
+};
+
+export type VerifyResult = {
+  serverSeedHash: string;
+  outcome: KenoOutcome | DiceOutcome | LimboOutcome | WheelOutcome | Coup;
+  /** A human-readable rendering of the same thing, for the result panel. */
+  display: string;
+};
+
+export function verify(input: VerifyInput): VerifyResult {
+  const { game, serverSeed, clientSeed, nonce } = input;
+  const serverSeedHash = hashServerSeed(serverSeed);
+
+  switch (game) {
+    case 'keno': {
+      const outcome = kenoDraw(serverSeed, clientSeed, nonce);
+      return { serverSeedHash, outcome, display: outcome.drawn.join(', ') };
+    }
+    case 'dice': {
+      const outcome = diceRoll(serverSeed, clientSeed, nonce);
+      return { serverSeedHash, outcome, display: outcome.roll.toFixed(2) };
+    }
+    case 'limbo': {
+      const outcome = limboResult(serverSeed, clientSeed, nonce);
+      return { serverSeedHash, outcome, display: `${outcome.result.toFixed(2)}×` };
+    }
+    case 'wheel': {
+      // The index is what the seeds decide; the multiplier is read off the
+      // published table for whichever risk was played. Only the index can be
+      // recomputed here, so that is what is shown — inventing a multiplier
+      // would mean guessing a risk level the seeds do not carry.
+      const outcome = wheelSpin(serverSeed, clientSeed, nonce, WHEEL_SEGMENTS);
+      return {
+        serverSeedHash,
+        outcome,
+        display: `segment ${outcome.index + 1} of ${WHEEL_SEGMENTS}`,
+      };
+    }
+    case 'baccarat': {
+      // The whole coup is recomputable, cards included: the drawing rules take
+      // no decisions from anybody, so the seeds fix every card that comes out.
+      const outcome = baccaratCoup(serverSeed, clientSeed, nonce);
+      const hand = (cards: Card[]) => cards.map((c) => `${c.r}${c.s}`).join(' ');
+      return {
+        serverSeedHash,
+        outcome,
+        display:
+          `Player ${outcome.playerTotal} (${hand(outcome.player)}) · ` +
+          `Banker ${outcome.bankerTotal} (${hand(outcome.banker)}) · ` +
+          `${outcome.outcome} wins`.replace('tie wins', 'tie'),
+      };
+    }
+  }
+}

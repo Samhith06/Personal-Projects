@@ -1,0 +1,214 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* ─── Accessibility baseline ───────────────────────────────────────────────
+   Applies site-wide. Keep these rules ahead of component styles so a component
+   can still opt out deliberately, but never has to opt *in* to being usable. */
+
+/* Visible keyboard focus. :focus-visible only fires for keyboard/AT users, so
+   mouse clicks stay visually clean. WCAG 2.4.7. */
+:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Never leave a control with no focus affordance: if something removes the
+   outline, this ring still lands. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Screen-reader-only text — for icon-only controls and section labels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+/* NOTE: don't redefine `.focus\:not-sr-only:focus` here — Tailwind generates its
+   own copy after this file in the cascade and wins. The skip link's revealed
+   appearance is styled with utilities on the element itself instead. */
+
+/* Respect the OS "reduce motion" setting. The site leans on Framer Motion and
+   long CSS transitions; for vestibular-sensitive users all of that collapses to
+   an instant state change rather than being removed (content must still appear).
+   WCAG 2.3.3. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Minimum touch target for coarse pointers (WCAG 2.5.5 / 2.5.8).
+   Opt-in class so dense admin tables can stay dense on desktop. */
+@media (pointer: coarse) {
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: #0b0f14;
+  color: white;
+}
+
+body {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0810;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3d2e08;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Hide scrollbar but keep scroll behaviour */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Glassmorphism */
+.glass {
+  background: rgba(20, 16, 30, 0.65);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(245, 158, 11, 0.08);
+}
+
+/* Gold glow effects */
+.neon-glow {
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.25);
+}
+
+.neon-text {
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+/* Button shimmer */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+  /* Transition only what actually moves. `all` also animated `outline`, which
+     made the keyboard focus ring fade in (and resolve to the UA default rather
+     than our gold) instead of appearing instantly — a focus indicator must be
+     immediate. It's also cheaper: `all` forces the compositor to watch every
+     animatable property. */
+  transition: background-color 0.3s ease, color 0.3s ease,
+    box-shadow 0.3s ease, transform 0.3s ease, filter 0.3s ease;
+}
+
+.btn-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.07),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.btn-glow:hover::before {
+  left: 100%;
+}
+
+/* Card hover */
+.card-hover {
+  transition: all 0.25s ease;
+}
+
+.card-hover:hover {
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3), 0 8px 32px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Prize green */
+.prize-text {
+  color: #22c55e;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.25);
+}
+
+/* Gold label */
+.gold-text {
+  color: #f59e0b;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+
+/* Rank badge */
+.rank-badge {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Premium hero card hover (used by the redesigned homepage Hero only) */
+.premium-card {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+
+.premium-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(92, 160, 242, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 24px rgba(21, 101, 216, 0.18);
+}
+
+/* Subtle gold glow on hover for the primary CTA */
+.premium-gold-hover {
+  transition: box-shadow 0.3s ease, transform 0.3s ease, filter 0.3s ease;
+}
+
+.premium-gold-hover:hover {
+  box-shadow: 0 0 28px rgba(247, 181, 44, 0.45);
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2.5rem;
+  }
+  .hero-subtitle {
+    font-size: 1.1rem;
+  }
+}

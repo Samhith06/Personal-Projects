@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Streamer — FGDR</title>
+  <meta name="description" content="FGDR creator profile: live status, schedule, recent streams, challenges and milestones.">
+  <meta name="theme-color" content="#05060a">
+  <meta name="color-scheme" content="dark">
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page-profile">
+  <div id="site-header"></div>
+
+  <main id="main">
+    <section class="p-hero" data-mount="p-hero" aria-busy="true">
+      <div class="container p-hero__inner"><div class="skeleton skeleton--hero" aria-hidden="true"><span></span><span></span><span></span></div></div>
+    </section>
+
+    <div class="container p-body">
+      <div class="p-main">
+        <section class="p-card reveal" aria-labelledby="p-about-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-about-title">About</h2></header>
+          <div data-mount="p-about"><div class="skeleton skeleton--row" aria-hidden="true"><span></span><span></span><span></span></div></div>
+        </section>
+
+        <section class="p-card reveal" aria-labelledby="p-stats-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-stats-title">Wager stats</h2><span class="kicker">Via FGDR affiliate</span></header>
+          <dl class="p-stats" data-mount="p-stats"></dl>
+        </section>
+
+        <section class="p-card reveal" aria-labelledby="p-wins-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-wins-title">Wall of fame</h2><a class="link-arrow" href="index.html#wall">Full wall<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></header>
+          <div class="p-wins" data-mount="p-wins"></div>
+        </section>
+
+        <section class="p-card reveal" aria-labelledby="p-clips-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-clips-title">Clips</h2><button class="btn btn--ghost btn--sm" type="button" data-open-upload data-mount="p-upload" hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>Submit a clip</button></header>
+          <div class="p-clips" data-mount="p-clips"></div>
+        </section>
+
+        <section class="p-card reveal" aria-labelledby="p-streams-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-streams-title">Recent streams</h2></header>
+          <div data-mount="p-streams"><div class="skeleton skeleton--row" aria-hidden="true"><span></span><span></span><span></span></div></div>
+        </section>
+
+        <section class="p-card p-card--flush reveal" aria-labelledby="p-challenges-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-challenges-title">Challenges</h2><a class="link-arrow" href="index.html#challenges">All challenges<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a></header>
+          <div class="p-challenges" data-mount="p-challenges"></div>
+        </section>
+      </div>
+
+      <aside class="p-side" aria-label="Channel details">
+        <section class="p-card p-live reveal" data-mount="p-live" aria-live="polite"></section>
+
+        <section class="p-card reveal" aria-labelledby="p-sched-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-sched-title">Stream schedule</h2><span class="kicker" data-tz></span></header>
+          <div data-mount="p-schedule"></div>
+        </section>
+
+        <section class="p-card reveal" aria-labelledby="p-ms-title">
+          <header class="p-card__head"><h2 class="p-card__title" id="p-ms-title">Milestones</h2></header>
+          <ul class="p-ms" data-mount="p-milestones"></ul>
+        </section>
+      </aside>
+    </div>
+
+    <section class="section section--compact" aria-labelledby="p-crew-title">
+      <div class="container">
+        <header class="sec-head reveal">
+          <div>
+            <p class="eyebrow">FGDR</p>
+            <h2 class="sec-title sec-title--sm" id="p-crew-title">More from the crew</h2>
+          </div>
+        </header>
+        <div class="p-crew reveal" data-mount="p-crew"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/kick-player.js"></script>
+  <script src="js/highlights.js"></script>
+  <script src="js/preview-tools.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>

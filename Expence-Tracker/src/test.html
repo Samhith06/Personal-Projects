@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracker</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #1a1f2e;
+      color: #d1d5db;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      background-image: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"%3E%3Cpath fill="%23222" d="M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,85.3C672,75,768,85,864,96C960,107,1056,117,1152,122.7C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"%3E%3C/path%3E%3C/svg%3E');
+      background-size: cover;
+    }
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-info span {
+      font-size: 16px;
+      color: #d1d5db;
+    }
+    .sign-out {
+      background: #ef4444;
+      border: none;
+      border-radius: 5px;
+      padding: 5px 10px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .sign-out:hover {
+      background: #b91c1c;
+    }
+    .header h1 {
+      font-size: 32px;
+      color: #00cc99;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header h1::before {
+      content: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2300cc99" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-dollar-sign"%3E%3Cline x1="12" y1="1" x2="12" y2="23"%3E%3C/line%3E%3Cpath d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"%3E%3C/path%3E%3C/svg%3E');
+      margin-right: 8px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #9ca3af;
+      margin: 5px 0 0;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: rgba(26, 31, 46, 0.9);
+      border-radius: 10px;
+      padding: 15px;
+      text-align: center;
+      backdrop-filter: blur(5px);
+    }
+    .card.income { background: linear-gradient(135deg, #10b981, #047857); }
+    .card.spent { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .card.balance { background: linear-gradient(135deg, #10b981, #047857); }
+    .card h3 { font-size: 14px; color: #d1d5db; margin: 0 0 5px; }
+    .card .amount { font-size: 24px; font-weight: bold; color: #fff; }
+    .card .subtext { font-size: 12px; color: #9ca3af; }
+    .form-card, .expenses-card {
+      background: rgba(26, 31, 46, 0.9);
+      border-radius: 10px;
+      padding: 15px;
+      backdrop-filter: blur(5px);
+    }
+    .form-card {
+      grid-column: span 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .form-group {
+      margin-bottom: 8px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 3px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 6px;
+      background: #1f2937;
+      border: none;
+      border-radius: 5px;
+      color: #d1d5db;
+      font-size: 14px;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border: 1px solid #00cc99;
+    }
+    .form-card button {
+      background: #00cc99;
+      border: none;
+      border-radius: 5px;
+      padding: 8px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .form-card button:hover {
+      background: #00b38d;
+    }
+    .income-form button {
+      background: #10b981;
+    }
+    .income-form button:hover {
+      background: #047857;
+    }
+    .expenses-card {
+      grid-column: span 2;
+    }
+    .expenses-card h3 {
+      font-size: 18px;
+      margin: 0 0 10px;
+      color: #d1d5db;
+    }
+    .expense-item {
+      background: #1f2937;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .expense-item .details {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .expense-item .details img {
+      width: 20px;
+      height: 20px;
+    }
+    .expense-item .amount {
+      color: #ef4444;
+      font-weight: bold;
+    }
+    .expense-item button {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+    }
+    .expense-item button:hover {
+      color: #d1d5db;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Expense Tracker</h1>
+      <div class="user-info">
+        <span>Welcome, John Doe</span>
+        <button class="sign-out" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+    <p class="header p">Take control of your finances. Track your spending, categorize expenses, and monitor your financial habits.</p>
+    <div class="cards">
+      <div class="card income">
+        <h3>Monthly Income</h3>
+        <div class="amount" id="income">$4500.00</div>
+        <div class="subtext">This month's income</div>
+      </div>
+      <div class="card spent">
+        <h3>Month Spent</h3>
+        <div class="amount" id="spent">$0.00</div>
+        <div class="subtext">0 expenses this month</div>
+      </div>
+      <div class="card balance">
+        <h3>Balance</h3>
+        <div class="amount" id="balance">$4500.00</div>
+        <div class="subtext">Available to spend</div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="form-card income-form">
+        <h3>Monthly Income</h3>
+        <div class="form-group">
+          <label>Monthly Income ($)</label>
+          <input type="number" id="incomeInput" value="4500">
+        </div>
+        <button onclick="updateIncome()">Update Income</button>
+      </div>
+      <div class="form-card">
+        <h3>Add New Expense</h3>
+        <div class="form-group">
+          <label>Amount ($)</label>
+          <input type="number" id="amount" value="0.00">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="date">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="description" placeholder="What did you spend on?">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="category">
+            <option value="Food & Dining">Food & Dining</option>
+            <option value="Transportation">Transportation</option>
+            <option value="Bills & Utilities">Bills & Utilities</option>
+          </select>
+        </div>
+        <button onclick="addExpense()">Add Expense</button>
+      </div>
+      <div class="form-card expenses-card">
+        <h3>Recent Expenses</h3>
+        <div id="expenseList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let monthlyIncome = parseFloat(localStorage.getItem('monthlyIncome')) || 4500.00;
+    let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+
+    function updateIncome() {
+      const income = parseFloat(document.getElementById('incomeInput').value);
+      if (!isNaN(income) && income >= 0) {
+        monthlyIncome = income;
+        localStorage.setItem('monthlyIncome', monthlyIncome);
+        updateSummary();
+      }
+    }
+
+    function addExpense() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const date = document.getElementById('date').value;
+      const description = document.getElementById('description').value;
+      const category = document.getElementById('category').value;
+
+      if (amount && date && description && category) {
+        const expense = { id: Date.now(), amount, date, description, category };
+        expenses.push(expense);
+        localStorage.setItem('expenses', JSON.stringify(expenses));
+        document.getElementById('amount').value = '0.00';
+        document.getElementById('description').value = '';
+        renderExpenses();
+        updateSummary();
+      }
+    }
+
+    function deleteExpense(id) {
+      expenses = expenses.filter(exp => exp.id !== id);
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      renderExpenses();
+      updateSummary();
+    }
+
+    function renderExpenses() {
+      const expenseList = document.getElementById('expenseList');
+      expenseList.innerHTML = '';
+      expenses.forEach(expense => {
+        const div = document.createElement('div');
+        div.className = 'expense-item';
+        div.innerHTML = `
+          <div class="details">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23facc15' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='feather feather-${expense.category === 'Food & Dining' ? 'utensils' : expense.category === 'Transportation' ? 'car' : 'lightbulb'}'%3E%3Cpath d='${expense.category === 'Food & Dining' ? 'M3 10h18M7 15h1v-6h4v6h1M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z' : expense.category === 'Transportation' ? 'M15 10l-4 4l4 4m-4-8l-4 4l4 4' : 'M12 6v6l4 2'}'%3E%3C/path%3E%3C/svg%3E" alt="${expense.category}">
+            <div>
+              <div>${expense.description}</div>
+              <div>${expense.category}</div>
+              <div>${expense.date}</div>
+            </div>
+          </div>
+          <div class="amount">$${expense.amount.toFixed(2)}</div>
+          <button onclick="deleteExpense(${expense.id})">🗑️</button>
+        `;
+        expenseList.appendChild(div);
+      });
+    }
+
+    function updateSummary() {
+      const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      document.getElementById('income').textContent = `$${monthlyIncome.toFixed(2)}`;
+      document.getElementById('spent').textContent = `$${totalSpent.toFixed(2)}`;
+      document.getElementById('balance').textContent = `$${(monthlyIncome - totalSpent).toFixed(2)}`;
+    }
+
+    function signOut() {
+      alert('Signed out!'); // Placeholder for sign-out logic
+      // Add actual sign-out logic here (e.g., clear session, redirect)
+    }
+
+    // Load data on page load
+    updateSummary();
+    renderExpenses();
+  </script>
+</body>
+</html>

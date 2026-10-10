@@ -1,0 +1,387 @@
+import { prisma } from '@/config/database';
+
+const USER_SELECT = {
+  id: true,
+  displayName: true,
+  kickUsername: true,
+  avatarUrl: true,
+} as const;
+
+function toDateOnly(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const HALF_DAY_MS = ONE_DAY_MS / 2;
+
+/**
+ * Wager data is stored per whole UTC day, but race start/end times rarely land on a UTC
+ * day boundary (e.g. midnight BST). Including a boundary day outright whenever the race
+ * window merely touches it would pull in a day's full wagered total for as little as an
+ * hour of real overlap. Instead, a boundary day only counts if the race actually covers
+ * at least half of it — the closest approximation possible without sub-day wager data.
+ */
+function firstIncludedDay(startDate: Date): Date {
+  const dayStart = toDateOnly(startDate);
+  const msIntoDay = startDate.getTime() - dayStart.getTime();
+  return msIntoDay < HALF_DAY_MS ? dayStart : new Date(dayStart.getTime() + ONE_DAY_MS);
+}
+
+function lastIncludedDay(endDate: Date): Date {
+  const dayStart = toDateOnly(endDate);
+  const msIntoDay = endDate.getTime() - dayStart.getTime();
+  return msIntoDay >= HALF_DAY_MS ? dayStart : new Date(dayStart.getTime() - ONE_DAY_MS);
+}
+
+interface RacePrize {
+  position: number;
+  amount: number;
+}
+
+type RacePhase = 'upcoming' | 'active' | 'ended';
+export type RaceType = 'WEEKLY' | 'MONTHLY';
+
+/**
+ * `startDate`/`endDate` carry exact times (e.g. 18:30 BST) for display/countdown/status
+ * purposes, but the underlying wager data (`RazedDailyWager`/`RazedUnlinkedWager`) is only
+ * ever stored at whole-UTC-day granularity — so standings always aggregate by the whole
+ * UTC calendar days the race's exact window overlaps, not sub-day precision.
+ */
+function getPhase(startDate: Date, endDate: Date, status: string): RacePhase {
+  if (status === 'ended') return 'ended';
+  const now = Date.now();
+  if (now < startDate.getTime()) return 'upcoming';
+  if (now >= endDate.getTime()) return 'ended';
+  return 'active';
+}
+
+export class WagerLeaderboardService {
+  /** Ranks every wagerer under our Razed code within [startDate, endDate] — linked site accounts and unlinked Razed usernames alike. */
+  static async computeStandings(startDate: Date, endDate: Date, prizes: RacePrize[], limit = 50) {
+    // Wager rows are date-only, so the query window snaps to whole UTC days that the
+    // race's exact [startDate, endDate) window covers at least half of.
+    const queryStart = firstIncludedDay(startDate);
+    const queryEnd = lastIncludedDay(endDate);
+
+    const [linkedSums, allLinkedUsers, unlinkedSums] = await Promise.all([
+      prisma.razedDailyWager.groupBy({
+        by: ['userId'],
+        where: { date: { gte: queryStart, lte: queryEnd } },
+        _sum: { amount: true },
+      }),
+      prisma.user.findMany({
+        where: { rainbetUsername: { not: null } },
+        select: { ...USER_SELECT, rainbetUsername: true },
+      }),
+      prisma.razedUnlinkedWager.groupBy({
+        by: ['razedUsername'],
+        where: { date: { gte: queryStart, lte: queryEnd } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const userMap = new Map(allLinkedUsers.map((u) => [u.id, u]));
+    const linkedUsernames = new Set(allLinkedUsers.map((u) => u.rainbetUsername!.toLowerCase()));
+
+    const linkedRows = linkedSums
+      .map((r) => {
+        const wagered = Number(r._sum.amount ?? 0);
+        const u = userMap.get(r.userId);
+        if (!u || wagered <= 0) return null;
+        return {
+          userId: u.id as string | null,
+          displayName: u.displayName,
+          kickUsername: u.kickUsername,
+          avatarUrl: u.avatarUrl,
+          wagered,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    const unlinkedRows = unlinkedSums
+      .filter((r) => Number(r._sum.amount ?? 0) > 0 && !linkedUsernames.has(r.razedUsername))
+      .map((r) => ({
+        userId: null as string | null,
+        displayName: r.razedUsername,
+        kickUsername: null as string | null,
+        avatarUrl: null as string | null,
+        wagered: Number(r._sum.amount ?? 0),
+      }));
+
+    const combinedAll = [...linkedRows, ...unlinkedRows].sort((a, b) => b.wagered - a.wagered);
+    // Summed over every wagerer in the window, not just the slice below — otherwise the
+    // total would silently shrink to whatever the display limit happens to be.
+    const totalWagered = combinedAll.reduce((sum, row) => sum + row.wagered, 0);
+    const combined = combinedAll.slice(0, limit);
+
+    const standings = combined.map((row, i) => {
+      const position = i + 1;
+      const prize = prizes.find((p) => p.position === position);
+      return {
+        position,
+        userId: row.userId,
+        displayName: row.displayName,
+        kickUsername: row.kickUsername,
+        avatarUrl: row.avatarUrl,
+        wagered: row.wagered.toString(),
+        prizeAmount: prize?.amount ?? null,
+        linked: row.userId !== null,
+      };
+    });
+
+    return { standings, totalWagered };
+  }
+
+  /** The single currently-running race of this type (admin ensures only one is active per type at a time), with live standings. */
+  static async getActiveRace(type: RaceType) {
+    const race = await prisma.wagerRace.findFirst({
+      where: { status: 'active', type },
+      include: { prizes: { orderBy: { position: 'asc' } } },
+      orderBy: { startDate: 'desc' },
+    });
+    if (!race) return null;
+
+    const { standings, totalWagered } = await WagerLeaderboardService.computeStandings(race.startDate, race.endDate, race.prizes, 50);
+    return {
+      id: race.id,
+      type: race.type as RaceType,
+      startDate: race.startDate.toISOString(),
+      endDate: race.endDate.toISOString(),
+      totalPrizePool: race.totalPrizePool,
+      totalWagered: totalWagered.toString(),
+      phase: getPhase(race.startDate, race.endDate, race.status),
+      prizes: race.prizes.map((p) => ({ position: p.position, amount: p.amount })),
+      standings,
+    };
+  }
+
+  static async getRaceHistory(type: RaceType, limit = 10) {
+    const races = await prisma.wagerRace.findMany({
+      where: { status: 'ended', type },
+      include: {
+        payouts: {
+          include: { user: { select: { id: true, displayName: true, kickUsername: true, avatarUrl: true } } },
+          orderBy: { position: 'asc' },
+        },
+      },
+      orderBy: { endDate: 'desc' },
+      take: limit,
+    });
+
+    return races.map((race) => ({
+      id: race.id,
+      type: race.type as RaceType,
+      startDate: race.startDate.toISOString(),
+      endDate: race.endDate.toISOString(),
+      totalPrizePool: race.totalPrizePool,
+      winners: race.payouts.map((p) => ({
+        id: p.id,
+        position: p.position,
+        userId: p.userId,
+        // Unlinked winners have no site account, so their Razed username is all we have.
+        displayName: p.user?.displayName ?? p.razedUsername ?? 'Unknown',
+        kickUsername: p.user?.kickUsername ?? null,
+        avatarUrl: p.user?.avatarUrl ?? null,
+        linked: p.userId !== null,
+        wagered: p.wagered.toString(),
+        prizeAmount: p.prizeAmount,
+      })),
+    }));
+  }
+
+  // ── Admin: race management ──────────────────────────────────────────────
+
+  /**
+   * Full standings for a single race, ended races included. `getRaceHistory` only surfaces
+   * the persisted payout rows, so once a race ends everyone below the prize cutoff becomes
+   * invisible — there is otherwise no way to answer "what did this user wager that week?"
+   * for a non-winner.
+   *
+   * Both views are returned because they can legitimately disagree. `payouts` is the frozen
+   * record written when the race was finalized and stays authoritative for what was actually
+   * paid out; `standings` is recomputed now from current `RazedDailyWager`/`RazedUnlinkedWager`
+   * rows, which a later resync may have changed. For a still-running race `payouts` is empty.
+   */
+  static async getRaceStandings(raceId: string, limit = 100) {
+    const race = await prisma.wagerRace.findUnique({
+      where: { id: raceId },
+      include: {
+        prizes: { orderBy: { position: 'asc' } },
+        payouts: { include: { user: { select: USER_SELECT } }, orderBy: { position: 'asc' } },
+      },
+    });
+    if (!race) return null;
+
+    const { standings, totalWagered } = await WagerLeaderboardService.computeStandings(
+      race.startDate,
+      race.endDate,
+      race.prizes,
+      limit,
+    );
+
+    return {
+      id: race.id,
+      type: race.type as RaceType,
+      startDate: race.startDate.toISOString(),
+      endDate: race.endDate.toISOString(),
+      totalPrizePool: race.totalPrizePool,
+      totalWagered: totalWagered.toString(),
+      status: race.status,
+      phase: getPhase(race.startDate, race.endDate, race.status),
+      prizes: race.prizes.map((p) => ({ position: p.position, amount: p.amount })),
+      standings,
+      payouts: race.payouts.map((p) => ({
+        id: p.id,
+        position: p.position,
+        userId: p.userId,
+        displayName: p.user?.displayName ?? p.razedUsername ?? 'Unknown',
+        kickUsername: p.user?.kickUsername ?? null,
+        avatarUrl: p.user?.avatarUrl ?? null,
+        linked: p.userId !== null,
+        wagered: p.wagered.toString(),
+        prizeAmount: p.prizeAmount,
+      })),
+    };
+  }
+
+  static async listRaces(type: RaceType) {
+    const races = await prisma.wagerRace.findMany({
+      where: { type },
+      include: { prizes: { orderBy: { position: 'asc' } } },
+      orderBy: { startDate: 'desc' },
+    });
+    return races.map((r) => ({
+      id: r.id,
+      type: r.type as RaceType,
+      startDate: r.startDate.toISOString(),
+      endDate: r.endDate.toISOString(),
+      totalPrizePool: r.totalPrizePool,
+      status: r.status,
+      phase: getPhase(r.startDate, r.endDate, r.status),
+      prizes: r.prizes.map((p) => ({ position: p.position, amount: p.amount })),
+    }));
+  }
+
+  private static validatePrizes(prizes: RacePrize[], totalPrizePool: number) {
+    if (!Array.isArray(prizes) || prizes.length === 0) {
+      throw new Error('At least one prize position is required');
+    }
+    const positions = prizes.map((p) => p.position);
+    if (new Set(positions).size !== positions.length) {
+      throw new Error('Prize positions must be unique');
+    }
+    for (const p of prizes) {
+      if (!Number.isInteger(p.position) || p.position < 1) {
+        throw new Error('Prize positions must be positive whole numbers');
+      }
+      if (!Number.isFinite(p.amount) || p.amount < 0) {
+        throw new Error('Prize amounts must be zero or greater');
+      }
+    }
+    if (!Number.isFinite(totalPrizePool) || totalPrizePool < 0) {
+      throw new Error('Total prize pool must be zero or greater');
+    }
+    const sum = prizes.reduce((s, p) => s + p.amount, 0);
+    if (sum !== totalPrizePool) {
+      throw new Error(`Prize positions sum to ${sum}, which doesn't match the total prize pool of ${totalPrizePool}`);
+    }
+  }
+
+  static async createRace(input: { type: RaceType; startDate: string; endDate: string; totalPrizePool: number; prizes: RacePrize[] }) {
+    const startDate = new Date(input.startDate);
+    const endDate = new Date(input.endDate);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error('Invalid start or end date');
+    }
+    if (endDate.getTime() <= startDate.getTime()) {
+      throw new Error('End date must be after the start date');
+    }
+    WagerLeaderboardService.validatePrizes(input.prizes, input.totalPrizePool);
+
+    const existingActive = await prisma.wagerRace.findFirst({ where: { status: 'active', type: input.type } });
+    if (existingActive) {
+      throw new Error(`A ${input.type.toLowerCase()} race is already active. End or delete it before creating a new one.`);
+    }
+
+    const race = await prisma.wagerRace.create({
+      data: {
+        type: input.type,
+        startDate,
+        endDate,
+        totalPrizePool: input.totalPrizePool,
+        prizes: { create: input.prizes.map((p) => ({ position: p.position, amount: p.amount })) },
+      },
+      include: { prizes: { orderBy: { position: 'asc' } } },
+    });
+
+    return {
+      id: race.id,
+      type: race.type as RaceType,
+      startDate: race.startDate.toISOString(),
+      endDate: race.endDate.toISOString(),
+      totalPrizePool: race.totalPrizePool,
+      status: race.status,
+      phase: getPhase(race.startDate, race.endDate, race.status),
+      prizes: race.prizes.map((p) => ({ position: p.position, amount: p.amount })),
+    };
+  }
+
+  static async updateRace(raceId: string, input: { startDate?: string; endDate?: string; totalPrizePool?: number; prizes?: RacePrize[] }) {
+    const race = await prisma.wagerRace.findUnique({ where: { id: raceId } });
+    if (!race) throw new Error('Race not found');
+    if (race.status !== 'active') throw new Error('Cannot edit a race that has already ended and been paid out');
+
+    const startDate = input.startDate ? new Date(input.startDate) : race.startDate;
+    const endDate = input.endDate ? new Date(input.endDate) : race.endDate;
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error('Invalid start or end date');
+    }
+    if (endDate.getTime() <= startDate.getTime()) {
+      throw new Error('End date must be after the start date');
+    }
+    const totalPrizePool = input.totalPrizePool ?? race.totalPrizePool;
+    if (input.prizes) {
+      WagerLeaderboardService.validatePrizes(input.prizes, totalPrizePool);
+    } else if (input.totalPrizePool !== undefined) {
+      // totalPrizePool changed without new prizes — re-validate against the existing ones.
+      const existingPrizes = await prisma.wagerRacePrize.findMany({ where: { raceId } });
+      WagerLeaderboardService.validatePrizes(existingPrizes, totalPrizePool);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.wagerRace.update({ where: { id: raceId }, data: { startDate, endDate, totalPrizePool } });
+      if (input.prizes) {
+        await tx.wagerRacePrize.deleteMany({ where: { raceId } });
+        await tx.wagerRacePrize.createMany({
+          data: input.prizes.map((p) => ({ raceId, position: p.position, amount: p.amount })),
+        });
+      }
+    });
+
+    return WagerLeaderboardService.getRace(raceId);
+  }
+
+  static async getRace(raceId: string) {
+    const race = await prisma.wagerRace.findUnique({
+      where: { id: raceId },
+      include: { prizes: { orderBy: { position: 'asc' } } },
+    });
+    if (!race) throw new Error('Race not found');
+    return {
+      id: race.id,
+      type: race.type as RaceType,
+      startDate: race.startDate.toISOString(),
+      endDate: race.endDate.toISOString(),
+      totalPrizePool: race.totalPrizePool,
+      status: race.status,
+      phase: getPhase(race.startDate, race.endDate, race.status),
+      prizes: race.prizes.map((p) => ({ position: p.position, amount: p.amount })),
+    };
+  }
+
+  static async deleteRace(raceId: string) {
+    const payoutCount = await prisma.wagerRacePayout.count({ where: { raceId } });
+    if (payoutCount > 0) throw new Error('Cannot delete a race that has already been paid out');
+    await prisma.wagerRace.delete({ where: { id: raceId } });
+  }
+}

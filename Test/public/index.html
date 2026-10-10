@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wager Leaderboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>500 Point Wager Leaderboard</h1>
+      <p class="subtitle">Ranked by total amount wagered &mdash; top 10 split <strong>500 points</strong></p>
+    </header>
+
+    <section class="controls">
+      <label>
+        From
+        <input type="date" id="from" />
+      </label>
+      <label>
+        To
+        <input type="date" id="to" />
+      </label>
+      <button id="refresh">Refresh</button>
+      <span id="status" class="status"></span>
+    </section>
+
+    <section class="points-key" id="pointsKey"></section>
+
+    <section class="table-card">
+      <table id="board">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-player">Player</th>
+            <th class="col-wagered">Wagered</th>
+            <th class="col-points">Points</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+
+    <footer class="foot">
+      <span id="meta"></span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

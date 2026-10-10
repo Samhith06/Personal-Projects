@@ -1,0 +1,48 @@
+{
+  "name": "mattyspins",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "check:rtp": "node scripts/check-rtp.mjs .",
+    "db:smoke": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/db-smoke.mts",
+    "razed:check": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/razed-check.mts",
+    "razed:sync": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/razed-sync.mts",
+    "razed:top": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/razed-top.mts",
+    "clips:refresh": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/clips-refresh.mts",
+    "kick:events": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/kick-events.mts",
+    "open:month": "node --env-file-if-exists=.env.local --import tsx --conditions=react-server scripts/open-month.mts",
+    "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev -p 3000",
+    "build:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next build",
+    "images": "node scripts/optimise-images.mjs"
+  },
+  "dependencies": {
+    "@types/pg": "^8.23.1",
+    "clsx": "^2.1.1",
+    "hls.js": "^1.7.2",
+    "lucide-react": "^0.462.0",
+    "next": "^15.4.0",
+    "next-auth": "^5.0.0-beta.32",
+    "pg": "^8.23.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^2.5.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
