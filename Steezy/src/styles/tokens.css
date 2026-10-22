@@ -1,0 +1,40 @@
+/* SteezeSpins design tokens — from the "SteezeSpins Home" Claude Design export (ARCHITECTURE.md §5.1). */
+:root {
+  --color-bg: #0d1310;
+  --color-surface: #161e19;
+  --color-surface-2: #1f2823;
+  --color-line: #26302a;
+  --color-line-strong: #2c3a32;
+  --color-text: #e9e9ed;
+  --color-text-2: #c3cbc6;
+  --color-muted: #8f9a94;
+
+  --color-accent: #4fd08a;
+  --color-accent-100: #effdf4;
+  --color-accent-200: #d8f8e3;
+  --color-accent-300: #b4efca;
+  --color-accent-400: #7fdea4;
+  --color-accent-500: #4cc47f;
+  --color-accent-600: #34a064;
+  --color-accent-700: #27794c;
+  --color-accent-800: #1c5436;
+  --color-accent-900: #143424;
+
+  --color-section: #0f3a25;
+  --color-section-glow: #16523a;
+
+  --color-warn-bg: #3a2e0c;
+  --color-warn: #ffd866;
+  --color-danger-bg: #3d1714;
+  --color-danger: #ffb4a8;
+
+  --color-roobet: #ffc61a;
+  --medal-gold: #ffc61a;
+  --medal-silver: #c9d1cc;
+  --medal-bronze: #e0a173;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --radius: 8px;
+  --shadow-ring: 0 0 0 1px var(--color-line);
+  --container: 1280px;
+}
