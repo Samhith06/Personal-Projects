@@ -44,7 +44,9 @@ After changing `src/server/db/schema.ts`: `npm run db:generate` (writes a new SQ
 | `/hunts`: bonus hunts mirrored from bonushunt.gg every 30 s (`GET /api/public/hunts`, Bearer key) | done |
 | Guess the balance: `!guess 4200` or on the site; locks when the opening starts; closest guess wins on completion | done |
 | Slot tournaments (not in the bonushunt.gg API): admin-run single-elimination brackets with byes | done |
-| OBS hunt overlay `/overlay/hunt/<token>`: hunt panel, guess box, leaderboard ticker | done |
+| OBS hunt overlay `/overlay/hunt/<token>`: one source that switches by phase — collecting (guessing open / locked), opening (closest guess right now), finished (results card) | done |
+| Hunts in the site nav only while a hunt or tournament is live; hunt + tournament controls on the admin overview | done |
+| Mobile: every page checked at 360px (no sideways overflow); header, admin menu, milestones and hunts tuned for phones (`src/styles/mobile.css`) | done |
 | Home: top-3 podium, About section (needs Steezy's photo + social handles) | done |
 | Leaderboard names always masked: first four letters + `****` | done |
 | Biggest wins (Kick clips), admin users & abuse review | next |

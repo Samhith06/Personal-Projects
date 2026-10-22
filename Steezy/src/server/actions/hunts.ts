@@ -54,6 +54,16 @@ export async function updateHunt(fd: FormData): Promise<void> {
   back('/admin/hunts', { ok: `Saved “${before.title}”.` });
 }
 
+/** Dashboard quick action: open or close guessing on a hunt. */
+export async function toggleGuessing(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const id = str(fd, 'huntId');
+  const open = str(fd, 'open') === '1';
+  await db.update(hunts).set({ guessesOpen: open }).where(eq(hunts.id, id));
+  await audit(staff.id, open ? 'hunt.guessing_open' : 'hunt.guessing_close', 'hunt', id);
+  back(str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : '/admin', { ok: open ? 'Guessing opened.' : 'Guessing closed.' });
+}
+
 export async function markHuntPrizePaid(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const id = str(fd, 'huntId');
@@ -99,9 +109,11 @@ export async function startTournamentAction(fd: FormData): Promise<void> {
 export async function recordResultAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const id = str(fd, 'tournamentId');
+  // The dashboard posts here too; only ever send staff back inside /admin.
+  const backTo = str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : `/admin/tournaments/${id}`;
   const a = Number(str(fd, 'multiA'));
   const b = Number(str(fd, 'multiB'));
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) back(`/admin/tournaments/${id}`, { error: 'Enter both multipliers as numbers.' });
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) back(backTo, { error: 'Enter both multipliers as numbers.' });
   const r = await recordResult(str(fd, 'matchId'), a, b, staff.id);
   const msg: Record<string, string> = {
     not_live: 'Start the tournament first.',
@@ -109,5 +121,5 @@ export async function recordResultAction(fd: FormData): Promise<void> {
     decided: 'That match already has a result.',
     tie: 'It’s a tie — replay the slots and enter the new multipliers.',
   };
-  back(`/admin/tournaments/${id}`, r === 'ok' ? { ok: 'Result saved, winner moved on.' } : { error: msg[r] });
+  back(backTo, r === 'ok' ? { ok: 'Result saved, winner moved on.' } : { error: msg[r] });
 }

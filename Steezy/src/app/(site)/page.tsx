@@ -1,6 +1,7 @@
 import { AboutSection } from '@/components/home/AboutSection';
 import { ChipBackground } from '@/components/home/ChipBackground';
 import { HomePodium } from '@/components/home/HomePodium';
+import { OfferCard } from '@/components/home/OfferCard';
 import { env } from '@/lib/env';
 import { getCurrentUser } from '@/server/auth/session';
 
@@ -42,40 +43,9 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="partner" id="partner" aria-labelledby="partner-title">
+        <section className="partner" id="partner">
           <div className="container">
-            <div className="partner__panel">
-              <div className="stack" style={{ gap: 14 }}>
-                <span className="partner__eyebrow" id="partner-title">
-                  Official partner
-                  <img src="/brand/roobet-logo-gold.png" alt="Roobet" width={109} height={34} />
-                </span>
-                <span style={{ color: 'var(--color-accent-200)' }}>Sign up with code</span>
-                <span className="partner__code">STZY</span>
-              </div>
-              <div className="stack" style={{ gap: 24 }}>
-                <ol className="partner__steps">
-                  <li>
-                    <strong>Sign up through the link</strong>
-                    Opens Roobet with STZY already applied.
-                  </li>
-                  <li>
-                    <strong>Play as you normally would</strong>
-                    Every wager under the code is tracked automatically.
-                  </li>
-                  <li>
-                    <strong>Get rewarded</strong>
-                    Climb the monthly leaderboard, unlock milestones and earn raffle tickets.
-                  </li>
-                </ol>
-                <div className="row" style={{ gap: 16 }}>
-                  <a className="btn btn--primary" href={env.roobetReferralUrl} target="_blank" rel="noopener sponsored">
-                    Open Roobet
-                  </a>
-                  <span style={{ fontSize: 12, color: 'var(--color-accent-300)' }}>18+ only. Gamble responsibly.</span>
-                </div>
-              </div>
-            </div>
+            <OfferCard />
           </div>
         </section>
       </div>

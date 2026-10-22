@@ -1,0 +1,176 @@
+/*
+ * Phone and small-tablet adjustments, kept in one place.
+ * Layouts are fluid already (no horizontal overflow on any page at 360px);
+ * these rules fix crowding and make long menus swipeable.
+ */
+
+@media (max-width: 760px) {
+  /* Header: logo + Live/avatar on one row, swipeable menu underneath. */
+  .site-header__inner {
+    padding-top: 8px;
+    padding-bottom: 6px;
+  }
+
+  .brand {
+    margin-right: 0;
+    font-size: 17px;
+  }
+
+  .site-header__actions {
+    padding-left: 12px;
+    gap: 8px;
+  }
+
+  .me-chip__name {
+    display: none;
+  }
+
+  .site-nav {
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+    padding-right: 24px;
+  }
+
+  .site-header .btn {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  /* Pages: a little less air at the top. */
+  .page {
+    padding-top: 28px;
+  }
+
+  .page__title {
+    font-size: 30px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .home-section {
+    padding-top: 48px;
+  }
+
+  .about {
+    gap: 28px;
+  }
+
+  .about__photo {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Admin: the sidebar becomes one swipeable row of links above the content. */
+  .admin {
+    flex-direction: column;
+  }
+
+  .admin__side {
+    flex: none;
+    width: 100%;
+    padding: 12px 16px 0;
+    gap: 8px;
+  }
+
+  .admin__nav {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+
+  .admin__nav a {
+    flex: none;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: var(--color-surface);
+    white-space: nowrap;
+    gap: 6px;
+  }
+
+  .admin__group {
+    display: none;
+  }
+
+  .admin__role {
+    padding: 0;
+  }
+
+  .admin__main {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .admin-row form {
+    width: 100%;
+  }
+
+  .admin-row .input {
+    width: auto !important;
+    flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Milestones: reward and claim sit on one line under the tier name. */
+  .ms-tier {
+    padding-left: 48px;
+    gap: 6px 14px;
+  }
+
+  .ms-tier__body {
+    flex-basis: 100%;
+  }
+
+  .ms-tier__reward {
+    font-size: 22px;
+  }
+
+  .ms-tier__action {
+    width: auto;
+    margin-left: auto;
+  }
+
+  /* Hunt slot list: drop the bet column so names fit. */
+  .slot-row {
+    grid-template-columns: 18px 34px minmax(0, 1fr) 64px;
+    gap: 10px;
+    padding: 8px 6px;
+  }
+
+  .slot-row > :nth-child(4) {
+    display: none;
+  }
+
+  .slot-row img,
+  .slot-row__ph {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Leaderboard race panel. */
+  .race__pool {
+    font-size: 64px;
+  }
+
+  .race-timer__tile b {
+    font-size: 24px;
+  }
+
+  /* Hall of Fame / tables: tighter cells. */
+  .table td,
+  .table th {
+    padding: 10px 6px;
+  }
+
+  .hof-title,
+  .about__title {
+    font-size: 38px;
+  }
+}

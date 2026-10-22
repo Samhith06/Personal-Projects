@@ -59,6 +59,17 @@ export async function currentHunt() {
   return last ?? null;
 }
 
+/** A hunt is "on" while it's started on bonushunt.gg and not finished (or hidden by staff). */
+export async function activeHunt() {
+  const [row] = await db
+    .select()
+    .from(hunts)
+    .where(and(eq(hunts.hidden, false), eq(hunts.completed, false)))
+    .orderBy(desc(hunts.remoteCreatedAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getHunt(id: string) {
   const [row] = await db.select().from(hunts).where(eq(hunts.id, id)).limit(1);
   return row ?? null;

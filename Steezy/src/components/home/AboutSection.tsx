@@ -1,10 +1,12 @@
+import Image from 'next/image';
+import steeze from '../../../public/brand/steeze.png';
 import { env } from '@/lib/env';
 
 /**
  * "Meet Steeze." from the SteezeSpins Home design. Socials only list the
  * channels we actually have links for (Kick, Discord, Roobet); the rest of the
- * design's handles were placeholders. The photo is a placeholder until Steezy
- * sends one — drop it at public/brand/steeze.jpg and swap the block below for an <img>.
+ * design's handles were placeholders. The photo is served resized and as
+ * WebP/AVIF by next/image (the original PNG is ~800 KB).
  */
 export function AboutSection() {
   const socials = [
@@ -40,8 +42,14 @@ export function AboutSection() {
           ))}
         </ul>
       </div>
-      <div className="about__photo" role="img" aria-label="Photo of Steeze (placeholder)">
-        <span>STEEZE</span>
+      <div className="about__photo">
+        <Image
+          src={steeze}
+          alt="Steeze snowboarding above the clouds"
+          placeholder="blur"
+          sizes="(max-width: 760px) 100vw, 440px"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '62% 70%' }}
+        />
       </div>
     </section>
   );

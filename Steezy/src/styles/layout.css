@@ -201,3 +201,10 @@
 .age-gate__actions .btn {
   flex: 1 1 160px;
 }
+
+.site-nav a.nav-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-300);
+}

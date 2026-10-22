@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/server/db';
 import { settings } from '@/server/db/schema';
 import { currentLeaderboard, getStandings } from './leaderboards';
-import { bestMulti, currentHunt, guessCount, guessingOpen, huntBonuses, huntStats, huntWinnerName } from './hunts';
+import { bestMulti, currentHunt, guessCount, guessList, guessingOpen, huntBonuses, huntStats, huntWinnerName } from './hunts';
 
 const TOKEN_KEY = 'hunt.overlayToken';
 
@@ -30,8 +30,18 @@ export type HuntOverlayState = {
     avgNeeded: number | null;
     status: 'collecting' | 'opening' | 'finished';
     slots: { id: string; name: string; bet: number | null; multi: number | null; current: boolean; opened: boolean }[];
+    /** Best-paying slot so far, for the results card. */
+    bestSlot: { name: string; multi: number } | null;
   } | null;
-  guess: { open: boolean; count: number; winner: string | null };
+  guess: {
+    open: boolean;
+    count: number;
+    /** Settled winner (finished hunts). */
+    winner: string | null;
+    winnerGuess: number | null;
+    /** Closest guess to the running balance while opening. */
+    leader: { name: string; amount: number } | null;
+  };
   ticker: { name: string; rank: number; wagered: number }[];
   boardName: string | null;
 };
@@ -41,17 +51,25 @@ export async function huntOverlayState(token: string): Promise<HuntOverlayState 
   const [hunt, board] = await Promise.all([currentHunt(), currentLeaderboard()]);
   const standings = board ? (await getStandings(board)).slice(0, 5) : [];
 
-  if (!hunt) return { hunt: null, guess: { open: false, count: 0, winner: null }, ticker: standings.map((s) => ({ name: s.displayName, rank: s.rank, wagered: s.wagered })), boardName: board?.name ?? null };
+  if (!hunt) return { hunt: null, guess: { open: false, count: 0, winner: null, winnerGuess: null, leader: null }, ticker: standings.map((s) => ({ name: s.displayName, rank: s.rank, wagered: s.wagered })), boardName: board?.name ?? null };
 
   const s = huntStats(hunt);
   const bonuses = huntBonuses(hunt);
-  const [count, winner] = await Promise.all([guessCount(hunt.id), huntWinnerName(hunt)]);
+  const won = s.totalWinnings ?? 0;
+  const [count, winner, ranked] = await Promise.all([
+    guessCount(hunt.id),
+    huntWinnerName(hunt),
+    hunt.isOpening ? guessList(hunt.id, won) : Promise.resolve([]),
+  ]);
+  const best = bonuses
+    .filter((b) => b.payout !== null && b.payout !== undefined)
+    .reduce<(typeof bonuses)[number] | null>((top, b) => ((b.multiplier ?? 0) > (top?.multiplier ?? 0) ? b : top), null);
   return {
     hunt: {
       title: hunt.title,
       casino: hunt.casino,
       startCost: hunt.startCost,
-      won: s.totalWinnings ?? 0,
+      won,
       opened: s.openedBonuses ?? 0,
       total: s.bonusCount ?? bonuses.length,
       best: bestMulti(hunt),
@@ -65,8 +83,15 @@ export async function huntOverlayState(token: string): Promise<HuntOverlayState 
         current: hunt.currentOpeningSlot === b.id,
         opened: b.payout !== null && b.payout !== undefined,
       })),
+      bestSlot: best && best.multiplier ? { name: best.slotName, multi: best.multiplier } : null,
     },
-    guess: { open: guessingOpen(hunt), count, winner },
+    guess: {
+      open: guessingOpen(hunt),
+      count,
+      winner,
+      winnerGuess: hunt.winnerGuess,
+      leader: ranked[0] ? { name: ranked[0].name, amount: ranked[0].amount } : null,
+    },
     ticker: standings.map((st) => ({ name: st.displayName, rank: st.rank, wagered: st.wagered })),
     boardName: board?.name ?? null,
   };

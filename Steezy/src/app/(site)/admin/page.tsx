@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
+import { StreamGamesPanel } from '@/components/admin/StreamGamesPanel';
 import { getCurrentUser, hasRole } from '@/server/auth/session';
 import { getBotAccount } from '@/server/kick/bot';
 import { lastSession } from '@/server/kick/sessions';
@@ -42,6 +43,8 @@ export default async function AdminOverview({ searchParams }: { searchParams: Fl
         {sync?.lastOkAt ? `last good pull ${formatAgo(sync.lastOkAt)}` : 'no successful pull yet'}
         {sync?.lastError ? ` · last error: ${sync.lastError}` : ''}
       </p>
+
+      <StreamGamesPanel />
 
       <section className="admin-kpis">
         {kpis.map((k) => (

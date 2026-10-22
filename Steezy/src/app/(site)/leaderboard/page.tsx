@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { RaceCountdown } from '@/components/leaderboard/Countdown';
+import { StagePodium } from '@/components/leaderboard/StagePodium';
+import { LossBackTag, VipTransferTag } from '@/components/VipTransferTag';
 import { getCurrentUser } from '@/server/auth/session';
 import { currentLeaderboard, getStandings } from '@/server/services/leaderboards';
 import { syncStatus } from '@/server/services/sync-status';
 import { approvedRoobetUid } from '@/server/services/wagers';
 import { env } from '@/lib/env';
-import { formatAgo, formatCountdown, formatUsd, ordinal } from '@/lib/format';
+import { formatAgo, formatUsd, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Leaderboard' };
-
-const MEDALS = ['var(--medal-gold)', 'var(--medal-silver)', 'var(--medal-bronze)'];
 
 export default async function LeaderboardPage() {
   const board = await currentLeaderboard();
@@ -29,34 +30,38 @@ export default async function LeaderboardPage() {
 
   const pool = board.prizes.reduce((a, b) => a + b, 0);
   const paidPlaces = board.prizes.filter((p) => p > 0).length;
-  const countdown = board.status === 'live' ? formatCountdown(board.endsAt) : null;
-  const podium = standings.slice(0, 3);
-  // Visual order 2nd, 1st, 3rd.
-  const podiumOrder = [podium[1], podium[0], podium[2]].filter(Boolean);
+  const month = (d: Date) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const span = month(board.startsAt) === month(board.endsAt) ? month(board.startsAt) : `${month(board.startsAt)} – ${month(board.endsAt)}`;
 
   return (
     <div className="container page">
-      <div className="lb-head">
-        <div className="stack" style={{ gap: 10 }}>
-          <span className="kicker">
-            {board.name} · <b style={{ color: 'var(--color-roobet)', fontStyle: 'italic' }}>Roobet</b>
-          </span>
-          <h1 className="page__title">{formatUsd(pool)} prize pool</h1>
-          <p className="meta" style={{ maxWidth: '48ch' }}>
-            Wager on Roobet under code STZY. Top {paidPlaces} by total {board.metric === 'weighted' ? 'weighted ' : ''}wager get paid.
+      <section className="race">
+        <div className="race__intro">
+          <img src="/brand/roobet-logo-gold.png" alt="Roobet" width={131} height={40} className="race__logo" />
+          <span className="kicker">Monthly wager race · {span}</span>
+          <h1 className="race__pool num">{formatUsd(pool)}</h1>
+          <p className="race__lede">
+            Play on Roobet with code STZY and every bet counts. Top {paidPlaces} at the end of the month split {formatUsd(pool)}.
           </p>
-        </div>
-        <div className="row" style={{ gap: 28 }}>
-          <div>
-            <div className="meta">{countdown ? 'Ends in' : 'Status'}</div>
-            <div className="num lb-head__value">{countdown ?? (board.status === 'live' ? 'Finalising' : 'Final')}</div>
+          {board.status === 'live' ? (
+            <RaceCountdown startsAt={board.startsAt.toISOString()} endsAt={board.endsAt.toISOString()} serverNow={new Date().toISOString()} />
+          ) : (
+            <p className="tag tag--neutral" style={{ alignSelf: 'flex-start' }}>
+              Final standings
+            </p>
+          )}
+          <div className="row" style={{ gap: 12 }}>
+            <a className="btn btn--primary" href={env.roobetReferralUrl} target="_blank" rel="noopener sponsored">
+              Play on Roobet →
+            </a>
           </div>
-          <div>
-            <div className="meta">Paid places</div>
-            <div className="num lb-head__value">{paidPlaces}</div>
+          <div className="perk-tags">
+            <LossBackTag />
+            <VipTransferTag />
           </div>
         </div>
-      </div>
+        <div className="race__stage">{standings.length ? <StagePodium top={standings.slice(0, 3)} /> : null}</div>
+      </section>
 
       {mine ? (
         <p className="notice notice--ok">
@@ -74,67 +79,38 @@ export default async function LeaderboardPage() {
           <p className="meta">No wagers counted yet this period.</p>
         </div>
       ) : (
-        <>
-          <div className="podium">
-            {podiumOrder.map((s) => (
-              <div key={s.rank} className={`podium__place podium__place--${s.rank}`}>
-                <span className="podium__avatar" style={{ boxShadow: `0 0 0 2px var(--color-bg), 0 0 0 4px ${MEDALS[s.rank - 1]}` }}>
-                  {s.displayName[0]?.toUpperCase()}
-                </span>
-                <div>
-                  <div className="podium__name">{s.displayName}</div>
-                  <div className="meta num">{formatUsd(s.wagered)} wagered</div>
-                </div>
-                <div className="podium__block" style={{ boxShadow: `inset 0 1px 0 0 ${MEDALS[s.rank - 1]}` }}>
-                  <span className="podium__rank" style={{ color: MEDALS[s.rank - 1] }}>
-                    {ordinal(s.rank)}
-                  </span>
-                  <span className="num podium__prize">{formatUsd(s.prize)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="card" style={{ padding: '8px 12px' }}>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 64 }}>Rank</th>
-                    <th>Player</th>
-                    <th style={{ textAlign: 'right' }}>Wagered</th>
-                    <th style={{ textAlign: 'right', width: 110 }}>Prize</th>
+        <div className="card" style={{ padding: '8px 12px' }}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 64 }}>Rank</th>
+                  <th>Player</th>
+                  <th style={{ textAlign: 'right' }}>Wagered</th>
+                  <th style={{ textAlign: 'right', width: 110 }}>Prize</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.slice(3, 50).map((s) => (
+                  <tr key={s.rank} className={s.roobetUid === myUid ? 'is-me' : undefined}>
+                    <td className="meta num">{s.rank}</td>
+                    <td>{s.displayName}</td>
+                    <td className="num" style={{ textAlign: 'right' }}>
+                      {formatUsd(s.wagered)}
+                    </td>
+                    <td className="num" style={{ textAlign: 'right', color: 'var(--color-accent)' }}>
+                      {s.prize ? formatUsd(s.prize) : '—'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {standings.slice(3, 50).map((s) => (
-                    <tr key={s.rank} className={s.roobetUid === myUid ? 'is-me' : undefined}>
-                      <td className="meta num">{s.rank}</td>
-                      <td>{s.displayName}</td>
-                      <td className="num" style={{ textAlign: 'right' }}>
-                        {formatUsd(s.wagered)}
-                      </td>
-                      <td className="num" style={{ textAlign: 'right', color: 'var(--color-accent)' }}>
-                        {s.prize ? formatUsd(s.prize) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="meta" style={{ padding: '12px 8px 6px' }}>
-              Roobet affiliate data{sync?.lastOkAt ? ` · updated ${formatAgo(sync.lastOkAt)}` : ''}. Names are shown masked for
-              privacy.
-            </p>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
+          <p className="meta" style={{ padding: '12px 8px 6px' }}>
+            Roobet affiliate data{sync?.lastOkAt ? ` · updated ${formatAgo(sync.lastOkAt)}` : ''}. Names are shown masked for privacy.
+          </p>
+        </div>
       )}
-
-      <div className="row">
-        <a className="btn btn--primary" href={env.roobetReferralUrl} target="_blank" rel="noopener sponsored">
-          Play on Roobet with code STZY
-        </a>
-      </div>
     </div>
   );
 }

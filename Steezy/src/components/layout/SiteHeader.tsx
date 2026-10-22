@@ -9,11 +9,11 @@ const NAV = [
   { href: '/milestones', label: 'Milestones' },
   { href: '/giveaways', label: 'Giveaways' },
   { href: '/raffles', label: 'Raffles' },
-  { href: '/hunts', label: 'Hunts' },
   { href: '/hall-of-fame', label: 'Hall of Fame' },
 ];
 
-export function SiteHeader({ user, live }: { user: User | null; live: boolean }) {
+/** `huntOn`: a bonus hunt or tournament is running — only then does "Hunts" appear in the nav. */
+export function SiteHeader({ user, live, huntOn }: { user: User | null; live: boolean; huntOn: boolean }) {
   const name = user ? user.discordGlobalName || user.discordUsername : null;
   return (
     <header className="site-header">
@@ -28,6 +28,12 @@ export function SiteHeader({ user, live }: { user: User | null; live: boolean })
               {item.label}
             </Link>
           ))}
+          {huntOn ? (
+            <Link href="/hunts" className="nav-live">
+              <span className="dot dot--live" aria-hidden="true" />
+              Hunt live
+            </Link>
+          ) : null}
           {hasRole(user, 'mod') ? <Link href="/admin">Admin</Link> : null}
         </nav>
         <div className="site-header__actions">
@@ -48,9 +54,9 @@ export function SiteHeader({ user, live }: { user: User | null; live: boolean })
             <span className="meta">STZY</span>
           </a>
           {user ? (
-            <Link href="/me" className="me-chip">
+            <Link href="/me" className="me-chip" aria-label={`My profile (${name})`}>
               <img className="avatar" src={discordAvatarUrl(user.discordId, user.discordAvatar, 64)} alt="" width={32} height={32} />
-              {name}
+              <span className="me-chip__name">{name}</span>
             </Link>
           ) : (
             <a className="btn btn--primary" href="/api/auth/discord">

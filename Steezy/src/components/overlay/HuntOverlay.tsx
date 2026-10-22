@@ -89,24 +89,77 @@ export function HuntOverlay({ token, initial, preview }: { token: string; initia
         </section>
       ) : null}
 
-      {h ? (
-        <section className="hov-guess">
-          <span className="ov-eyebrow">Guess the balance</span>
-          {state.guess.winner ? (
-            <div className="hov-guess__big">
-              Closest: <b style={{ color: 'var(--color-accent)' }}>{state.guess.winner}</b>
-            </div>
-          ) : state.guess.open ? (
-            <div className="hov-guess__big">
-              Type <b style={{ color: 'var(--color-accent)' }}>!guess 4200</b>
-            </div>
-          ) : (
-            <div className="hov-guess__big">Guesses locked</div>
-          )}
-          <span className="hov-guess__sub">
-            <b>{state.guess.count}</b> guess{state.guess.count === 1 ? '' : 'es'}
-            {state.guess.open ? ' · closes when the opening starts' : ''}
+      {/* Guess box: one look per phase. Hidden at the end, when the results card takes over. */}
+      {h && h.status !== 'finished' ? (
+        <section className={`hov-guess${state.guess.open ? ' is-open' : ''}`} key={`${h.status}-${state.guess.open}`}>
+          <span className="ov-eyebrow">
+            Guess the balance · {state.guess.open ? 'open' : h.status === 'opening' ? 'opening' : 'locked'}
           </span>
+          {state.guess.open ? (
+            <>
+              <div className="hov-guess__big">
+                Type <b style={{ color: 'var(--color-accent)' }}>!guess 4200</b>
+              </div>
+              <span className="hov-guess__sub">
+                <b>{state.guess.count}</b> guess{state.guess.count === 1 ? '' : 'es'} · closes when the opening starts
+              </span>
+            </>
+          ) : h.status === 'opening' && state.guess.leader ? (
+            <>
+              <div className="hov-guess__big">
+                Closest now: <b style={{ color: 'var(--color-accent)' }}>{state.guess.leader.name}</b>
+              </div>
+              <span className="hov-guess__sub">
+                Guessed {money(state.guess.leader.amount)} · balance {money(h.won)} · <b>{state.guess.count}</b> guesses
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="hov-guess__big">Guesses locked</div>
+              <span className="hov-guess__sub">
+                <b>{state.guess.count}</b> guess{state.guess.count === 1 ? '' : 'es'} in
+              </span>
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {/* Ending phase: results card. */}
+      {h && h.status === 'finished' ? (
+        <section className="hov-result">
+          <span className="ov-eyebrow">{h.title} · final</span>
+          <div className="hov-result__grid">
+            <div>
+              <span>Start</span>
+              <b>{money(h.startCost)}</b>
+            </div>
+            <div>
+              <span>Final balance</span>
+              <b style={{ color: h.won >= h.startCost ? 'var(--color-accent)' : 'var(--color-danger)' }}>{money2(h.won)}</b>
+            </div>
+            <div>
+              <span>{h.won >= h.startCost ? 'Profit' : 'Loss'}</span>
+              <b style={{ color: h.won >= h.startCost ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+                {h.won >= h.startCost ? '+' : '−'}
+                {money(Math.abs(h.won - h.startCost))}
+              </b>
+            </div>
+          </div>
+          {h.bestSlot ? (
+            <div className="hov-result__best">
+              Best slot <b>{h.bestSlot.name}</b> <span>{multi(h.bestSlot.multi)}</span>
+            </div>
+          ) : null}
+          <div className="hov-result__gtb">
+            {state.guess.winner ? (
+              <>
+                Guess the balance winner <b>{state.guess.winner}</b>
+                {state.guess.winnerGuess !== null ? <span> guessed {money2(state.guess.winnerGuess)}</span> : null}
+              </>
+            ) : (
+              <>No guesses this hunt</>
+            )}
+          </div>
         </section>
       ) : null}
 
