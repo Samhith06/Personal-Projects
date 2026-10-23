@@ -12,8 +12,21 @@ const NAV = [
   { href: '/hall-of-fame', label: 'Hall of Fame' },
 ];
 
-/** `huntOn`: a bonus hunt or tournament is running — only then does "Hunts" appear in the nav. */
-export function SiteHeader({ user, live, huntOn }: { user: User | null; live: boolean; huntOn: boolean }) {
+/**
+ * `huntOn`: a bonus hunt is running. `tournamentOn`: a tournament is taking
+ * sign-ups or live. Each only appears in the nav while it's on.
+ */
+export function SiteHeader({
+  user,
+  live,
+  huntOn,
+  tournamentOn,
+}: {
+  user: User | null;
+  live: boolean;
+  huntOn: boolean;
+  tournamentOn: 'signup' | 'live' | null;
+}) {
   const name = user ? user.discordGlobalName || user.discordUsername : null;
   return (
     <header className="site-header">
@@ -32,6 +45,12 @@ export function SiteHeader({ user, live, huntOn }: { user: User | null; live: bo
             <Link href="/hunts" className="nav-live">
               <span className="dot dot--live" aria-hidden="true" />
               Hunt live
+            </Link>
+          ) : null}
+          {tournamentOn ? (
+            <Link href="/tournament" className="nav-live" title={tournamentOn === 'live' ? 'Tournament live' : 'Tournament sign-ups open'}>
+              <span className={`dot ${tournamentOn === 'live' ? 'dot--live' : 'dot--warn'}`} aria-hidden="true" />
+              Tournament
             </Link>
           ) : null}
           {hasRole(user, 'mod') ? <Link href="/admin">Admin</Link> : null}

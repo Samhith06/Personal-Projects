@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { recordResultAction, toggleGuessing } from '@/server/actions/hunts';
+import { ResultForm } from './ResultForm';
+import { toggleGuessing, toggleHuntRequests } from '@/server/actions/hunts';
+import { requestsFor } from '@/server/services/hunt-requests';
 import { activeHunt, bestMulti, guessCount, guessingOpen, huntBonuses, huntStats } from '@/server/services/hunts';
-import { bracket, featuredTournament } from '@/server/services/tournaments';
+import { featuredTournament, getEntries, getMatches, summarise } from '@/server/services/tournaments';
 import { formatUsd } from '@/lib/format';
 
 const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -13,8 +15,13 @@ const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDig
  */
 export async function StreamGamesPanel() {
   const [hunt, tournament] = await Promise.all([activeHunt(), featuredTournament()]);
-  const [count, rounds] = await Promise.all([hunt ? guessCount(hunt.id) : 0, tournament?.status === 'live' ? bracket(tournament.id) : []]);
-  const next = rounds.flatMap((r) => r.matches.map((m) => ({ ...m, roundName: r.name }))).find((m) => !m.winner && m.playerA && m.playerB);
+  const [count, matches, entries, pending] = await Promise.all([
+    hunt ? guessCount(hunt.id) : 0,
+    tournament ? getMatches(tournament.id) : [],
+    tournament ? getEntries(tournament.id) : [],
+    hunt ? requestsFor(hunt.id) : [],
+  ]);
+  const next = summarise(matches).current;
 
   const s = hunt ? huntStats(hunt) : null;
   const bonuses = hunt ? huntBonuses(hunt) : [];
@@ -61,6 +68,21 @@ export async function StreamGamesPanel() {
             </div>
             {current ? <span className="meta">Opening now: {current.slotName}</span> : null}
             <div className="row" style={{ justifyContent: 'space-between' }}>
+              <Link href="/admin/hunts" className="meta">
+                {pending.length} slot request{pending.length === 1 ? '' : 's'} waiting
+              </Link>
+              {!hunt.isOpening ? (
+                <form action={toggleHuntRequests}>
+                  <input type="hidden" name="huntId" value={hunt.id} />
+                  <input type="hidden" name="open" value={hunt.requestsOpen ? '0' : '1'} />
+                  <input type="hidden" name="back" value="/admin" />
+                  <button className="btn btn--secondary" type="submit">
+                    {hunt.requestsOpen ? 'Close !sr' : 'Open !sr'}
+                  </button>
+                </form>
+              ) : null}
+            </div>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
               <span className="meta">
                 {count} guess{count === 1 ? '' : 'es'}
                 {hunt.isOpening ? ' · locked automatically while opening' : ''}
@@ -93,34 +115,29 @@ export async function StreamGamesPanel() {
           <>
             <span>{tournament.name}</span>
             {next ? (
-              <form action={recordResultAction} className="stack" style={{ gap: 10 }}>
+              <div className="stack" style={{ gap: 8 }}>
                 <span className="meta">
                   Next: {next.roundName} · <b style={{ color: 'var(--color-text)' }}>{next.playerA}</b> ({next.slotA}) vs{' '}
                   <b style={{ color: 'var(--color-text)' }}>{next.playerB}</b> ({next.slotB})
                 </span>
-                <input type="hidden" name="tournamentId" value={tournament.id} />
-                <input type="hidden" name="matchId" value={next.id} />
-                <input type="hidden" name="back" value="/admin" />
-                <div className="bracket__form" style={{ marginTop: 0 }}>
-                  <label className="visually-hidden" htmlFor="dash-a">
-                    {next.playerA} multiplier
-                  </label>
-                  <input id="dash-a" name="multiA" className="input" inputMode="decimal" placeholder={`${next.playerA} ×`} required />
-                  <label className="visually-hidden" htmlFor="dash-b">
-                    {next.playerB} multiplier
-                  </label>
-                  <input id="dash-b" name="multiB" className="input" inputMode="decimal" placeholder={`${next.playerB} ×`} required />
-                  <button className="btn btn--primary" type="submit">
-                    Save
-                  </button>
-                </div>
-              </form>
+                <ResultForm match={next} tournamentId={tournament.id} back="/admin" />
+              </div>
             ) : (
               <span className="meta">Waiting for players to reach the next round.</span>
             )}
           </>
+        ) : tournament?.status === 'signup' ? (
+          <>
+            <span>{tournament.name}</span>
+            <span className="meta">
+              {entries.length} signed up for {tournament.size} places · !sr {tournament.requestsOpen ? 'open' : 'closed'}
+            </span>
+            <Link className="btn btn--primary" href={`/admin/tournaments/${tournament.id}`} style={{ alignSelf: 'flex-start' }}>
+              Review sign-ups &amp; draw
+            </Link>
+          </>
         ) : (
-          <p className="meta">{tournament ? `Last: ${tournament.name} (${tournament.status}).` : 'No tournaments yet.'}</p>
+          <p className="meta">{tournament ? `Last: ${tournament.name} (finished).` : 'No tournaments yet.'}</p>
         )}
       </div>
     </section>

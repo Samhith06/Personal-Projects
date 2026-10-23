@@ -129,23 +129,6 @@
     margin-left: auto;
   }
 
-  /* Hunt slot list: drop the bet column so names fit. */
-  .slot-row {
-    grid-template-columns: 18px 34px minmax(0, 1fr) 64px;
-    gap: 10px;
-    padding: 8px 6px;
-  }
-
-  .slot-row > :nth-child(4) {
-    display: none;
-  }
-
-  .slot-row img,
-  .slot-row__ph {
-    width: 34px;
-    height: 34px;
-  }
-
   /* Leaderboard race panel. */
   .race__pool {
     font-size: 64px;

@@ -6,10 +6,11 @@
  */
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/server/db';
-import { giveawayWinners, hunts, leaderboardResults, leaderboards, raffleWinners, roobetDailyWager, roobetLinks, users, watchTime } from '@/server/db/schema';
+import { giveawayWinners, leaderboardResults, leaderboards, raffleWinners, roobetDailyWager, roobetLinks, users, watchTime } from '@/server/db/schema';
 import { formatMinutes, maskName } from '@/lib/format';
 import { publicName } from './people';
 import { handleFor } from './profiles';
+import { artFor, slotArt } from './slot-art';
 
 type PublicPerson = { name: string; handle: string | null };
 
@@ -62,25 +63,6 @@ export type HitRow = PublicPerson & {
   image: string | null;
 };
 
-/** "Big Bass Splash 1000" and "big-bass-splash-1000" are the same slot. */
-const slotKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-/**
- * Slot name → artwork, from the bonuses in synced bonushunt.gg hunts. Roobet's
- * affiliate data has no images and bonushunt.gg has no lookup by name, so a
- * slot Steezy has never hunted gets the styled fallback instead.
- */
-async function slotArt() {
-  const rows = await db.execute(sql`
-    select b->>'slotName' as name, b->>'slotImage' as image
-    from ${hunts}, jsonb_array_elements(${hunts.bonuses}) b
-    where coalesce(b->>'slotImage', '') <> ''
-  `);
-  const art = new Map<string, string>();
-  for (const r of rows.rows as { name: string; image: string }[]) art.set(slotKey(r.name), r.image);
-  return art;
-}
-
 type HitDbRow = {
   username: string;
   day?: string;
@@ -106,7 +88,7 @@ function toHit(r: HitDbRow, art: Map<string, string>): HitRow {
     gameTitle: r.hit!.gameTitle ?? 'Unknown game',
     wagered: showAmounts ? (r.hit!.wagered ?? null) : null,
     payout: showAmounts ? (r.hit!.payout ?? null) : null,
-    image: art.get(slotKey(r.hit!.gameTitle ?? '')) ?? null,
+    image: artFor(art, r.hit!.gameTitle),
   };
 }
 

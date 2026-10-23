@@ -7,14 +7,22 @@
  */
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { z } from 'zod';
 import { db } from '@/server/db';
 import { hunts } from '@/server/db/schema';
 import { requireRole, requireUser } from '@/server/auth/session';
 import { bonushuntKey, syncHunts } from '@/server/bonushunt/sync';
 import { audit } from '@/server/services/audit';
 import { getHunt, parseGuess, placeGuess } from '@/server/services/hunts';
-import { createTournament, recordResult, startTournament } from '@/server/services/tournaments';
+import { setHuntRequestsOpen, setRequestStatus } from '@/server/services/hunt-requests';
+import {
+  TOURNAMENT_SIZES,
+  addEntry,
+  createTournament,
+  recordResult,
+  removeEntry,
+  setRequestsOpen,
+  startTournament,
+} from '@/server/services/tournaments';
 
 function back(path: string, params: Record<string, string>): never {
   redirect(`${path}?${new URLSearchParams(params)}`);
@@ -72,54 +80,88 @@ export async function markHuntPrizePaid(fd: FormData): Promise<void> {
   back(str(fd, 'back') || '/admin/hunts', { ok: 'Marked paid.' });
 }
 
-/* ----------------------------------------------------------- tournaments */
+/** Hunt slot requests from `!sr`: mark added on bonushunt.gg, dismiss, or open/close the queue. */
+export async function setRequestStatusAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const status = str(fd, 'status');
+  if (status !== 'added' && status !== 'dismissed' && status !== 'pending') back('/admin/hunts', { error: 'Unknown status.' });
+  const r = await setRequestStatus(str(fd, 'requestId'), status as 'added' | 'dismissed' | 'pending', staff.id);
+  back('/admin/hunts', r ? { ok: `${r.slot}: ${status}.` } : { error: 'Request not found.' });
+}
 
-const entryLine = z.string().transform((line, ctx) => {
-  // "player — slot", "player - slot", "player | slot" or "player, slot"
-  const [player, ...rest] = line.split(/\s+[—–|-]\s+|\s*\|\s*|,\s*/);
-  const slot = rest.join(' ').trim();
-  if (!player?.trim() || !slot) {
-    ctx.addIssue({ code: 'custom', message: `Couldn’t read “${line}”. Use one “player — slot” per line.` });
-    return z.NEVER;
-  }
-  return { player: player.trim().slice(0, 40), slot: slot.slice(0, 60) };
-});
+export async function toggleHuntRequests(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const open = str(fd, 'open') === '1';
+  await setHuntRequestsOpen(str(fd, 'huntId'), open, staff.id);
+  back(str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : '/admin/hunts', { ok: open ? 'Slot requests opened.' : 'Slot requests closed.' });
+}
+
+/* ----------------------------------------------------------- tournaments */
 
 export async function createTournamentAction(fd: FormData): Promise<void> {
   const staff = await requireRole('admin');
   const name = str(fd, 'name');
   if (!name) back('/admin/tournaments', { error: 'Give the tournament a name.' });
-  const lines = str(fd, 'entries')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const parsed = z.array(entryLine).min(2, 'Add at least 2 players.').max(64, 'At most 64 players.').safeParse(lines);
-  if (!parsed.success) back('/admin/tournaments', { error: parsed.error.issues[0].message });
-  const t = await createTournament(name.slice(0, 80), str(fd, 'prize') || null, parsed.data, staff.id);
-  back(`/admin/tournaments/${t.id}`, { ok: 'Bracket created. Start it when you go live.' });
+  const size = Number(str(fd, 'size'));
+  if (!TOURNAMENT_SIZES.includes(size as (typeof TOURNAMENT_SIZES)[number])) back('/admin/tournaments', { error: 'Pick a bracket size.' });
+  const t = await createTournament(name.slice(0, 80), str(fd, 'prize').slice(0, 80) || null, size, staff.id);
+  back(`/admin/tournaments/${t.id}`, { ok: 'Created. Sign-ups are open: chat types !sr slot name.' });
+}
+
+export async function addEntryAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const id = str(fd, 'tournamentId');
+  const player = str(fd, 'player').slice(0, 40);
+  const slot = str(fd, 'slot').slice(0, 60);
+  if (!player || !slot) back(`/admin/tournaments/${id}`, { error: 'Enter a player and a slot.' });
+  const r = await addEntry(id, player, slot, staff.id);
+  const msg = { ok: `Added ${player}.`, taken: `${player} is already signed up.`, not_signup: 'Sign-ups are over.' };
+  back(`/admin/tournaments/${id}`, r === 'ok' ? { ok: msg.ok } : { error: msg[r] });
+}
+
+export async function removeEntryAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const e = await removeEntry(str(fd, 'entryId'), staff.id);
+  back(`/admin/tournaments/${str(fd, 'tournamentId')}`, e ? { ok: `Removed ${e.kickUsername}.` } : { error: 'Can’t remove that entry now.' });
+}
+
+export async function toggleTournamentRequests(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const id = str(fd, 'tournamentId');
+  const open = str(fd, 'open') === '1';
+  await setRequestsOpen(id, open, staff.id);
+  back(`/admin/tournaments/${id}`, { ok: open ? '!sr is open.' : '!sr is closed.' });
 }
 
 export async function startTournamentAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const id = str(fd, 'id');
   const r = await startTournament(id, staff.id);
-  back(`/admin/tournaments/${id}`, r === 'ok' ? { ok: 'Started. Byes went straight through.' } : { error: 'Already started.' });
+  const msg = { ok: 'Bracket drawn — it’s live. Byes went straight through.', not_signup: 'Already started.', too_few: 'Needs at least 2 sign-ups.' };
+  back(`/admin/tournaments/${id}`, r === 'ok' ? { ok: msg.ok } : { error: msg[r] });
 }
 
+const money = (v: string) => {
+  const n = Number(v.replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+/** One buy per player: what it cost and what it paid. The higher multiplier goes through. */
 export async function recordResultAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const id = str(fd, 'tournamentId');
   // The dashboard posts here too; only ever send staff back inside /admin.
   const backTo = str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : `/admin/tournaments/${id}`;
-  const a = Number(str(fd, 'multiA'));
-  const b = Number(str(fd, 'multiB'));
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) back(backTo, { error: 'Enter both multipliers as numbers.' });
-  const r = await recordResult(str(fd, 'matchId'), a, b, staff.id);
+  const [costA, payoutA, costB, payoutB] = ['costA', 'payoutA', 'costB', 'payoutB'].map((k) => money(str(fd, k)));
+  if (costA === null || payoutA === null || costB === null || payoutB === null || !costA || !costB) {
+    back(backTo, { error: 'Enter each buy’s cost (more than 0) and payout.' });
+  }
+  const r = await recordResult(str(fd, 'matchId'), { cost: costA!, payout: payoutA! }, { cost: costB!, payout: payoutB! }, staff.id);
   const msg: Record<string, string> = {
-    not_live: 'Start the tournament first.',
+    not_live: 'The tournament isn’t live.',
     not_ready: 'That match is still waiting for a player.',
     decided: 'That match already has a result.',
-    tie: 'It’s a tie — replay the slots and enter the new multipliers.',
   };
+  if (r === 'tie') back(backTo, { ok: 'Level — both buy again, then enter the new result.' });
   back(backTo, r === 'ok' ? { ok: 'Result saved, winner moved on.' } : { error: msg[r] });
 }

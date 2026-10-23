@@ -454,8 +454,30 @@ export const hunts = pgTable(
     prizePaidAt: ts('prize_paid_at'),
     /** Hidden from the site (test hunts). */
     hidden: boolean('hidden').notNull().default(false),
+    /** `!sr` slot suggestions are taken while the hunt is being collected and this is on. */
+    requestsOpen: boolean('requests_open').notNull().default(true),
   },
   (t) => [index('hunts_created_idx').on(t.remoteCreatedAt)],
+);
+
+/** Slots chat suggested for a hunt with `!sr`. Staff add them on bonushunt.gg, then mark them here. */
+export const huntRequests = pgTable(
+  'hunt_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    huntId: text('hunt_id')
+      .notNull()
+      .references(() => hunts.id, { onDelete: 'cascade' }),
+    kickUserId: text('kick_user_id').notNull(),
+    kickUsername: text('kick_username').notNull(),
+    slot: text('slot').notNull(),
+    /** Lowercased letters and digits only, so "Sweet Bonanza" and "sweet-bonanza" are one request. */
+    slotKey: text('slot_key').notNull(),
+    /** pending | added | dismissed */
+    status: text('status').notNull().default('pending'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('hunt_requests_once_idx').on(t.huntId, t.kickUserId, t.slotKey), index('hunt_requests_hunt_idx').on(t.huntId, t.status)],
 );
 
 /** One guess per member per hunt; guessing again replaces it until guessing closes. */
@@ -485,10 +507,34 @@ export const tournaments = pgTable('tournaments', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   prize: text('prize'),
-  /** draft | live | finished */
-  status: text('status').notNull().default('draft'),
+  /** Most players the bracket holds: 4, 8 or 16. */
+  size: integer('size').notNull().default(8),
+  /** signup | live | finished */
+  status: text('status').notNull().default('signup'),
+  /** `!sr` sign-ups (and, once live, slot changes) are taken while this is on. */
+  requestsOpen: boolean('requests_open').notNull().default(true),
   createdAt: createdAt(),
+  startedAt: ts('started_at'),
+  finishedAt: ts('finished_at'),
 });
+
+/** Who signed up in chat with `!sr <slot>`, and the slot they'll play. One entry per Kick account. */
+export const tournamentEntries = pgTable(
+  'tournament_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tournamentId: uuid('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    /** Null for players staff added by hand. */
+    kickUserId: text('kick_user_id'),
+    kickUsername: text('kick_username').notNull(),
+    slot: text('slot').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('tournament_entries_kick_idx').on(t.tournamentId, t.kickUserId)],
+);
 
 export const tournamentMatches = pgTable(
   'tournament_matches',
@@ -507,8 +553,12 @@ export const tournamentMatches = pgTable(
     playerB: text('player_b'),
     slotB: text('slot_b'),
     multiB: numeric('multi_b', { precision: 12, scale: 2, mode: 'number' }),
-    /** 'a' | 'b' once decided. */
+    /** 'a' | 'b' once decided. A level result leaves it null and both buy again. */
     winner: text('winner'),
+    /** Every bonus bought in this match (ties included), and what they cost and paid, for profit. */
+    buys: integer('buys').notNull().default(0),
+    cost: money('cost').notNull().default(0),
+    payout: money('payout').notNull().default(0),
   },
   (t) => [uniqueIndex('tournament_matches_pos_idx').on(t.tournamentId, t.round, t.slot)],
 );

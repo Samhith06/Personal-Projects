@@ -1,12 +1,14 @@
 /**
  * Everything that happens when a chat message arrives from Kick's webhook:
- * `!verify` codes, watch time (only while live), giveaway `!join` and bot commands.
+ * `!verify` codes, watch time (only while live), giveaway `!join`, `!guess`,
+ * `!sr` slot requests / tournament sign-ups and bot commands.
  */
 import { handleJoinCommand } from '@/server/services/giveaways';
 import { handleGuessCommand, type GuessResult } from '@/server/services/hunts';
 import { handleVerifyCommand } from './chat-verification';
 import { parseCommand, replyFor, takeCooldown } from './commands';
 import { sendChat, type SendChat } from './bot';
+import { handleSlotRequest } from './slot-requests';
 import { openSession } from './sessions';
 import { recordChat, type ChatEvent } from './watchtime';
 
@@ -16,11 +18,13 @@ export type ChatOutcome = {
   counted: boolean;
   joined: boolean;
   guess: GuessResult | null;
+  /** What `!sr` did, if the message was one, as `target:result`. */
+  slotRequest: string | null;
   reply: string | null;
 };
 
 export async function handleChatEvent(msg: ChatEvent, broadcasterUserId: string, send: SendChat = sendChat): Promise<ChatOutcome> {
-  const outcome: ChatOutcome = { verified: false, recorded: false, counted: false, joined: false, guess: null, reply: null };
+  const outcome: ChatOutcome = { verified: false, recorded: false, counted: false, joined: false, guess: null, slotRequest: null, reply: null };
 
   outcome.verified = await handleVerifyCommand(msg);
 
@@ -38,6 +42,17 @@ export async function handleChatEvent(msg: ChatEvent, broadcasterUserId: string,
   outcome.joined = joins.some((j) => j.result === 'entered');
   // `!guess 4200` for the current bonus hunt — also silent; the hunt overlay shows the guess count.
   outcome.guess = await handleGuessCommand(msg.senderId, msg.content);
+
+  // `!sr Sweet Bonanza`: tournament sign-up / slot change first, else a hunt suggestion. Answered, with a cooldown.
+  const sr = await handleSlotRequest(msg.senderId, msg.senderUsername, msg.content);
+  if (sr) {
+    outcome.slotRequest = `${sr.target}:${sr.result}`;
+    if (sr.reply) {
+      outcome.reply = `@${msg.senderUsername} ${sr.reply}`;
+      await send({ broadcasterUserId, content: outcome.reply, replyToMessageId: msg.messageId });
+    }
+    return outcome;
+  }
 
   const command = parseCommand(msg.content);
   if (command && takeCooldown(command, msg.senderId)) {

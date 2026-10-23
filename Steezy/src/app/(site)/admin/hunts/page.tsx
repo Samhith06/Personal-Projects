@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
-import { markHuntPrizePaid, syncHuntsNow, updateHunt } from '@/server/actions/hunts';
+import { SlotThumb } from '@/components/hall-of-fame/SlotArt';
+import { markHuntPrizePaid, setRequestStatusAction, syncHuntsNow, toggleHuntRequests, updateHunt } from '@/server/actions/hunts';
+import { requestsFor, requestsOpen } from '@/server/services/hunt-requests';
+import { artFor, slotArt } from '@/server/services/slot-art';
 import { huntOverlayToken } from '@/server/services/hunt-overlay';
 import { currentHunt, guessList, huntStats, huntWinnerName, listHunts } from '@/server/services/hunts';
 import { syncStatus } from '@/server/services/sync-status';
@@ -15,7 +18,14 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
   const flash = await searchParams;
   const [rows, current, sync, token] = await Promise.all([listHunts(true), currentHunt(), syncStatus('bonushunt'), huntOverlayToken()]);
   const target = current ? (huntStats(current).totalWinnings ?? null) : null;
-  const [guesses, winners] = await Promise.all([current ? guessList(current.id, target) : [], Promise.all(rows.map(huntWinnerName))]);
+  const [guesses, winners, requests, art] = await Promise.all([
+    current ? guessList(current.id, target) : [],
+    Promise.all(rows.map(huntWinnerName)),
+    current ? requestsFor(current.id, ['pending', 'added']) : [],
+    slotArt(),
+  ]);
+  const pending = requests.filter((r) => r.status === 'pending');
+  const added = requests.filter((r) => r.status === 'added');
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -46,6 +56,51 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
         <code className="hash">{siteUrl(`/overlay/hunt/${token}`)}</code>
         <span className="meta">1920×1080, transparent. Shows the current hunt, the guess count and the leaderboard ticker. Add ?preview=1 to check it in a browser.</span>
       </section>
+
+      {current && !current.completed ? (
+        <section className="card stack" style={{ gap: 10 }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <strong>
+              Slot requests for “{current.title}” · {pending.length} waiting
+            </strong>
+            <form action={toggleHuntRequests}>
+              <input type="hidden" name="huntId" value={current.id} />
+              <input type="hidden" name="open" value={current.requestsOpen ? '0' : '1'} />
+              <button className={current.requestsOpen ? 'btn btn--secondary' : 'btn btn--primary'} type="submit">
+                {current.requestsOpen ? 'Close !sr' : 'Open !sr'}
+              </button>
+            </form>
+          </div>
+          <span className="meta">
+            Chat suggests with <code>!sr slot name</code> {requestsOpen(current) ? 'right now' : current.isOpening ? '— closed while opening' : '— closed'}. Add the
+            ones you like on bonushunt.gg, then mark them added so the queue stays short.
+          </span>
+          {pending.length === 0 ? <div className="emptyq">Nothing waiting.</div> : null}
+          {pending.map((r) => (
+            <div key={r.id} className="admin-row">
+              <div className="slotcell admin-row__body">
+                <SlotThumb name={r.slot} image={artFor(art, r.slot)} size={36} />
+                <span>
+                  <b>{r.slot}</b>
+                  <small>
+                    {r.kickUsername} · {formatAgo(r.createdAt)}
+                  </small>
+                </span>
+              </div>
+              <form action={setRequestStatusAction} className="row" style={{ gap: 6 }}>
+                <input type="hidden" name="requestId" value={r.id} />
+                <button className="btn btn--primary" name="status" value="added" type="submit">
+                  Added
+                </button>
+                <button className="btn btn--secondary" name="status" value="dismissed" type="submit">
+                  Dismiss
+                </button>
+              </form>
+            </div>
+          ))}
+          {added.length ? <span className="meta">Added so far: {added.map((r) => `${r.slot} (${r.kickUsername})`).join(', ')}</span> : null}
+        </section>
+      ) : null}
 
       <section className="card">
         <strong>Hunts</strong>

@@ -22,6 +22,13 @@
       "when": 1792773484595,
       "tag": "0002_weighted_leaderboards",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792794255368,
+      "tag": "0003_tournament_signups_and_requests",
+      "breakpoints": true
     }
   ]
 }

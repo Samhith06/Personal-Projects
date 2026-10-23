@@ -18,11 +18,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     activeHunt().catch(() => null),
     featuredTournament().catch(() => null),
   ]);
-  const huntOn = Boolean(hunt) || tournament?.status === 'live';
+  const tournamentOn = tournament?.status === 'live' || tournament?.status === 'signup' ? tournament.status : null;
 
   return (
     <>
-      <SiteHeader user={user} live={Boolean(session)} huntOn={huntOn} />
+      <SiteHeader user={user} live={Boolean(session)} huntOn={Boolean(hunt)} tournamentOn={tournamentOn} />
       <main id="main">{children}</main>
       <SiteFooter />
       {showAgeGate && user ? <AgeGate name={user.discordGlobalName || user.discordUsername} /> : null}
