@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { biggestHits, champions, records } from '@/server/services/hall-of-fame';
+import { BIG_WIN_MULTIPLIER, bigWins, biggestHits, champions, records } from '@/server/services/hall-of-fame';
 import { formatUsd, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Hall of Fame' };
 
 const MEDAL = ['var(--medal-gold)', 'var(--medal-silver)', 'var(--medal-bronze)'];
+
+const multi = (m: number) => `${m.toLocaleString('en-US', { maximumFractionDigits: 1 })}×`;
+const dayLabel = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
 function Person({ name, handle }: { name: string; handle: string | null }) {
   return handle ? (
@@ -18,7 +21,7 @@ function Person({ name, handle }: { name: string; handle: string | null }) {
 }
 
 export default async function HallOfFamePage() {
-  const [champs, hits, recs] = await Promise.all([champions(), biggestHits(), records()]);
+  const [champs, hits, wins, recs] = await Promise.all([champions(), biggestHits(), bigWins(), records()]);
 
   return (
     <div className="container page" style={{ gap: 48 }}>
@@ -26,7 +29,7 @@ export default async function HallOfFamePage() {
         <span className="kicker">Hall of Fame</span>
         <h1 className="hof-title">The ones chat remembers.</h1>
         <p className="meta" style={{ fontSize: 15, maxWidth: '56ch' }}>
-          Monthly champions, the biggest multipliers under code STZY, and the community&apos;s records.
+          Monthly champions, the biggest multipliers under code STZY, the {BIG_WIN_MULTIPLIER}× club, and the community&apos;s records.
         </p>
       </div>
 
@@ -125,7 +128,7 @@ export default async function HallOfFamePage() {
                         {h.payout === null ? '—' : formatUsd(h.payout)}
                       </td>
                       <td className="num" style={{ textAlign: 'right', color: 'var(--color-accent)', fontSize: 17, fontWeight: 600 }}>
-                        {h.multiplier.toLocaleString('en-US', { maximumFractionDigits: 1 })}×
+                        {multi(h.multiplier)}
                       </td>
                     </tr>
                   ))}
@@ -138,6 +141,40 @@ export default async function HallOfFamePage() {
             </p>
           )}
         </div>
+      </section>
+
+      <section className="stack">
+        <div>
+          <h2 style={{ fontSize: 26, marginBottom: 6 }}>The {BIG_WIN_MULTIPLIER}× club</h2>
+          <span className="meta">Every hit of {BIG_WIN_MULTIPLIER}× or more under STZY lands here automatically, newest first</span>
+        </div>
+        {wins.length ? (
+          <div className="card-grid">
+            {wins.map((w, i) => (
+              <article key={i} className="card stack" style={{ gap: 10 }}>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <span className="num" style={{ fontSize: 30, fontWeight: 700, color: 'var(--color-accent)', letterSpacing: '-0.02em' }}>
+                    {multi(w.multiplier)}
+                  </span>
+                  <span className="meta">{dayLabel(w.day)}</span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>
+                  <Person name={w.name} handle={w.handle} />
+                </div>
+                <span className="meta">{w.gameTitle}</span>
+                {w.wagered !== null && w.payout !== null ? (
+                  <span className="meta num">
+                    {formatUsd(w.wagered)} bet · {formatUsd(w.payout)} paid
+                  </span>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="card">
+            <p className="meta">No {BIG_WIN_MULTIPLIER}× hits yet. The first one shows up here within minutes of landing.</p>
+          </div>
+        )}
       </section>
 
       {recs.length ? (

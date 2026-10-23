@@ -1,5 +1,6 @@
 /**
- * Hall of Fame: monthly champions, biggest multipliers under code STZY, and
+ * Hall of Fame: monthly champions, biggest multipliers under code STZY, the
+ * 500x club (every big hit, added automatically as wagers sync), and
  * community records. Members only appear by name if they left "show my name"
  * on; Roobet players who never linked an account are masked.
  */
@@ -59,6 +60,34 @@ export type HitRow = PublicPerson & {
   payout: number | null;
 };
 
+type HitDbRow = {
+  username: string;
+  day?: string;
+  hit: { multiplier?: number; wagered?: number; payout?: number; gameTitle?: string } | null;
+  kick_username: string | null;
+  discord_username: string | null;
+  discord_global_name: string | null;
+  name_on_leaderboards: boolean | null;
+  wager_public: boolean | null;
+};
+
+/** Same privacy rules everywhere: names only for members who show them, amounts only when public. */
+function toHit(r: HitDbRow): HitRow {
+  const member = r.discord_username !== null;
+  const named = member && r.name_on_leaderboards;
+  const showAmounts = !member || Boolean(r.wager_public);
+  return {
+    name: named
+      ? publicName({ kickUsername: r.kick_username, discordGlobalName: r.discord_global_name, discordUsername: r.discord_username!, nameOnLeaderboards: true })
+      : maskName(r.username),
+    handle: named ? handleFor({ kickUsername: r.kick_username, discordUsername: r.discord_username! }) : null,
+    multiplier: r.hit!.multiplier!,
+    gameTitle: r.hit!.gameTitle ?? 'Unknown game',
+    wagered: showAmounts ? (r.hit!.wagered ?? null) : null,
+    payout: showAmounts ? (r.hit!.payout ?? null) : null,
+  };
+}
+
 /** Each player's best multiplier, highest first. */
 export async function biggestHits(limit = 10): Promise<HitRow[]> {
   const rows = await db.execute(sql`
@@ -71,34 +100,33 @@ export async function biggestHits(limit = 10): Promise<HitRow[]> {
     where d.highest_multiplier is not null and (u.blocked_from_rewards is not true)
     order by d.roobet_uid, (d.highest_multiplier->>'multiplier')::float8 desc nulls last
   `);
-  type Row = {
-    username: string;
-    hit: { multiplier?: number; wagered?: number; payout?: number; gameTitle?: string } | null;
-    kick_username: string | null;
-    discord_username: string | null;
-    discord_global_name: string | null;
-    name_on_leaderboards: boolean | null;
-    wager_public: boolean | null;
-  };
-  return (rows.rows as Row[])
+  return (rows.rows as HitDbRow[])
     .filter((r) => r.hit?.multiplier)
-    .map((r) => {
-      const member = r.discord_username !== null;
-      const named = member && r.name_on_leaderboards;
-      const showAmounts = !member || Boolean(r.wager_public);
-      return {
-        name: named
-          ? publicName({ kickUsername: r.kick_username, discordGlobalName: r.discord_global_name, discordUsername: r.discord_username!, nameOnLeaderboards: true })
-          : maskName(r.username),
-        handle: named ? handleFor({ kickUsername: r.kick_username, discordUsername: r.discord_username! }) : null,
-        multiplier: r.hit!.multiplier!,
-        gameTitle: r.hit!.gameTitle ?? 'Unknown game',
-        wagered: showAmounts ? (r.hit!.wagered ?? null) : null,
-        payout: showAmounts ? (r.hit!.payout ?? null) : null,
-      };
-    })
+    .map(toHit)
     .sort((a, b) => b.multiplier - a.multiplier)
     .slice(0, limit);
+}
+
+/** A hit at or above this multiplier joins the 500x club. */
+export const BIG_WIN_MULTIPLIER = 500;
+
+/**
+ * Every big hit, newest day first. Roobet only reports each player's best
+ * multiplier per synced day, so this is at most one hit per player per day.
+ */
+export async function bigWins(limit = 30): Promise<(HitRow & { day: string })[]> {
+  const rows = await db.execute(sql`
+    select
+      d.username, d.day::text as day, d.highest_multiplier as hit,
+      u.kick_username, u.discord_username, u.discord_global_name, u.name_on_leaderboards, u.wager_public
+    from ${roobetDailyWager} d
+    left join ${roobetLinks} l on l.roobet_uid = d.roobet_uid and l.status = 'approved'
+    left join ${users} u on u.id = l.user_id
+    where (d.highest_multiplier->>'multiplier')::float8 >= ${BIG_WIN_MULTIPLIER} and (u.blocked_from_rewards is not true)
+    order by d.day desc, (d.highest_multiplier->>'multiplier')::float8 desc
+    limit ${limit}
+  `);
+  return (rows.rows as HitDbRow[]).map((r) => ({ ...toHit(r), day: r.day! }));
 }
 
 export type RecordRow = { label: string; person: PublicPerson; value: string };
