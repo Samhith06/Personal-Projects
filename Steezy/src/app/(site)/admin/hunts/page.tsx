@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
+import { HuntDetail } from '@/components/admin/HuntDetail';
 import { SlotThumb } from '@/components/hall-of-fame/SlotArt';
-import { markHuntPrizePaid, setRequestStatusAction, syncHuntsNow, toggleHuntRequests, updateHunt } from '@/server/actions/hunts';
+import { setRequestStatusAction, syncHuntsNow, toggleHuntRequests } from '@/server/actions/hunts';
 import { requestsFor, requestsOpen } from '@/server/services/hunt-requests';
 import { artFor, slotArt } from '@/server/services/slot-art';
 import { huntOverlayToken } from '@/server/services/hunt-overlay';
-import { currentHunt, guessList, huntStats, huntWinnerName, listHunts } from '@/server/services/hunts';
+import { currentHunt, listHunts, guessList, huntStats, huntWinnerName } from '@/server/services/hunts';
 import { syncStatus } from '@/server/services/sync-status';
 import { siteUrl } from '@/lib/env';
-import { formatAgo, formatUsd } from '@/lib/format';
+import { formatAgo } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Bonus hunts' };
 
@@ -16,11 +18,11 @@ const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDig
 
 export default async function HuntsAdmin({ searchParams }: { searchParams: FlashParams }) {
   const flash = await searchParams;
-  const [rows, current, sync, token] = await Promise.all([listHunts(true), currentHunt(), syncStatus('bonushunt'), huntOverlayToken()]);
+  const [current, sync, token, past] = await Promise.all([currentHunt(), syncStatus('bonushunt'), huntOverlayToken(), listHunts(true)]);
   const target = current ? (huntStats(current).totalWinnings ?? null) : null;
-  const [guesses, winners, requests, art] = await Promise.all([
+  const [guesses, winnerName, requests, art] = await Promise.all([
     current ? guessList(current.id, target) : [],
-    Promise.all(rows.map(huntWinnerName)),
+    current ? huntWinnerName(current) : null,
     current ? requestsFor(current.id, ['pending', 'added']) : [],
     slotArt(),
   ]);
@@ -29,13 +31,18 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
 
   return (
     <div className="stack" style={{ gap: 20 }}>
-      <div>
-        <span className="kicker">Stream games</span>
-        <h1 className="admin__title">Bonus hunts</h1>
-        <p className="meta">
-          Hunts come from bonushunt.gg every 30 seconds. Guessing closes on its own when the opening starts; the closest guess wins
-          when the hunt completes.
-        </p>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <span className="kicker">Stream games</span>
+          <h1 className="admin__title">Bonus hunts</h1>
+          <p className="admin__sub">
+            Hunts come from bonushunt.gg every 30 seconds. Guessing closes on its own when the opening starts; the closest guess wins
+            when the hunt completes.
+          </p>
+        </div>
+        <Link className="btn btn--secondary" href="/admin/hunts/history">
+          History{past.length > 1 ? ` · ${past.filter((h) => h.id !== current?.id).length}` : ''}
+        </Link>
       </div>
       <Flash {...flash} />
 
@@ -51,11 +58,12 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
         </form>
       </section>
 
-      <section className="card stack" style={{ gap: 8 }}>
-        <strong>OBS browser source — hunt overlay</strong>
-        <code className="hash">{siteUrl(`/overlay/hunt/${token}`)}</code>
-        <span className="meta">1920×1080, transparent. Shows the current hunt, the guess count and the leaderboard ticker. Add ?preview=1 to check it in a browser.</span>
-      </section>
+      {current ? (
+        <HuntDetail hunt={current} winnerName={winnerName} back="/admin/hunts" />
+      ) : (
+        <div className="emptyq">No hunts synced yet. Start one on bonushunt.gg and it shows here within 30 seconds.</div>
+      )}
+
 
       {current && !current.completed ? (
         <section className="card stack" style={{ gap: 10 }}>
@@ -102,49 +110,6 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
         </section>
       ) : null}
 
-      <section className="card">
-        <strong>Hunts</strong>
-        {rows.length === 0 ? <p className="meta" style={{ marginTop: 8 }}>No hunts synced yet.</p> : null}
-        {rows.map((h, i) => {
-          const s = huntStats(h);
-          return (
-            <form key={h.id} action={updateHunt} className="admin-row">
-              <input type="hidden" name="huntId" value={h.id} />
-              <div className="admin-row__body">
-                <div style={{ fontWeight: 500 }}>
-                  {h.title} {h.id === current?.id ? <span className="tag tag--accent">current</span> : null}{' '}
-                  <span className="tag tag--neutral">{h.completed ? 'completed' : h.isOpening ? 'opening' : 'collecting'}</span>
-                </div>
-                <div className="meta">
-                  {h.casino ?? '—'} · {formatUsd(h.startCost)} start · {s.openedBonuses ?? 0}/{s.bonusCount ?? 0} opened · {money2(s.totalWinnings ?? 0)} won
-                  {h.settledAt ? ` · closest guess: ${winners[i] ?? 'none'}${h.winnerGuess !== null ? ` (${money2(h.winnerGuess)})` : ''}` : ''}
-                </div>
-              </div>
-              <label className="check">
-                <input type="checkbox" name="guessesOpen" defaultChecked={h.guessesOpen} />
-                Guessing
-              </label>
-              <label className="check">
-                <input type="checkbox" name="hidden" defaultChecked={h.hidden} />
-                Hidden
-              </label>
-              <label className="visually-hidden" htmlFor={`prize-${h.id}`}>
-                Guess prize
-              </label>
-              <input id={`prize-${h.id}`} name="guessPrize" className="input" placeholder="Guess prize, e.g. $100 tip" defaultValue={h.guessPrize ?? ''} style={{ width: 200 }} />
-              <button className="btn btn--secondary" type="submit">
-                Save
-              </button>
-              {h.winnerUserId && h.guessPrize && !h.prizePaidAt ? (
-                <button className="btn btn--primary" formAction={markHuntPrizePaid}>
-                  Mark prize paid
-                </button>
-              ) : null}
-            </form>
-          );
-        })}
-      </section>
-
       {current ? (
         <section className="card">
           <strong>
@@ -186,6 +151,12 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
           </div>
         </section>
       ) : null}
+
+      <section className="card stack" style={{ gap: 8 }}>
+        <strong>OBS browser source — hunt overlay</strong>
+        <code className="hash">{siteUrl(`/overlay/hunt/${token}`)}</code>
+        <span className="meta">1920×1080, transparent. Shows the current hunt, the guess count and the leaderboard ticker. Add ?preview=1 to check it in a browser.</span>
+      </section>
     </div>
   );
 }

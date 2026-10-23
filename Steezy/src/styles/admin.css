@@ -303,3 +303,14 @@
   flex: 1 1 0;
   min-width: 0;
 }
+
+/* Six hunt numbers: two even rows of three, two columns on phones. */
+.admin-kpis--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .admin-kpis--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

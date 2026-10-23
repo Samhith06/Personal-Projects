@@ -59,7 +59,7 @@ export async function updateHunt(fd: FormData): Promise<void> {
   };
   await db.update(hunts).set(change).where(eq(hunts.id, id));
   await audit(staff.id, 'hunt.update', 'hunt', id, { guessesOpen: before.guessesOpen, hidden: before.hidden, guessPrize: before.guessPrize }, change);
-  back('/admin/hunts', { ok: `Saved “${before.title}”.` });
+  back(str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : '/admin/hunts', { ok: `Saved “${before.title}”.` });
 }
 
 /** Dashboard quick action: open or close guessing on a hunt. */
