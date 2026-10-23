@@ -33,7 +33,7 @@ export function LeaderboardForm({ board }: { board?: Leaderboard }) {
           </div>
           <div className="field">
             <label htmlFor="lb-metric">Rank by</label>
-            <select id="lb-metric" name="metric" className="input" defaultValue={board?.metric ?? 'wagered'}>
+            <select id="lb-metric" name="metric" className="input" defaultValue={board?.metric ?? 'weighted'}>
               <option value="wagered">Total wagered</option>
               <option value="weighted">Weighted wagered</option>
             </select>

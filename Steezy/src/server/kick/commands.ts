@@ -8,7 +8,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/server/db';
 import { users } from '@/server/db/schema';
-import { formatMinutes, formatUsd, ordinal } from '@/lib/format';
+import { formatMinutes, formatUsd, metricLabel, ordinal } from '@/lib/format';
 import { currentLeaderboard, getStandings } from '@/server/services/leaderboards';
 import { approvedRoobetUid, wagerTotalFor, type Metric } from '@/server/services/wagers';
 import { watchTotals } from './watchtime';
@@ -74,7 +74,7 @@ export async function replyFor(command: Command, kickUserId: string): Promise<st
     const lifetime = await wagerTotalFor(uid, null);
     if (!board) return `${formatUsd(lifetime)} wagered lifetime under code STZY.`;
     const period = await wagerTotalFor(uid, board.startsAt, board.endsAt, board.metric as Metric);
-    return `${formatUsd(period)} wagered on the ${board.name} leaderboard · ${formatUsd(lifetime)} lifetime.`;
+    return `${formatUsd(period)} ${metricLabel(board.metric)} on the ${board.name} leaderboard · ${formatUsd(lifetime)} lifetime.`;
   }
 
   // rank

@@ -15,6 +15,13 @@
       "when": 1792668352513,
       "tag": "0001_hunts_and_tournaments",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792773484595,
+      "tag": "0002_weighted_leaderboards",
+      "breakpoints": true
     }
   ]
 }

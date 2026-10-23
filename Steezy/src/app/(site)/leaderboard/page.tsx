@@ -8,7 +8,7 @@ import { currentLeaderboard, getStandings } from '@/server/services/leaderboards
 import { syncStatus } from '@/server/services/sync-status';
 import { approvedRoobetUid } from '@/server/services/wagers';
 import { env } from '@/lib/env';
-import { formatAgo, formatUsd, ordinal } from '@/lib/format';
+import { formatAgo, formatUsd, metricLabel, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Leaderboard' };
 
@@ -29,6 +29,8 @@ export default async function LeaderboardPage() {
   const mine = myUid ? standings.find((s) => s.roobetUid === myUid) : null;
 
   const pool = board.prizes.reduce((a, b) => a + b, 0);
+  const label = metricLabel(board.metric);
+  const weighted = board.metric === 'weighted';
   const paidPlaces = board.prizes.filter((p) => p > 0).length;
   const month = (d: Date) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const span = month(board.startsAt) === month(board.endsAt) ? month(board.startsAt) : `${month(board.startsAt)} – ${month(board.endsAt)}`;
@@ -41,7 +43,7 @@ export default async function LeaderboardPage() {
           <span className="kicker">Monthly wager race · {span}</span>
           <h1 className="race__pool num">{formatUsd(pool)}</h1>
           <p className="race__lede">
-            Play on Roobet with code STZY and every bet counts. Top {paidPlaces} at the end of the month split {formatUsd(pool)}.
+            Play on Roobet with code STZY and every bet counts{weighted ? ' (ranked by Roobet’s weighted wager)' : ''}. Top {paidPlaces} at the end of the month split {formatUsd(pool)}.
           </p>
           {board.status === 'live' ? (
             <RaceCountdown startsAt={board.startsAt.toISOString()} endsAt={board.endsAt.toISOString()} serverNow={new Date().toISOString()} />
@@ -60,12 +62,12 @@ export default async function LeaderboardPage() {
             <VipTransferTag />
           </div>
         </div>
-        <div className="race__stage">{standings.length ? <StagePodium top={standings.slice(0, 3)} /> : null}</div>
+        <div className="race__stage">{standings.length ? <StagePodium top={standings.slice(0, 3)} label={weighted ? 'Weighted' : 'Wagered'} /> : null}</div>
       </section>
 
       {mine ? (
         <p className="notice notice--ok">
-          You&apos;re <b>{ordinal(mine.rank)}</b> with {formatUsd(mine.wagered)} wagered
+          You&apos;re <b>{ordinal(mine.rank)}</b> with {formatUsd(mine.wagered)} {label}
           {mine.rank > 1 ? ` · ${formatUsd(standings[mine.rank - 2].wagered - mine.wagered)} behind ${ordinal(mine.rank - 1)}` : ''}.
         </p>
       ) : user && !myUid ? (
@@ -86,7 +88,7 @@ export default async function LeaderboardPage() {
                 <tr>
                   <th style={{ width: 64 }}>Rank</th>
                   <th>Player</th>
-                  <th style={{ textAlign: 'right' }}>Wagered</th>
+                  <th style={{ textAlign: 'right' }}>{weighted ? 'Weighted' : 'Wagered'}</th>
                   <th style={{ textAlign: 'right', width: 110 }}>Prize</th>
                 </tr>
               </thead>

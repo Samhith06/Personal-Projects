@@ -246,8 +246,8 @@ export const leaderboards = pgTable('leaderboards', {
   name: text('name').notNull(),
   startsAt: ts('starts_at').notNull(),
   endsAt: ts('ends_at').notNull(),
-  /** 'wagered' | 'weighted' */
-  metric: text('metric').notNull().default('wagered'),
+  /** 'wagered' | 'weighted' (default: Roobet's weighted wager, so low-edge games count less) */
+  metric: text('metric').notNull().default('weighted'),
   minWager: money('min_wager').notNull().default(0),
   /** Prize per place, index 0 = 1st. */
   prizes: jsonb('prizes').$type<number[]>().notNull().default(sql`'[]'::jsonb`),

@@ -13,7 +13,7 @@ function Money({ value }: { value: number }) {
 }
 
 /** Top 3 on pedestals: 2nd · 1st · 3rd, crown on the winner, prize chip above each block. */
-export function StagePodium({ top }: { top: Standing[] }) {
+export function StagePodium({ top, label = 'Wagered' }: { top: Standing[]; label?: string }) {
   const order = [top[1], top[0], top[2]];
   return (
     <div className="stage">
@@ -34,7 +34,7 @@ export function StagePodium({ top }: { top: Standing[] }) {
             <span className="stage__name">{s.displayName}</span>
             <span className="stage__wager">
               <Money value={s.wagered} />
-              <span>Wagered</span>
+              <span>{label}</span>
             </span>
             <span className="stage__prize">
               <span>Prize</span>

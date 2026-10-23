@@ -38,7 +38,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
         <span className="kicker">Milestones</span>
         <h1 className="page__title">Lifetime wager rewards</h1>
         <p className="meta" style={{ maxWidth: '56ch' }}>
-          Everything you wager on Roobet under code STZY adds up. Each tier pays out once, tipped to your Roobet account.
+          Everything you wager on Roobet under code STZY adds up, counted as Roobet’s weighted wager (low-edge games count for less). Each tier pays out once, tipped to your Roobet account.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
           ) : (
             <>
               <div>
-                <div className="meta">Your lifetime wager</div>
+                <div className="meta">Your lifetime weighted wager</div>
                 <div className="num" style={{ fontSize: 40, letterSpacing: '-0.03em' }}>
                   {formatUsd(view.lifetime ?? 0)}
                 </div>
@@ -96,7 +96,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
               </span>
               <div className="ms-tier__body">
                 <div className="ms-tier__name">{t.name}</div>
-                <div className="meta num">{formatUsd(t.threshold)} wagered</div>
+                <div className="meta num">{formatUsd(t.threshold)} weighted wager</div>
               </div>
               <span className="num ms-tier__reward">{formatUsd(t.reward)}</span>
               <div className="ms-tier__action">

@@ -40,3 +40,6 @@ export const ordinal = (n: number) => {
 export function maskName(name: string) {
   return `${name.slice(0, name.length > 4 ? 4 : 2)}****`;
 }
+
+/** What a board's numbers are: Roobet's weighted wager, or the raw total. */
+export const metricLabel = (metric: string) => (metric === 'weighted' ? 'weighted wager' : 'wagered');

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { currentLeaderboard, getStandings } from '@/server/services/leaderboards';
-import { formatCountdown, formatUsd, ordinal } from '@/lib/format';
+import { formatCountdown, formatUsd, metricLabel, ordinal } from '@/lib/format';
 
 const MEDALS = ['var(--medal-gold)', 'var(--medal-silver)', 'var(--medal-bronze)'];
 
@@ -47,7 +47,7 @@ export async function HomePodium() {
               </span>
               <div>
                 <div className="podium__name">{s.displayName}</div>
-                <div className="meta num">{formatUsd(s.wagered)} wagered</div>
+                <div className="meta num">{formatUsd(s.wagered)} {metricLabel(board.metric)}</div>
               </div>
               <div className="podium__block" style={{ boxShadow: `inset 0 1px 0 0 ${MEDALS[s.rank - 1]}` }}>
                 <span className="podium__rank" style={{ color: MEDALS[s.rank - 1] }}>

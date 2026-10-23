@@ -133,7 +133,7 @@ export async function saveLeaderboard(fd: FormData): Promise<void> {
     name: str(fd, 'name'),
     startDay: str(fd, 'startDay'),
     endDay: str(fd, 'endDay'),
-    metric: str(fd, 'metric') || 'wagered',
+    metric: str(fd, 'metric') || 'weighted',
     minWager: str(fd, 'minWager') || '0',
     prizes: str(fd, 'prizes'),
   });

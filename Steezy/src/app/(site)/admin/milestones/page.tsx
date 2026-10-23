@@ -19,7 +19,7 @@ function TierForm({ tier }: { tier?: Tier }) {
         <input id={`name-${key}`} name="name" className="input" defaultValue={tier?.name} required />
       </div>
       <div className="field" style={{ flex: '1 1 140px' }}>
-        <label htmlFor={`threshold-${key}`}>Lifetime wager ($)</label>
+        <label htmlFor={`threshold-${key}`}>Lifetime weighted wager ($)</label>
         <input id={`threshold-${key}`} name="threshold" type="number" min="1" step="1" className="input" defaultValue={tier?.threshold} required />
       </div>
       <div className="field" style={{ flex: '1 1 120px' }}>
@@ -47,7 +47,7 @@ export default async function MilestonesAdmin({ searchParams }: { searchParams: 
         <span className="kicker">Stream games</span>
         <h1 className="admin__title">Milestone tiers</h1>
         <p className="meta">
-          Members claim a tier once their lifetime STZY wager reaches it. Turning a tier off hides it; existing claims stay in
+          Members claim a tier once their lifetime weighted STZY wager reaches it. Turning a tier off hides it; existing claims stay in
           Payouts.
         </p>
       </div>

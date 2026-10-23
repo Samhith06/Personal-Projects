@@ -1,5 +1,7 @@
 /**
  * Lifetime-wager milestones. Each tier pays once per member, as a Roobet tip.
+ * Progress counts Roobet's weighted wager, the same number the leaderboard
+ * ranks by, so low-edge games count for less.
  *
  * Claiming needs an approved Roobet username and a member who isn't blocked
  * from rewards; the unique index on (user, milestone) is the final guard
@@ -32,7 +34,7 @@ export async function milestoneView(userId: string | null) {
     db.select({ blocked: users.blockedFromRewards }).from(users).where(eq(users.id, userId)).limit(1),
     db.select().from(milestoneClaims).where(eq(milestoneClaims.userId, userId)),
   ]);
-  const lifetime = uid ? await wagerTotalFor(uid, null) : null;
+  const lifetime = uid ? await wagerTotalFor(uid, null, null, 'weighted') : null;
   const blocked = user?.blocked ?? false;
   const byMilestone = new Map(claims.map((c) => [c.milestoneId, c]));
 
