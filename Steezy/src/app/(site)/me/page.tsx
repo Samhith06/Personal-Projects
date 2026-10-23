@@ -62,12 +62,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <span className="stat__value num">{stats.streams}</span>
         </div>
         <div className="card stack" style={{ gap: 6 }}>
-          <span className="meta">Wagered this month</span>
+          <span className="meta">Weighted wager this month</span>
           <span className="stat__value num">{stats.month === null ? '—' : formatUsd(stats.month)}</span>
           {stats.month === null ? <span className="meta">Needs an approved Roobet username</span> : null}
         </div>
         <div className="card stack" style={{ gap: 6 }}>
-          <span className="meta">Lifetime wager</span>
+          <span className="meta">Lifetime weighted wager</span>
           <span className="stat__value num">{stats.lifetime === null ? '—' : formatUsd(stats.lifetime)}</span>
           <span className="meta">Roobet · code STZY</span>
         </div>

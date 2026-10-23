@@ -71,10 +71,10 @@ export async function replyFor(command: Command, kickUserId: string): Promise<st
   const board = await currentLeaderboard();
 
   if (command === 'wager') {
-    const lifetime = await wagerTotalFor(uid, null);
-    if (!board) return `${formatUsd(lifetime)} wagered lifetime under code STZY.`;
+    const lifetime = await wagerTotalFor(uid, null, null, 'weighted');
+    if (!board) return `${formatUsd(lifetime)} weighted wager lifetime under code STZY.`;
     const period = await wagerTotalFor(uid, board.startsAt, board.endsAt, board.metric as Metric);
-    return `${formatUsd(period)} ${metricLabel(board.metric)} on the ${board.name} leaderboard · ${formatUsd(lifetime)} lifetime.`;
+    return `${formatUsd(period)} ${metricLabel(board.metric)} on the ${board.name} leaderboard · ${formatUsd(lifetime)} weighted lifetime.`;
   }
 
   // rank
