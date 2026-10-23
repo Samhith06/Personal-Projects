@@ -2,7 +2,7 @@
  * Runs once when the server boots (pattern from FTDWEBSITE).
  *
  * Keeps Roobet wagers in step — pull now, then every ROOBET_SYNC_INTERVAL_MS —
- * freezes live leaderboards whose window has ended, closes ended draws, and
+ * posts leaderboard climbs to Discord, freezes live leaderboards whose window has ended, closes ended draws, and
  * mirrors bonushunt.gg hunts every BONUSHUNT_SYNC_INTERVAL_MS.
  * This needs a server that stays up; on serverless hosting, run
  * `npm run roobet:sync` from a scheduler instead. The Kick chat worker, badge
@@ -14,6 +14,7 @@ export async function register() {
   try {
     const { roobetConfigFromEnv, syncRoobetRecent } = await import('@/server/roobet/sync');
     const { freezeEndedLeaderboards } = await import('@/server/services/leaderboards');
+    const { announceLeaderboardChanges } = await import('@/server/services/leaderboard-announce');
     const { closeStaleSessions } = await import('@/server/kick/sessions');
     const { closeEndedRaffles } = await import('@/server/services/raffles');
     const { closeExpiredGiveaways } = await import('@/server/services/giveaways');
@@ -24,6 +25,13 @@ export async function register() {
         const result = await syncRoobetRecent(config);
         if (result.ok) console.log(`[roobet] synced ${result.rows} player-days over ${result.days} days`);
         else console.warn(`[roobet] sync failed — ${result.error}`);
+        if (result.ok) {
+          const climbs = await announceLeaderboardChanges().catch((error) => {
+            console.warn('[leaderboard] Discord update failed', error);
+            return 0;
+          });
+          if (climbs) console.log(`[leaderboard] posted ${climbs} climb(s) to Discord`);
+        }
       }
       // After the pull, so a board ending now freezes on the final numbers.
       const frozen = await freezeEndedLeaderboards().catch((error) => {
