@@ -23,10 +23,10 @@ export default async function AdminOverview({ searchParams }: { searchParams: Fl
   const top = board ? (await getStandings(board)).slice(0, 5) : [];
 
   const kpis = [
-    { label: 'Members', value: stats.users.toLocaleString('en-US') },
-    { label: 'Kick linked', value: stats.kickLinked.toLocaleString('en-US') },
-    { label: 'Roobet approved', value: stats.roobetApproved.toLocaleString('en-US') },
-    { label: 'Wagered this month', value: formatUsd(stats.monthWagered), sub: `${stats.monthPlayers} players under STZY` },
+    { label: 'Waiting on you', value: String(counts.approvals + counts.payouts), sub: `${counts.approvals} approvals · ${counts.payouts} payouts`, tone: counts.approvals + counts.payouts ? 'warn' : '' },
+    { label: 'Members', value: stats.users.toLocaleString('en-US'), sub: `${stats.kickLinked} Kick · ${stats.roobetApproved} Roobet linked` },
+    { label: 'Weighted wager this month', value: formatUsd(stats.monthWeighted), sub: `${stats.monthPlayers} players under STZY`, tone: 'accent' },
+    { label: 'Unweighted this month', value: formatUsd(stats.monthWagered), sub: 'raw Roobet wager', tone: 'gold' },
   ];
 
   return (
@@ -34,29 +34,24 @@ export default async function AdminOverview({ searchParams }: { searchParams: Fl
       <div>
         <span className="kicker">Overview</span>
         <h1 className="admin__title">Dashboard</h1>
+        <p className="admin__sub">What needs doing, how the month is going, and what&apos;s live.</p>
       </div>
 
       <Flash {...flash} />
 
-      <p className={`notice ${sync?.lastError ? 'notice--danger' : 'notice--ok'}`}>
-        Roobet sync:{' '}
-        {sync?.lastOkAt ? `last good pull ${formatAgo(sync.lastOkAt)}` : 'no successful pull yet'}
-        {sync?.lastError ? ` · last error: ${sync.lastError}` : ''}
-      </p>
-
-      <StreamGamesPanel />
+      {sync?.lastError ? <p className="notice notice--danger">Roobet sync failed: {sync.lastError}</p> : null}
 
       <section className="admin-kpis">
         {kpis.map((k) => (
-          <div key={k.label} className="card stack" style={{ gap: 4, padding: 16 }}>
-            <span className="meta">{k.label}</span>
-            <span className="num" style={{ fontSize: 24, fontWeight: 600 }}>
-              {k.value}
-            </span>
-            {k.sub ? <span className="meta">{k.sub}</span> : null}
+          <div key={k.label} className="kpi">
+            <div className="kpi__label">{k.label}</div>
+            <div className={`kpi__value${k.tone ? ` kpi__value--${k.tone}` : ''}`}>{k.value}</div>
+            <div className="kpi__note">{k.sub}</div>
           </div>
         ))}
       </section>
+
+      <StreamGamesPanel />
 
       <section className="admin-split">
         <div className="card stack">

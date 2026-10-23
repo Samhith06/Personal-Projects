@@ -16,7 +16,7 @@ export default async function RafflesAdmin({ searchParams }: { searchParams: Fla
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div>
-        <span className="kicker">Stream games</span>
+        <span className="kicker">Moderation</span>
         <h1 className="admin__title">Raffles</h1>
         <p className="meta">Draft → open (seed fingerprint published) → closed (tickets frozen, automatic at the end date) → drawn live on stream.</p>
       </div>

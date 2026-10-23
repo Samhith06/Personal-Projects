@@ -6,7 +6,7 @@
  */
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/server/db';
-import { giveawayWinners, leaderboardResults, leaderboards, raffleWinners, roobetDailyWager, roobetLinks, users, watchTime } from '@/server/db/schema';
+import { giveawayWinners, hunts, leaderboardResults, leaderboards, raffleWinners, roobetDailyWager, roobetLinks, users, watchTime } from '@/server/db/schema';
 import { formatMinutes, maskName } from '@/lib/format';
 import { publicName } from './people';
 import { handleFor } from './profiles';
@@ -58,7 +58,28 @@ export type HitRow = PublicPerson & {
   /** Bet and payout are only shown for unlinked (masked) players or members who made wagers public. */
   wagered: number | null;
   payout: number | null;
+  /** Slot artwork, when the slot has appeared in one of Steezy's bonushunt.gg hunts. */
+  image: string | null;
 };
+
+/** "Big Bass Splash 1000" and "big-bass-splash-1000" are the same slot. */
+const slotKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Slot name → artwork, from the bonuses in synced bonushunt.gg hunts. Roobet's
+ * affiliate data has no images and bonushunt.gg has no lookup by name, so a
+ * slot Steezy has never hunted gets the styled fallback instead.
+ */
+async function slotArt() {
+  const rows = await db.execute(sql`
+    select b->>'slotName' as name, b->>'slotImage' as image
+    from ${hunts}, jsonb_array_elements(${hunts.bonuses}) b
+    where coalesce(b->>'slotImage', '') <> ''
+  `);
+  const art = new Map<string, string>();
+  for (const r of rows.rows as { name: string; image: string }[]) art.set(slotKey(r.name), r.image);
+  return art;
+}
 
 type HitDbRow = {
   username: string;
@@ -72,7 +93,7 @@ type HitDbRow = {
 };
 
 /** Same privacy rules everywhere: names only for members who show them, amounts only when public. */
-function toHit(r: HitDbRow): HitRow {
+function toHit(r: HitDbRow, art: Map<string, string>): HitRow {
   const member = r.discord_username !== null;
   const named = member && r.name_on_leaderboards;
   const showAmounts = !member || Boolean(r.wager_public);
@@ -85,11 +106,13 @@ function toHit(r: HitDbRow): HitRow {
     gameTitle: r.hit!.gameTitle ?? 'Unknown game',
     wagered: showAmounts ? (r.hit!.wagered ?? null) : null,
     payout: showAmounts ? (r.hit!.payout ?? null) : null,
+    image: art.get(slotKey(r.hit!.gameTitle ?? '')) ?? null,
   };
 }
 
 /** Each player's best multiplier, highest first. */
 export async function biggestHits(limit = 10): Promise<HitRow[]> {
+  const art = await slotArt();
   const rows = await db.execute(sql`
     select distinct on (d.roobet_uid)
       d.roobet_uid, d.username, d.highest_multiplier as hit,
@@ -102,7 +125,7 @@ export async function biggestHits(limit = 10): Promise<HitRow[]> {
   `);
   return (rows.rows as HitDbRow[])
     .filter((r) => r.hit?.multiplier)
-    .map(toHit)
+    .map((r) => toHit(r, art))
     .sort((a, b) => b.multiplier - a.multiplier)
     .slice(0, limit);
 }
@@ -115,6 +138,7 @@ export const BIG_WIN_MULTIPLIER = 500;
  * multiplier per synced day, so this is at most one hit per player per day.
  */
 export async function bigWins(limit = 30): Promise<(HitRow & { day: string })[]> {
+  const art = await slotArt();
   const rows = await db.execute(sql`
     select
       d.username, d.day::text as day, d.highest_multiplier as hit,
@@ -126,7 +150,7 @@ export async function bigWins(limit = 30): Promise<(HitRow & { day: string })[]>
     order by d.day desc, (d.highest_multiplier->>'multiplier')::float8 desc
     limit ${limit}
   `);
-  return (rows.rows as HitDbRow[]).map((r) => ({ ...toHit(r), day: r.day! }));
+  return (rows.rows as HitDbRow[]).map((r) => ({ ...toHit(r, art), day: r.day! }));
 }
 
 export type RecordRow = { label: string; person: PublicPerson; value: string };

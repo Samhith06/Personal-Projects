@@ -22,7 +22,7 @@ export default async function LeaderboardsAdmin({ searchParams }: { searchParams
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div>
-        <span className="kicker">Stream games</span>
+        <span className="kicker">Moderation</span>
         <h1 className="admin__title">Leaderboards</h1>
         <p className="meta">Draft → live → frozen (final standings locked, prizes go to Payouts) → published. Live boards freeze automatically when they end.</p>
       </div>

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RaceCountdown } from '@/components/leaderboard/Countdown';
+import { RaceStats } from '@/components/leaderboard/RaceStats';
 import { StagePodium } from '@/components/leaderboard/StagePodium';
 import { LossBackTag, VipTransferTag } from '@/components/VipTransferTag';
 import { getCurrentUser } from '@/server/auth/session';
-import { currentLeaderboard, getStandings } from '@/server/services/leaderboards';
+import { boardTotals, currentLeaderboard, getStandings } from '@/server/services/leaderboards';
 import { syncStatus } from '@/server/services/sync-status';
 import { approvedRoobetUid } from '@/server/services/wagers';
 import { env } from '@/lib/env';
@@ -24,7 +25,7 @@ export default async function LeaderboardPage() {
     );
   }
 
-  const [standings, user, sync] = await Promise.all([getStandings(board), getCurrentUser(), syncStatus('roobet')]);
+  const [standings, user, sync, totals] = await Promise.all([getStandings(board), getCurrentUser(), syncStatus('roobet'), boardTotals(board)]);
   const myUid = user ? await approvedRoobetUid(user.id) : null;
   const mine = myUid ? standings.find((s) => s.roobetUid === myUid) : null;
 
@@ -64,6 +65,13 @@ export default async function LeaderboardPage() {
         </div>
         <div className="race__stage">{standings.length ? <StagePodium top={standings.slice(0, 3)} label={weighted ? 'Weighted' : 'Wagered'} /> : null}</div>
       </section>
+
+      <RaceStats
+        weighted={totals.weighted}
+        wagered={totals.wagered}
+        players={totals.players}
+        status={board.status !== 'live' ? 'final' : board.startsAt > new Date() ? 'upcoming' : 'live'}
+      />
 
       {mine ? (
         <p className="notice notice--ok">

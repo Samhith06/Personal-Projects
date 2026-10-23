@@ -46,12 +46,13 @@ export async function overviewStats() {
     db
       .select({
         total: sql<number>`coalesce(sum(${roobetDailyWager.wagered}), 0)::float8`,
+        weighted: sql<number>`coalesce(sum(${roobetDailyWager.weightedWagered}), 0)::float8`,
         players: sql<number>`count(distinct ${roobetDailyWager.roobetUid})::int`,
       })
       .from(roobetDailyWager)
       .where(gte(roobetDailyWager.day, dayKey(monthStart))),
   ]);
-  return { users: all.n, kickLinked: kick.n, roobetApproved: roobet.n, monthWagered: month.total, monthPlayers: month.players };
+  return { users: all.n, kickLinked: kick.n, roobetApproved: roobet.n, monthWagered: month.total, monthWeighted: month.weighted, monthPlayers: month.players };
 }
 
 /**
@@ -179,4 +180,99 @@ export async function recentAudit(limit = 100) {
     .leftJoin(users, eq(users.id, auditLog.actorId))
     .orderBy(desc(auditLog.createdAt))
     .limit(limit);
+}
+
+export const MEMBER_FILTERS = ['all', 'roobet', 'pending', 'unlinked', 'kick', 'staff', 'blocked'] as const;
+export const MEMBER_SORTS = ['recent', 'joined', 'name', 'wager', 'watch'] as const;
+export type MemberFilter = (typeof MEMBER_FILTERS)[number];
+export type MemberSort = (typeof MEMBER_SORTS)[number];
+
+export type MemberRow = {
+  id: string;
+  discordUsername: string;
+  discordGlobalName: string | null;
+  kickUsername: string | null;
+  role: string;
+  blocked: boolean;
+  createdAt: Date;
+  lastSeenAt: Date;
+  roobetStatus: string | null;
+  roobetUsername: string | null;
+  /** Lifetime weighted wager under an approved link; null without one. */
+  weighted: number | null;
+  watchMinutes: number;
+};
+
+const FILTER_SQL: Record<MemberFilter, ReturnType<typeof sql>> = {
+  all: sql`true`,
+  roobet: sql`l.status = 'approved'`,
+  pending: sql`l.status = 'pending'`,
+  unlinked: sql`l.user_id is null`,
+  kick: sql`u.kick_user_id is not null`,
+  staff: sql`u.role <> 'member'`,
+  blocked: sql`u.blocked_from_rewards`,
+};
+
+const SORT_SQL: Record<MemberSort, ReturnType<typeof sql>> = {
+  recent: sql`u.last_seen_at desc`,
+  joined: sql`u.created_at desc`,
+  name: sql`lower(u.discord_username) asc`,
+  wager: sql`weighted desc nulls last`,
+  watch: sql`watch_minutes desc`,
+};
+
+/** The staff member list: search by Discord, Kick or Roobet name, filter, sort, page. */
+export async function searchMembers(opts: { query?: string; filter: MemberFilter; sort: MemberSort; limit: number; offset: number }) {
+  const q = opts.query?.trim() ? `%${opts.query.trim().toLowerCase()}%` : null;
+  const where = sql`${FILTER_SQL[opts.filter]} and (${q}::text is null
+    or lower(u.discord_username) like ${q} or lower(coalesce(u.discord_global_name, '')) like ${q}
+    or lower(coalesce(u.kick_username, '')) like ${q} or lower(coalesce(l.requested_username, '')) like ${q})`;
+
+  const [rows, [{ total }]] = await Promise.all([
+    db.execute(sql`
+      select u.id, u.discord_username, u.discord_global_name, u.kick_username, u.role, u.blocked_from_rewards,
+        u.created_at, u.last_seen_at, l.status as roobet_status, l.requested_username as roobet_username,
+        (select sum(d.weighted_wagered)::float8 from ${roobetDailyWager} d where l.status = 'approved' and d.roobet_uid = l.roobet_uid) as weighted,
+        coalesce((select sum(w.minutes)::int from watch_time w where w.user_id = u.id), 0) as watch_minutes
+      from ${users} u
+      left join ${roobetLinks} l on l.user_id = u.id
+      where ${where}
+      order by ${SORT_SQL[opts.sort]}, u.created_at desc
+      limit ${opts.limit} offset ${opts.offset}
+    `),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(sql`${users} u left join ${roobetLinks} l on l.user_id = u.id`)
+      .where(where),
+  ]);
+
+  type Raw = {
+    id: string;
+    discord_username: string;
+    discord_global_name: string | null;
+    kick_username: string | null;
+    role: string;
+    blocked_from_rewards: boolean;
+    created_at: string | Date;
+    last_seen_at: string | Date;
+    roobet_status: string | null;
+    roobet_username: string | null;
+    weighted: number | null;
+    watch_minutes: number;
+  };
+  const members: MemberRow[] = (rows.rows as Raw[]).map((r) => ({
+    id: r.id,
+    discordUsername: r.discord_username,
+    discordGlobalName: r.discord_global_name,
+    kickUsername: r.kick_username,
+    role: r.role,
+    blocked: r.blocked_from_rewards,
+    createdAt: new Date(r.created_at),
+    lastSeenAt: new Date(r.last_seen_at),
+    roobetStatus: r.roobet_status,
+    roobetUsername: r.roobet_username,
+    weighted: r.roobet_status === 'approved' ? Number(r.weighted ?? 0) : null,
+    watchMinutes: r.watch_minutes,
+  }));
+  return { members, total };
 }

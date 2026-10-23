@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BIG_WIN_MULTIPLIER, bigWins, biggestHits, champions, records } from '@/server/services/hall-of-fame';
-import { formatUsd, ordinal } from '@/lib/format';
+import { SlotThumb, WinCard } from '@/components/hall-of-fame/SlotArt';
+import { formatBet, formatUsd, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Hall of Fame' };
 
 const MEDAL = ['var(--medal-gold)', 'var(--medal-silver)', 'var(--medal-bronze)'];
 
 const multi = (m: number) => `${m.toLocaleString('en-US', { maximumFractionDigits: 1 })}×`;
-const dayLabel = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
 function Person({ name, handle }: { name: string; handle: string | null }) {
   return handle ? (
@@ -120,9 +120,14 @@ export default async function HallOfFamePage() {
                       <td style={{ fontWeight: 500 }}>
                         <Person name={h.name} handle={h.handle} />
                       </td>
-                      <td className="meta">{h.gameTitle}</td>
+                      <td className="meta">
+                        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+                          <SlotThumb name={h.gameTitle} image={h.image} />
+                          {h.gameTitle}
+                        </span>
+                      </td>
                       <td className="num" style={{ textAlign: 'right' }}>
-                        {h.wagered === null ? '—' : formatUsd(h.wagered)}
+                        {h.wagered === null ? '—' : formatBet(h.wagered)}
                       </td>
                       <td className="num" style={{ textAlign: 'right' }}>
                         {h.payout === null ? '—' : formatUsd(h.payout)}
@@ -149,25 +154,9 @@ export default async function HallOfFamePage() {
           <span className="meta">Every hit of {BIG_WIN_MULTIPLIER}× or more under STZY lands here automatically, newest first</span>
         </div>
         {wins.length ? (
-          <div className="card-grid">
+          <div className="win-grid">
             {wins.map((w, i) => (
-              <article key={i} className="card stack" style={{ gap: 10 }}>
-                <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <span className="num" style={{ fontSize: 30, fontWeight: 700, color: 'var(--color-accent)', letterSpacing: '-0.02em' }}>
-                    {multi(w.multiplier)}
-                  </span>
-                  <span className="meta">{dayLabel(w.day)}</span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>
-                  <Person name={w.name} handle={w.handle} />
-                </div>
-                <span className="meta">{w.gameTitle}</span>
-                {w.wagered !== null && w.payout !== null ? (
-                  <span className="meta num">
-                    {formatUsd(w.wagered)} bet · {formatUsd(w.payout)} paid
-                  </span>
-                ) : null}
-              </article>
+              <WinCard key={i} {...w} />
             ))}
           </div>
         ) : (

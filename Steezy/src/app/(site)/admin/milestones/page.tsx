@@ -44,7 +44,7 @@ export default async function MilestonesAdmin({ searchParams }: { searchParams: 
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div>
-        <span className="kicker">Stream games</span>
+        <span className="kicker">Moderation</span>
         <h1 className="admin__title">Milestone tiers</h1>
         <p className="meta">
           Members claim a tier once their lifetime weighted STZY wager reaches it. Turning a tier off hides it; existing claims stay in

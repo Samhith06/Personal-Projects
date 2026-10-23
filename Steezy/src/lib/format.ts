@@ -2,6 +2,10 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 
 export const formatUsd = (value: number) => usd.format(value);
 
+/** Bet sizes keep their cents below $100, so a $0.20 spin doesn't read as "$0". */
+export const formatBet = (value: number) =>
+  value < 100 ? value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : usd.format(value);
+
 export function formatMinutes(total: number) {
   const h = Math.floor(total / 60);
   const m = total % 60;

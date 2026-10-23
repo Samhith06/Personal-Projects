@@ -1499,3 +1499,231 @@
     display: none;
   }
 }
+
+/* Race totals under the leaderboard hero: four tiles, gold-ringed icons. */
+.race-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+}
+
+.race-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 16px 22px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 70%), var(--color-surface);
+  text-align: center;
+}
+
+.race-stat__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--medal-gold) 55%, transparent);
+  border-radius: 50%;
+  color: var(--color-text-2);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--medal-gold) 12%, transparent);
+}
+
+.race-stat__value {
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.race-stat__value--accent,
+.race-stat__value--live {
+  color: var(--color-accent);
+}
+
+.race-stat__value--gold {
+  color: var(--medal-gold);
+}
+
+.race-stat__value--upcoming {
+  color: var(--color-warn);
+}
+
+.race-stat__value--final {
+  color: var(--color-text-2);
+}
+
+.race-stat__label {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.race-stat__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+
+.race-stat__dot--live {
+  background: var(--color-accent);
+  box-shadow: 0 0 10px var(--color-accent);
+  animation: race-stat-pulse 1.8s ease-in-out infinite;
+}
+
+.race-stat__dot--upcoming {
+  background: var(--color-warn);
+}
+
+@keyframes race-stat-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .race-stat__dot--live {
+    animation: none;
+  }
+}
+
+/* Hall of Fame slot art: thumbnails in the multipliers table, full-bleed cards in the 500x club. */
+.slot-thumb {
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.slot-thumb--ph {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--hue) 70% 42%), hsl(calc(var(--hue) + 50) 70% 22%));
+}
+
+.win-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 16px;
+}
+
+.win-card {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  background: var(--color-surface);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.win-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--medal-gold) 60%, transparent);
+  box-shadow: 0 14px 40px -18px color-mix(in srgb, var(--medal-gold) 45%, transparent);
+}
+
+.win-card__art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.win-card:hover .win-card__art {
+  transform: scale(1.05);
+}
+
+.win-card--ph {
+  background:
+    radial-gradient(circle at 30% 20%, hsl(var(--hue) 80% 55% / 0.55), transparent 55%),
+    radial-gradient(circle at 80% 70%, hsl(calc(var(--hue) + 60) 80% 45% / 0.45), transparent 60%),
+    linear-gradient(160deg, hsl(var(--hue) 45% 16%), hsl(calc(var(--hue) + 40) 45% 8%));
+}
+
+.win-card__ph {
+  position: absolute;
+  inset: 0 0 30%;
+  z-index: -2;
+  display: grid;
+  place-items: center;
+  font-size: 84px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: rgb(255 255 255 / 0.16);
+}
+
+.win-card__shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.35) 0%, transparent 28%, transparent 45%, rgb(8 12 10 / 0.92) 78%);
+}
+
+.win-card__multi {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--medal-gold) 70%, transparent);
+  border-radius: 999px;
+  background: rgb(10 12 10 / 0.72);
+  backdrop-filter: blur(6px);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--medal-gold);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--medal-gold) 60%, transparent);
+}
+
+.win-card__body {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+}
+
+.win-card__game {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.win-card__player {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.win-card__player a {
+  color: inherit;
+}
+
+.win-card__meta {
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-card,
+  .win-card__art {
+    transition: none;
+  }
+
+  .win-card:hover,
+  .win-card:hover .win-card__art {
+    transform: none;
+  }
+}

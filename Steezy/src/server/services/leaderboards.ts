@@ -9,11 +9,11 @@
  * whether or not they linked an account here. Members still see their own
  * place through "your rank".
  */
-import { and, asc, desc, eq, inArray, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '@/server/db';
-import { leaderboardResults, leaderboards } from '@/server/db/schema';
+import { leaderboardResults, leaderboards, roobetDailyWager } from '@/server/db/schema';
 import { maskName } from '@/lib/format';
-import { wagerTotals, type Metric } from './wagers';
+import { dayKey, wagerTotals, type Metric } from './wagers';
 import { audit } from './audit';
 
 export type Leaderboard = typeof leaderboards.$inferSelect;
@@ -53,6 +53,19 @@ export async function currentLeaderboard(now = new Date()) {
 
 export async function listLeaderboards() {
   return db.select().from(leaderboards).orderBy(desc(leaderboards.startsAt));
+}
+
+/** Everyone's wager in the board's window, both ways, and how many players it took. */
+export async function boardTotals(board: Leaderboard) {
+  const [row] = await db
+    .select({
+      weighted: sql<number>`coalesce(sum(${roobetDailyWager.weightedWagered}), 0)::float8`,
+      wagered: sql<number>`coalesce(sum(${roobetDailyWager.wagered}), 0)::float8`,
+      players: sql<number>`count(distinct ${roobetDailyWager.roobetUid}) filter (where ${roobetDailyWager.wagered} > 0)::int`,
+    })
+    .from(roobetDailyWager)
+    .where(and(gte(roobetDailyWager.day, dayKey(board.startsAt)), lte(roobetDailyWager.day, dayKey(board.endsAt))));
+  return row;
 }
 
 /** Live standings computed from wagers. Blocked members and players under the minimum are left out. */

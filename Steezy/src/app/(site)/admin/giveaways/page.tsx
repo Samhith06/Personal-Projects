@@ -15,7 +15,7 @@ export default async function GiveawaysAdmin({ searchParams }: { searchParams: F
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div>
-        <span className="kicker">Stream games</span>
+        <span className="kicker">Moderation</span>
         <h1 className="admin__title">Giveaways</h1>
         <p className="meta">Draft → open (members join on the site or with the chat keyword) → closed → drawn live on the overlay.</p>
       </div>
