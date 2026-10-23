@@ -314,3 +314,79 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Adding a requested slot: base bet + normal / super / hidden. */
+.req-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.req-add__bet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+}
+
+.req-add__bet .input {
+  width: 100px;
+}
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background: var(--color-bg);
+}
+
+.seg label {
+  cursor: pointer;
+}
+
+.seg input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.seg span {
+  display: block;
+  padding: 6px 11px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: capitalize;
+}
+
+.seg input:checked + span {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.seg input:focus-visible + span {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.bonus-tag {
+  text-transform: capitalize;
+}
+
+.bonus-tag--super {
+  background: color-mix(in srgb, var(--medal-gold) 18%, transparent);
+  color: var(--medal-gold);
+}
+
+.bonus-tag--hidden {
+  background: color-mix(in srgb, #a78bfa 18%, transparent);
+  color: #c4b5fd;
+}
+
+.bonus-tag--normal {
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+}

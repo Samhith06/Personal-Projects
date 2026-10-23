@@ -13,7 +13,7 @@ import { requireRole, requireUser } from '@/server/auth/session';
 import { bonushuntKey, syncHunts } from '@/server/bonushunt/sync';
 import { audit } from '@/server/services/audit';
 import { getHunt, parseGuess, placeGuess } from '@/server/services/hunts';
-import { setHuntRequestsOpen, setRequestStatus } from '@/server/services/hunt-requests';
+import { BONUS_TYPES, addRequest, setHuntRequestsOpen, setRequestStatus, type BonusType } from '@/server/services/hunt-requests';
 import {
   TOURNAMENT_SIZES,
   addEntry,
@@ -80,13 +80,24 @@ export async function markHuntPrizePaid(fd: FormData): Promise<void> {
   back(str(fd, 'back') || '/admin/hunts', { ok: 'Marked paid.' });
 }
 
-/** Hunt slot requests from `!sr`: mark added on bonushunt.gg, dismiss, or open/close the queue. */
+/** Hunt slot requests from `!sr`: dismiss one, or put it back in the queue. */
 export async function setRequestStatusAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const status = str(fd, 'status');
-  if (status !== 'added' && status !== 'dismissed' && status !== 'pending') back('/admin/hunts', { error: 'Unknown status.' });
-  const r = await setRequestStatus(str(fd, 'requestId'), status as 'added' | 'dismissed' | 'pending', staff.id);
-  back('/admin/hunts', r ? { ok: `${r.slot}: ${status}.` } : { error: 'Request not found.' });
+  if (status !== 'dismissed' && status !== 'pending') back('/admin/hunts', { error: 'Unknown status.' });
+  const r = await setRequestStatus(str(fd, 'requestId'), status as 'dismissed' | 'pending', staff.id);
+  back('/admin/hunts', r ? { ok: `${r.slot}: ${status === 'pending' ? 'back in the queue' : 'dismissed'}.` } : { error: 'Request not found.' });
+}
+
+/** Staff added a requested slot to the hunt: record its base bet and whether it's a normal, super or hidden bonus. */
+export async function addRequestAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const bet = Number(str(fd, 'bet').replace(/[$,\s]/g, ''));
+  const bonusType = str(fd, 'bonusType');
+  if (!Number.isFinite(bet) || bet <= 0) back('/admin/hunts', { error: 'Enter the base bet, e.g. 0.40.' });
+  if (!BONUS_TYPES.includes(bonusType as BonusType)) back('/admin/hunts', { error: 'Pick normal, super or hidden.' });
+  const r = await addRequest(str(fd, 'requestId'), Math.round(bet * 100) / 100, bonusType as BonusType, staff.id);
+  back('/admin/hunts', r ? { ok: `Added ${r.slot} (${bonusType}, $${bet.toFixed(2)} base bet).` } : { error: 'Request not found.' });
 }
 
 export async function toggleHuntRequests(fd: FormData): Promise<void> {

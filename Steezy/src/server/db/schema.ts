@@ -475,6 +475,10 @@ export const huntRequests = pgTable(
     slotKey: text('slot_key').notNull(),
     /** pending | added | dismissed */
     status: text('status').notNull().default('pending'),
+    /** Set when staff add it: the base bet it was bought at, and the kind of bonus. */
+    bet: money('bet'),
+    /** normal | super | hidden */
+    bonusType: text('bonus_type'),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('hunt_requests_once_idx').on(t.huntId, t.kickUserId, t.slotKey), index('hunt_requests_hunt_idx').on(t.huntId, t.status)],

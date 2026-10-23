@@ -2,7 +2,8 @@
  * `!sr <slot>` suggestions for the bonus hunt. Taken while the current hunt
  * is still being collected (not opening, not finished) and staff haven't
  * closed requests. Staff add the ones they like on bonushunt.gg and mark them
- * here; the public hunt page shows what chat suggested.
+ * added here with the base bet and the kind of bonus (normal, super or
+ * hidden); the public hunt page shows what chat suggested.
  */
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/server/db';
@@ -53,7 +54,17 @@ export async function requestersBySlot(huntId: string) {
   return by;
 }
 
-export async function setRequestStatus(id: string, status: 'added' | 'dismissed' | 'pending', actorId: string) {
+export const BONUS_TYPES = ['normal', 'super', 'hidden'] as const;
+export type BonusType = (typeof BONUS_TYPES)[number];
+
+/** Staff bought it: record the base bet and the kind of bonus, and take it off the queue. */
+export async function addRequest(id: string, bet: number, bonusType: BonusType, actorId: string) {
+  const [r] = await db.update(huntRequests).set({ status: 'added', bet, bonusType }).where(eq(huntRequests.id, id)).returning();
+  if (r) await audit(actorId, 'hunt.request_added', 'hunt', r.huntId, null, { slot: r.slot, by: r.kickUsername, bet, bonusType });
+  return r ?? null;
+}
+
+export async function setRequestStatus(id: string, status: 'dismissed' | 'pending', actorId: string) {
   const [r] = await db.update(huntRequests).set({ status }).where(eq(huntRequests.id, id)).returning();
   if (r) await audit(actorId, `hunt.request_${status}`, 'hunt', r.huntId, null, { slot: r.slot, by: r.kickUsername });
   return r ?? null;

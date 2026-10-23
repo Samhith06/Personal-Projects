@@ -29,6 +29,13 @@
       "when": 1792794255368,
       "tag": "0003_tournament_signups_and_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792796987825,
+      "tag": "0004_hunt_request_bet_and_type",
+      "breakpoints": true
     }
   ]
 }
