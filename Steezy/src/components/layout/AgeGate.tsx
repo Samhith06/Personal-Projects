@@ -4,10 +4,11 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { confirmAge, declineAge } from '@/server/actions/age';
 
 /**
- * 18+ confirmation shown after each sign-in (from FTDWEBSITE). It can't be
- * dismissed with Esc or a backdrop click — only by confirming or signing out.
+ * 18+ confirmation shown to every visitor on their first visit (remembered
+ * for 30 days) and again after each sign-in (from FTDWEBSITE). It can't be
+ * dismissed with Esc or a backdrop click — only by confirming or leaving.
  */
-export function AgeGate({ name }: { name: string }) {
+export function AgeGate({ name }: { name: string | null }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(true);
   const [pending, start] = useTransition();
@@ -27,7 +28,7 @@ export function AgeGate({ name }: { name: string }) {
         <span className="age-gate__badge" aria-hidden="true">
           18+
         </span>
-        <p className="kicker">Welcome, {name}</p>
+        <p className="kicker">{name ? `Welcome, ${name}` : 'Welcome to SteezeSpins'}</p>
         <h2 id="age-gate-title">Are you 18 or older?</h2>
         <p className="meta" style={{ fontSize: 15, color: 'var(--color-text-2)' }}>
           This site is about online gambling content and links to a casino partner. You must be of legal gambling age where
@@ -50,7 +51,7 @@ export function AgeGate({ name }: { name: string }) {
             Yes, I&apos;m 18+
           </button>
           <button type="button" className="btn btn--secondary" disabled={pending} onClick={() => start(() => declineAge())}>
-            No, sign me out
+            {name ? 'No, sign me out' : 'No, take me away'}
           </button>
         </div>
         <p className="meta">

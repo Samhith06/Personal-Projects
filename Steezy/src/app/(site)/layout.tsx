@@ -1,4 +1,6 @@
+import { cookies } from 'next/headers';
 import { AgeGate } from '@/components/layout/AgeGate';
+import { AGE_COOKIE } from '@/lib/age';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { getCurrentUser, needsAgeConfirmation } from '@/server/auth/session';
@@ -12,7 +14,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     console.error('[layout] could not read session', error);
     return null;
   });
-  const showAgeGate = await needsAgeConfirmation(user);
+  // Members confirm after every sign-in; visitors once per browser.
+  const showAgeGate = user ? await needsAgeConfirmation(user) : !(await cookies()).has(AGE_COOKIE);
   const [session, hunt, tournament] = await Promise.all([
     openSession().catch(() => null),
     activeHunt().catch(() => null),
@@ -25,7 +28,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <SiteHeader user={user} live={Boolean(session)} huntOn={Boolean(hunt)} tournamentOn={tournamentOn} />
       <main id="main">{children}</main>
       <SiteFooter />
-      {showAgeGate && user ? <AgeGate name={user.discordGlobalName || user.discordUsername} /> : null}
+      {showAgeGate ? <AgeGate name={user ? user.discordGlobalName || user.discordUsername : null} /> : null}
     </>
   );
 }
