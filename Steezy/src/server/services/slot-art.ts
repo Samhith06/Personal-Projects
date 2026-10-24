@@ -26,3 +26,14 @@ export async function slotArt(): Promise<SlotArtMap> {
 }
 
 export const artFor = (art: SlotArtMap, name: string | null | undefined) => (name ? (art.get(slotKey(name)) ?? null) : null);
+
+/** Every slot name seen in a hunt, for the admin's "add a bonus" search. */
+export async function knownSlots(): Promise<string[]> {
+  const rows = await db.execute(sql`
+    select distinct on (lower(b->>'slotName')) b->>'slotName' as name
+    from ${hunts}, jsonb_array_elements(${hunts.bonuses}) b
+    where coalesce(b->>'slotName', '') <> ''
+    order by lower(b->>'slotName')
+  `);
+  return (rows.rows as { name: string }[]).map((r) => r.name);
+}

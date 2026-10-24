@@ -12,8 +12,10 @@ import { hunts } from '@/server/db/schema';
 import { requireRole, requireUser } from '@/server/auth/session';
 import { bonushuntKey, syncHunts } from '@/server/bonushunt/sync';
 import { audit } from '@/server/services/audit';
-import { getHunt, parseGuess, placeGuess } from '@/server/services/hunts';
+import { getHunt, huntBonuses, parseGuess, placeGuess } from '@/server/services/hunts';
 import { BONUS_TYPES, addRequest, setHuntRequestsOpen, setRequestStatus, type BonusType } from '@/server/services/hunt-requests';
+import { addBonus, deleteHunt, isLocalHunt, removeBonus, renameHunt, setPayout, setPhase, startHunt, type Phase } from '@/server/services/hunt-admin';
+import { artFor, slotArt } from '@/server/services/slot-art';
 import {
   TOURNAMENT_SIZES,
   addEntry,
@@ -86,6 +88,15 @@ export async function setRequestStatusAction(fd: FormData): Promise<void> {
   const status = str(fd, 'status');
   if (status !== 'dismissed' && status !== 'pending') back('/admin/hunts', { error: 'Unknown status.' });
   const r = await setRequestStatus(str(fd, 'requestId'), status as 'dismissed' | 'pending', staff.id);
+  // Undoing an add on a hunt run here takes the slot back off its list.
+  if (r && status === 'pending' && isLocalHunt({ id: r.huntId })) {
+    const hunt = await getHunt(r.huntId);
+    const bonus = hunt ? huntBonuses(hunt).find((b) => b.requestedBy === r.kickUsername && b.slotName === r.slot) : null;
+    if (bonus) {
+      const err = await removeBonus(r.huntId, bonus.id, staff.id);
+      if (err) back('/admin/hunts', { error: err });
+    }
+  }
   back('/admin/hunts', r ? { ok: `${r.slot}: ${status === 'pending' ? 'back in the queue' : 'dismissed'}.` } : { error: 'Request not found.' });
 }
 
@@ -97,6 +108,15 @@ export async function addRequestAction(fd: FormData): Promise<void> {
   if (!Number.isFinite(bet) || bet <= 0) back('/admin/hunts', { error: 'Enter the base bet, e.g. 0.40.' });
   if (!BONUS_TYPES.includes(bonusType as BonusType)) back('/admin/hunts', { error: 'Pick normal, super or hidden.' });
   const r = await addRequest(str(fd, 'requestId'), Math.round(bet * 100) / 100, bonusType as BonusType, staff.id);
+  // A hunt run here takes the slot straight onto its bonus list.
+  if (r && isLocalHunt({ id: r.huntId })) {
+    const err = await addBonus(
+      r.huntId,
+      { slotName: r.slot, provider: null, slotImage: artFor(await slotArt(), r.slot), betSize: Math.round(bet * 100) / 100, requestedBy: r.kickUsername },
+      staff.id,
+    );
+    if (err) back('/admin/hunts', { error: err });
+  }
   back('/admin/hunts', r ? { ok: `Added ${r.slot} (${bonusType}, $${bet.toFixed(2)} base bet).` } : { error: 'Request not found.' });
 }
 
@@ -105,6 +125,79 @@ export async function toggleHuntRequests(fd: FormData): Promise<void> {
   const open = str(fd, 'open') === '1';
   await setHuntRequestsOpen(str(fd, 'huntId'), open, staff.id);
   back(str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : '/admin/hunts', { ok: open ? 'Slot requests opened.' : 'Slot requests closed.' });
+}
+
+/* ------------------------------------------------- hunts run on the site */
+
+const dollars = (v: string) => {
+  const n = Number(v.replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+};
+const done = (err: string | null, ok: string): never => back('/admin/hunts', err ? { error: err } : { ok });
+
+export async function startHuntAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const title = str(fd, 'title').slice(0, 80);
+  const start = dollars(str(fd, 'startCost'));
+  if (!title) back('/admin/hunts', { error: 'Give the hunt a name.' });
+  if (!start) back('/admin/hunts', { error: 'Enter the start balance, e.g. 1000.' });
+  await startHunt(title, start!, staff.id);
+  back('/admin/hunts', { ok: `Started “${title}”. Chat can !sr now; open guessing when you’re ready.` });
+}
+
+export async function saveHuntAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const title = str(fd, 'title').slice(0, 80);
+  const start = dollars(str(fd, 'startCost'));
+  if (!title || !start) back('/admin/hunts', { error: 'Enter a name and a start balance.' });
+  done(await renameHunt(str(fd, 'huntId'), title, start!, staff.id), 'Saved.');
+}
+
+export async function addBonusAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const slot = str(fd, 'slot').slice(0, 80);
+  const bet = dollars(str(fd, 'bet'));
+  if (!slot) back('/admin/hunts', { error: 'Pick or type a slot.' });
+  if (!bet) back('/admin/hunts', { error: 'Enter the bet, e.g. 2.00.' });
+  const err = await addBonus(str(fd, 'huntId'), { slotName: slot, provider: null, slotImage: artFor(await slotArt(), slot), betSize: bet! }, staff.id);
+  done(err, `Added ${slot}.`);
+}
+
+export async function removeBonusAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  done(await removeBonus(str(fd, 'huntId'), str(fd, 'bonusId'), staff.id), 'Removed.');
+}
+
+export async function setPayoutAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const raw = str(fd, 'payout');
+  const payout = raw === '' ? null : dollars(raw);
+  if (raw !== '' && payout === null) back('/admin/hunts', { error: 'Enter the payout in dollars, e.g. 84.20.' });
+  done(await setPayout(str(fd, 'huntId'), str(fd, 'bonusId'), payout, staff.id), 'Payout saved.');
+}
+
+export async function setPhaseAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const phase = str(fd, 'phase') as Phase;
+  if (!['collecting', 'opening', 'finished'].includes(phase)) back('/admin/hunts', { error: 'Unknown step.' });
+  const ok = { collecting: 'Back to collecting.', opening: 'Opening — !sr and guessing are closed.', finished: 'Hunt finished and guesses settled.' };
+  done(await setPhase(str(fd, 'huntId'), phase, staff.id), ok[phase]);
+}
+
+/** The control row: set the prize and open or close guessing in one go. */
+export async function guessingAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  const id = str(fd, 'huntId');
+  const open = str(fd, 'open') === '1';
+  const guessPrize = str(fd, 'guessPrize').slice(0, 80) || null;
+  await db.update(hunts).set({ guessesOpen: open, guessPrize }).where(eq(hunts.id, id));
+  await audit(staff.id, open ? 'hunt.guessing_open' : 'hunt.guessing_close', 'hunt', id, null, { guessPrize });
+  back('/admin/hunts', { ok: open ? 'Guessing opened — chat can !guess.' : 'Guessing closed.' });
+}
+
+export async function deleteHuntAction(fd: FormData): Promise<void> {
+  const staff = await requireRole('mod');
+  done(await deleteHunt(str(fd, 'huntId'), staff.id), 'Hunt deleted.');
 }
 
 /* ----------------------------------------------------------- tournaments */

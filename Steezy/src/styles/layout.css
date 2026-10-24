@@ -115,6 +115,19 @@
   gap: 8px;
 }
 
+/* Staff only: the way into the admin panel, top right beside the account (MattySpins' Staff button). */
+.admin-chip {
+  gap: 8px;
+  border-color: color-mix(in srgb, var(--color-warn) 40%, transparent);
+  color: var(--color-warn);
+}
+
+@media (max-width: 760px) {
+  .admin-chip__label {
+    display: none;
+  }
+}
+
 .roobet-chip b {
   color: var(--color-roobet);
   font-style: italic;

@@ -390,3 +390,110 @@
   background: var(--color-surface-2);
   color: var(--color-text-2);
 }
+
+/* The bonus hunt screen (MattySpins layout). */
+.hunt-h {
+  font-size: 16px;
+}
+
+.hunt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hunt-tags .tag {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Name / start balance / button, or slot / bet / button: wide field, narrower field, button on the baseline. */
+.hunt-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.hunt-form .field label {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@media (max-width: 640px) {
+  .hunt-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hunt-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hunt-switches__guess {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hunt-switches__guess .input {
+  width: 150px;
+}
+
+.hunt-danger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-line);
+}
+
+.btn--danger-ghost {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
+  background: transparent;
+  color: var(--color-danger);
+}
+
+.btn--danger-ghost:hover {
+  background: var(--color-danger-bg);
+}
+
+.admin .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hunt-fold {
+  padding: 16px 22px;
+}
+
+.hunt-fold summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.hunt-fold.is-error {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 50%, transparent);
+}
+
+.payout-form {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.admin .payout-form .input {
+  width: 110px;
+  min-height: 32px;
+  text-align: right;
+}
+
+.admin .payout-form .btn {
+  min-height: 32px;
+}

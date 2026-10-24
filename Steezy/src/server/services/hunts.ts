@@ -23,6 +23,8 @@ export type HuntBonus = {
   payout?: number | null;
   multiplier?: number | null;
   order?: number | null;
+  /** Hunts run on the site: the chatter whose `!sr` it came from. */
+  requestedBy?: string | null;
 };
 export type HuntStats = {
   bonusCount?: number | null;

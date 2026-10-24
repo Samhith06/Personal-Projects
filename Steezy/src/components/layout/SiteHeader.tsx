@@ -53,7 +53,6 @@ export function SiteHeader({
               Tournament
             </Link>
           ) : null}
-          {hasRole(user, 'mod') ? <Link href="/admin">Admin</Link> : null}
         </nav>
         <div className="site-header__actions">
           {live ? (
@@ -72,6 +71,12 @@ export function SiteHeader({
             <b>Roobet</b>
             <span className="meta">STZY</span>
           </a>
+          {hasRole(user, 'mod') ? (
+            <Link href="/admin" className="btn btn--secondary admin-chip" title="Staff area">
+              <span aria-hidden="true">◆</span>
+              <span className="admin-chip__label">Admin</span>
+            </Link>
+          ) : null}
           {user ? (
             <Link href="/me" className="me-chip" aria-label={`My profile (${name})`}>
               <img className="avatar" src={discordAvatarUrl(user.discordId, user.discordAvatar, 64)} alt="" width={32} height={32} />
