@@ -497,3 +497,124 @@
 .admin .payout-form .btn {
   min-height: 32px;
 }
+
+.members-filters__busy {
+  align-self: center;
+}
+
+/* Inline "Referred by" cell on the members table. */
+.referred-by {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+}
+
+.input--compact {
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  background: transparent;
+  border-color: transparent;
+}
+
+.input--compact:hover,
+.input--compact:focus-visible {
+  background: var(--color-surface-2);
+  border-color: var(--color-line-strong);
+}
+
+.referred-by__error {
+  color: var(--color-danger);
+  font-size: 0.75rem;
+}
+
+/* Leaderboard prize-per-place editor. */
+.prize-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 520px;
+}
+
+.prize-table__head,
+.prize-table__row {
+  display: grid;
+  grid-template-columns: 64px 1fr 56px 40px;
+  align-items: center;
+  gap: 10px;
+}
+
+.prize-table__head {
+  padding: 0 4px 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.prize-table__row {
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.prize-table__row:nth-of-type(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.prize-table__place {
+  font-weight: 600;
+  padding-left: 6px;
+}
+
+.prize-table__row:nth-of-type(2) .prize-table__place {
+  color: var(--medal-gold);
+}
+
+.prize-table__row:nth-of-type(3) .prize-table__place {
+  color: var(--medal-silver);
+}
+
+.prize-table__row:nth-of-type(4) .prize-table__place {
+  color: var(--medal-bronze);
+}
+
+.prize-table__amount {
+  position: relative;
+  display: block;
+}
+
+.prize-table__amount > span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.prize-table__amount .input {
+  width: 100%;
+  padding-left: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.prize-table__share {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.prize-table__remove {
+  padding: 6px 0;
+  justify-content: center;
+}
+
+.prize-table__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}

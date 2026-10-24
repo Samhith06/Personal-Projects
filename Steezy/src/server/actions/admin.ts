@@ -9,10 +9,11 @@
  *   owner  + unlocking an approved Roobet username
  */
 import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { db } from '@/server/db';
-import { leaderboardResults, leaderboards, milestoneClaims, milestones, roobetLinks } from '@/server/db/schema';
+import { leaderboardResults, leaderboards, milestoneClaims, milestones, roobetLinks, users } from '@/server/db/schema';
 import { requireRole } from '@/server/auth/session';
 import { findRoobetCandidate } from '@/server/services/admin';
 import { audit } from '@/server/services/audit';
@@ -107,6 +108,22 @@ export async function markPrizePaid(fd: FormData): Promise<void> {
     .where(and(eq(leaderboardResults.leaderboardId, leaderboardId), eq(leaderboardResults.rank, rank)));
   await audit(staff.id, 'leaderboard.prize_paid', 'leaderboard', leaderboardId, null, { rank });
   back('/admin/payouts', { ok: 'Marked paid.' });
+}
+
+/* -------------------------------------------------------------------- Members */
+
+/** Who referred a member to play under the code. Returns instead of redirecting so the table edits in place. */
+export async function setReferredBy(fd: FormData): Promise<{ error?: string }> {
+  const staff = await requireRole('admin');
+  const userId = str(fd, 'userId');
+  const referredBy = str(fd, 'referredBy').replace(/^@/, '').slice(0, 64) || null;
+  const [before] = await db.select({ referredBy: users.referredBy }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!before) return { error: 'Member not found.' };
+  if (before.referredBy === referredBy) return {};
+  await db.update(users).set({ referredBy }).where(eq(users.id, userId));
+  await audit(staff.id, 'member.referred_by', 'user', userId, before, { referredBy });
+  revalidatePath('/admin/members');
+  return {};
 }
 
 /* --------------------------------------------------------------- Leaderboards */

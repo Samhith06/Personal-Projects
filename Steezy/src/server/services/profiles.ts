@@ -83,7 +83,7 @@ export type Trophy = { title: string; when: Date; prize: number | null; kind: 'l
 
 export async function profileView(user: User) {
   const uid = await approvedRoobetUid(user.id);
-  const [badgeList, watch, finishes, raffleWins, giveawayWins, milestoneRows, bestHit] = await Promise.all([
+  const [badgeList, watch, finishes, raffleWins, giveawayWins, milestoneRows, bestHit, wager] = await Promise.all([
     badgesFor(user),
     watchTotals(user.id),
     db
@@ -115,6 +115,7 @@ export async function profileView(user: User) {
       .innerJoin(milestones, eq(milestones.id, milestoneClaims.milestoneId))
       .where(and(eq(milestoneClaims.userId, user.id), inArray(milestoneClaims.status, ['claimed', 'paid']))),
     uid ? bestMultiplierFor(uid) : Promise.resolve(null),
+    uid ? wagerTotalsFor(uid) : Promise.resolve(null),
   ]);
 
   const trophies: Trophy[] = [
@@ -138,6 +139,7 @@ export async function profileView(user: User) {
     bestFinish,
     titles,
     bestHit,
+    wager,
     linkedRoobet: Boolean(uid),
     discordCreated: discordAccountCreatedAt(user.discordId),
   };
@@ -146,6 +148,19 @@ export async function profileView(user: User) {
 export type Hit = { multiplier: number; wagered: number; payout: number; gameTitle: string; day: string };
 
 /** A Roobet account's best multiplier on record (Roobet reports the best per day). */
+/** Raw Roobet wager under STZY: lifetime, and the current calendar month (UTC). */
+export async function wagerTotalsFor(roobetUid: string): Promise<{ total: number; month: number }> {
+  const monthStart = new Date().toISOString().slice(0, 8) + '01';
+  const [row] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${roobetDailyWager.wagered}), 0)::float8`,
+      month: sql<number>`coalesce(sum(${roobetDailyWager.wagered}) filter (where ${roobetDailyWager.day} >= ${monthStart}), 0)::float8`,
+    })
+    .from(roobetDailyWager)
+    .where(eq(roobetDailyWager.roobetUid, roobetUid));
+  return { total: Number(row?.total ?? 0), month: Number(row?.month ?? 0) };
+}
+
 export async function bestMultiplierFor(roobetUid: string): Promise<Hit | null> {
   const [row] = await db
     .select({ hit: roobetDailyWager.highestMultiplier, day: roobetDailyWager.day })

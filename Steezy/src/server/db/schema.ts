@@ -65,6 +65,8 @@ export const users = pgTable(
     /** Set by staff after an abuse review: no giveaways, raffles or milestone claims. */
     blockedFromRewards: boolean('blocked_from_rewards').notNull().default(false),
     staffNotes: text('staff_notes'),
+    /** Who sent them to play under the code. Free text typed by staff. */
+    referredBy: text('referred_by'),
 
     createdAt: createdAt(),
     updatedAt: updatedAt(),

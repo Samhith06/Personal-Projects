@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MEMBER_FILTERS, MEMBER_SORTS, searchMembers, type MemberFilter, type MemberSort } from '@/server/services/admin';
 import { handleFor } from '@/server/services/profiles';
+import { MemberFilters } from '@/components/admin/MemberFilters';
+import { ReferredByField } from '@/components/admin/ReferredByField';
 import { formatAgo, formatMinutes, formatUsd } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Members' };
@@ -60,49 +62,32 @@ export default async function MembersAdmin({ searchParams }: { searchParams: Pro
         </span>
         <h1 className="admin__title">Members</h1>
         <p className="admin__sub">
-          Everyone who has signed in with Discord. Search by Discord, Kick or Roobet name. Click a name for their public
+          Everyone who has signed in with Discord. Search by Discord, Kick or Roobet name, or by who referred them. Click a name for their public
           profile.
         </p>
       </div>
 
-      <form className="members-filters" method="get">
-        <input className="input" type="search" name="q" defaultValue={q} placeholder="Search names…" aria-label="Search members" />
-        <select className="input" name="filter" defaultValue={filter} aria-label="Filter">
-          {MEMBER_FILTERS.map((f) => (
-            <option key={f} value={f}>
-              {FILTER_LABEL[f]}
-            </option>
-          ))}
-        </select>
-        <select className="input" name="sort" defaultValue={sort} aria-label="Sort">
-          {MEMBER_SORTS.map((s) => (
-            <option key={s} value={s}>
-              Sort: {SORT_LABEL[s]}
-            </option>
-          ))}
-        </select>
-        <button className="btn btn--primary" type="submit">
-          Apply
-        </button>
-        {q || filter !== 'all' || sort !== 'recent' ? (
-          <Link className="btn btn--secondary" href="/admin/members">
-            Clear
-          </Link>
-        ) : null}
-      </form>
+      <MemberFilters
+        q={q}
+        filter={filter}
+        sort={sort}
+        filters={MEMBER_FILTERS.map((f) => ({ value: f, label: FILTER_LABEL[f] }))}
+        sorts={MEMBER_SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }))}
+      />
 
       {members.length === 0 ? (
         <div className="emptyq">{q || filter !== 'all' ? 'No members match that.' : 'No members yet — the list fills as people sign in.'}</div>
       ) : (
         <div className="card" style={{ padding: '6px 12px' }}>
           <div className="table-wrap">
-            <table className="table" style={{ minWidth: 900 }}>
+            <table className="table" style={{ minWidth: 1080 }}>
               <thead>
                 <tr>
                   <th>Member</th>
                   <th>Role</th>
                   <th>Kick</th>
                   <th>Roobet</th>
+                  <th>Referred by</th>
                   <th style={{ textAlign: 'right' }}>Weighted wager</th>
                   <th style={{ textAlign: 'right' }}>Watch time</th>
                   <th>Joined</th>
@@ -131,6 +116,9 @@ export default async function MembersAdmin({ searchParams }: { searchParams: Pro
                       ) : (
                         <span className="meta">—</span>
                       )}
+                    </td>
+                    <td>
+                      <ReferredByField key={`${m.id}:${m.referredBy ?? ''}`} userId={m.id} value={m.referredBy} />
                     </td>
                     <td className="num" style={{ textAlign: 'right' }}>
                       {/* Null means no approved Roobet link, which isn't the same as wagering nothing under one. */}
@@ -169,7 +157,7 @@ export default async function MembersAdmin({ searchParams }: { searchParams: Pro
 
       <p className="meta" style={{ maxWidth: '72ch' }}>
         Roles come from OWNER_DISCORD_IDS, ADMIN_DISCORD_IDS and MOD_DISCORD_IDS and are set again on every login, so nobody can
-        grant themselves staff from inside the site. Weighted wager is lifetime, counted only under an approved Roobet link.
+        grant themselves staff from inside the site. Weighted wager is lifetime, counted only under an approved Roobet link. Referred by is typed by staff — press Enter or click away to save.
       </p>
     </div>
   );

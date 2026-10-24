@@ -201,6 +201,7 @@ export type MemberRow = {
   /** Lifetime weighted wager under an approved link; null without one. */
   weighted: number | null;
   watchMinutes: number;
+  referredBy: string | null;
 };
 
 const FILTER_SQL: Record<MemberFilter, ReturnType<typeof sql>> = {
@@ -226,12 +227,12 @@ export async function searchMembers(opts: { query?: string; filter: MemberFilter
   const q = opts.query?.trim() ? `%${opts.query.trim().toLowerCase()}%` : null;
   const where = sql`${FILTER_SQL[opts.filter]} and (${q}::text is null
     or lower(u.discord_username) like ${q} or lower(coalesce(u.discord_global_name, '')) like ${q}
-    or lower(coalesce(u.kick_username, '')) like ${q} or lower(coalesce(l.requested_username, '')) like ${q})`;
+    or lower(coalesce(u.kick_username, '')) like ${q} or lower(coalesce(l.requested_username, '')) like ${q} or lower(coalesce(u.referred_by, '')) like ${q})`;
 
   const [rows, [{ total }]] = await Promise.all([
     db.execute(sql`
       select u.id, u.discord_username, u.discord_global_name, u.kick_username, u.role, u.blocked_from_rewards,
-        u.created_at, u.last_seen_at, l.status as roobet_status, l.requested_username as roobet_username,
+        u.created_at, u.last_seen_at, u.referred_by, l.status as roobet_status, l.requested_username as roobet_username,
         (select sum(d.weighted_wagered)::float8 from ${roobetDailyWager} d where l.status = 'approved' and d.roobet_uid = l.roobet_uid) as weighted,
         coalesce((select sum(w.minutes)::int from watch_time w where w.user_id = u.id), 0) as watch_minutes
       from ${users} u
@@ -259,6 +260,7 @@ export async function searchMembers(opts: { query?: string; filter: MemberFilter
     roobet_username: string | null;
     weighted: number | null;
     watch_minutes: number;
+    referred_by: string | null;
   };
   const members: MemberRow[] = (rows.rows as Raw[]).map((r) => ({
     id: r.id,
@@ -273,6 +275,7 @@ export async function searchMembers(opts: { query?: string; filter: MemberFilter
     roobetUsername: r.roobet_username,
     weighted: r.roobet_status === 'approved' ? Number(r.weighted ?? 0) : null,
     watchMinutes: r.watch_minutes,
+    referredBy: r.referred_by,
   }));
   return { members, total };
 }

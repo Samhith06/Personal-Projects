@@ -41,7 +41,7 @@ export async function OfferCard() {
           <li>
             <Check />
             <span>
-              <b>10% monthly loss back</b>
+              <b>20% monthly loss back</b>
             </span>
           </li>
           <li>
@@ -61,7 +61,7 @@ export async function OfferCard() {
         <div className="offer__tiles">
           <div>
             <span>Loss back</span>
-            <b>10%</b>
+            <b>20%</b>
           </div>
           <div>
             <span>Leaderboard</span>

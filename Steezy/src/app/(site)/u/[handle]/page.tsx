@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getCurrentUser } from '@/server/auth/session';
+import { getCurrentUser, hasRole } from '@/server/auth/session';
 import { findByHandle, profileView, type Trophy } from '@/server/services/profiles';
 import { discordAvatarUrl } from '@/lib/discord';
 import { formatMinutes, formatUsd, ordinal } from '@/lib/format';
@@ -27,6 +27,9 @@ export default async function PublicProfile({ params }: Params) {
   const name = publicName(user);
   const isMe = viewer?.id === user.id;
   const showAmounts = user.wagerPublic;
+  /** The member and staff always see wager totals; everyone else only when the member made them public. */
+  const showWager = showAmounts || isMe || hasRole(viewer, 'mod');
+  const monthName = new Date().toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
 
   return (
     <>
@@ -63,7 +66,21 @@ export default async function PublicProfile({ params }: Params) {
       </section>
 
       <div className="container page">
-        <section className="stat-grid">
+        <section className="stat-grid stat-grid--profile">
+          <div className="card stack" style={{ gap: 6 }}>
+            <span className="meta">Total wagered</span>
+            <span className="stat__value num" style={{ color: view.wager && showWager ? 'var(--color-roobet)' : undefined }}>
+              {!view.wager ? '—' : showWager ? formatUsd(view.wager.total) : 'Hidden'}
+            </span>
+            <span className="meta">{!view.wager ? 'Roobet not linked' : showWager ? 'All time on Roobet · code STZY' : `Hidden by ${name}`}</span>
+          </div>
+          <div className="card stack" style={{ gap: 6 }}>
+            <span className="meta">Wagered this month</span>
+            <span className="stat__value num" style={{ color: view.wager && showWager ? 'var(--color-roobet)' : undefined }}>
+              {!view.wager ? '—' : showWager ? formatUsd(view.wager.month) : 'Hidden'}
+            </span>
+            <span className="meta">{!view.wager ? 'Roobet not linked' : showWager ? `${monthName} so far` : `Hidden by ${name}`}</span>
+          </div>
           <div className="card stack" style={{ gap: 6 }}>
             <span className="meta">Watch time</span>
             <span className="stat__value num">{formatMinutes(view.watch.minutes)}</span>

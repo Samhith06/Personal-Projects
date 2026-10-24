@@ -1,17 +1,19 @@
 import Image from 'next/image';
 import steeze from '../../../public/brand/steeze.png';
 import { env } from '@/lib/env';
+import { SOCIALS } from '@/lib/socials';
 
 /**
  * "Meet Steeze." from the SteezeSpins Home design. Socials only list the
- * channels we actually have links for (Kick, Discord, Roobet); the rest of the
- * design's handles were placeholders. The photo is served resized and as
+ * channels we actually have links for (Kick, Discord, Instagram, X, YouTube,
+ * Roobet). The photo is served resized and as
  * WebP/AVIF by next/image (the original PNG is ~800 KB).
  */
 export function AboutSection() {
   const socials = [
     env.kickChannelSlug ? { name: 'Kick', handle: `kick.com/${env.kickChannelSlug}`, href: `https://kick.com/${env.kickChannelSlug}`, mark: 'K' } : null,
     { name: 'Discord', handle: env.discordInviteUrl.replace(/^https?:\/\//, ''), href: env.discordInviteUrl, mark: 'D' },
+    ...SOCIALS,
     { name: 'Roobet', handle: 'code STZY', href: env.roobetReferralUrl, mark: 'R' },
   ].filter((s): s is NonNullable<typeof s> => s !== null);
 

@@ -1,5 +1,6 @@
 import { saveLeaderboard } from '@/server/actions/admin';
 import type { Leaderboard } from '@/server/services/leaderboards';
+import { PrizeTable } from './PrizeTable';
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -44,13 +45,8 @@ export function LeaderboardForm({ board }: { board?: Leaderboard }) {
           </div>
         </div>
         <div className="field">
-          <label htmlFor="lb-prizes">Prizes by place, in dollars (comma-separated, 1st first)</label>
-          <input
-            id="lb-prizes"
-            name="prizes"
-            className="input"
-            defaultValue={(board?.prizes ?? [1200, 700, 400, 250, 150, 60, 60, 60, 60, 60]).join(', ')}
-          />
+          <label>Prizes by place</label>
+          <PrizeTable initial={board?.prizes ?? [1200, 700, 400, 250, 150, 60, 60, 60, 60, 60]} disabled={locked} />
         </div>
         <p className="meta">Player names are always shown masked on the public board (first four letters, then ****).</p>
         <div>

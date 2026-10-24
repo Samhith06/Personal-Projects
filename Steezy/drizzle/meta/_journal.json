@@ -36,6 +36,13 @@
       "when": 1792796987825,
       "tag": "0004_hunt_request_bet_and_type",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792856299718,
+      "tag": "0005_members_referred_by",
+      "breakpoints": true
     }
   ]
 }

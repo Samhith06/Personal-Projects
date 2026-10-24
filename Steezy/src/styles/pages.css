@@ -1947,3 +1947,20 @@
     text-align: center;
   }
 }
+
+/* Profile stats: six cards, laid out 3 × 2 so no row is left half-empty. */
+.stat-grid--profile {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .stat-grid--profile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-grid--profile {
+    grid-template-columns: 1fr;
+  }
+}

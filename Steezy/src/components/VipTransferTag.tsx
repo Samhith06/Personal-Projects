@@ -36,13 +36,13 @@ export function VipTransferTag() {
   );
 }
 
-/** "10% monthly loss back available" on Roobet under code STZY. */
+/** "20% monthly loss back available" on Roobet under code STZY. */
 export function LossBackTag() {
   return (
     <PerkTag
       href={env.roobetReferralUrl}
       sponsored
-      title="10% monthly loss back available"
+      title="20% monthly loss back available"
       sub="On Roobet with code STZY"
       icon={
         <svg {...svg}>
