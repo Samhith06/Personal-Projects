@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { GiveawayForm } from '@/components/admin/DrawForms';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
+import { deleteGiveaway } from '@/server/actions/draws';
 import { entryCount, listGiveaways } from '@/server/services/giveaways';
 
 export const metadata: Metadata = { title: 'Giveaways' };
@@ -20,6 +22,10 @@ export default async function GiveawaysAdmin({ searchParams }: { searchParams: F
         <p className="meta">Draft → open (members join on the site or with the chat keyword) → closed → drawn live on the overlay.</p>
       </div>
       <Flash {...flash} />
+      <section className="card stack">
+        <strong>New giveaway</strong>
+        <GiveawayForm />
+      </section>
       <section className="card">
         {rows.length === 0 ? <p className="meta">No giveaways yet.</p> : null}
         {rows.map((g, i) => (
@@ -34,12 +40,14 @@ export default async function GiveawaysAdmin({ searchParams }: { searchParams: F
               </div>
             </div>
             <span className={TAG[g.status] ?? 'tag tag--neutral'}>{g.status}</span>
+            <form action={deleteGiveaway}>
+              <input type="hidden" name="id" value={g.id} />
+              <ConfirmSubmit className="btn btn--danger" message={`Delete “${g.prize}” and its ${counts[i]} entries? This can't be undone.`}>
+                Delete
+              </ConfirmSubmit>
+            </form>
           </div>
         ))}
-      </section>
-      <section className="card stack">
-        <strong>New giveaway</strong>
-        <GiveawayForm />
       </section>
     </div>
   );

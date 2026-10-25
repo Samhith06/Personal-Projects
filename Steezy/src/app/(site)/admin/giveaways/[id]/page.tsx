@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/admin/Flash';
 import { GiveawayForm } from '@/components/admin/DrawForms';
-import { giveawayStep, markGiveawayPaid } from '@/server/actions/draws';
+import { deleteGiveaway, giveawayStep, markGiveawayPaid } from '@/server/actions/draws';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { entrantNames, entryCount, getGiveaway, getGiveawayWinners } from '@/server/services/giveaways';
 import { siteUrl } from '@/lib/env';
 import { ordinal } from '@/lib/format';
@@ -102,6 +103,25 @@ export default async function GiveawayAdmin({ params, searchParams }: { params: 
           {names.length ? names.join(' · ') : 'No entries yet.'}
           {count > names.length ? ` · and ${count - names.length} more` : ''}
         </p>
+      </section>
+
+      <section className="card row" style={{ justifyContent: 'space-between' }}>
+        <span className="meta" style={{ flex: '1 1 300px' }}>
+          Deletes the giveaway with its entries and winners. Can&apos;t be undone.
+        </span>
+        <form action={deleteGiveaway}>
+          <input type="hidden" name="id" value={g.id} />
+          <ConfirmSubmit
+            className="btn btn--danger"
+            message={
+              winners.some((w) => !w.paidAt)
+                ? `Delete “${g.prize}”? It has unpaid winners, and they'll disappear from Payouts too.`
+                : `Delete “${g.prize}” and its ${count} entries?`
+            }
+          >
+            Delete giveaway
+          </ConfirmSubmit>
+        </form>
       </section>
     </div>
   );

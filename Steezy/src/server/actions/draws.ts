@@ -175,6 +175,17 @@ export async function giveawayStep(fd: FormData): Promise<void> {
   back(path, { ok: { open: 'Open — entries are being accepted.', close: 'Closed — entries frozen.', draw: 'Drawn — winner on the overlay now.' }[step] ?? 'Done.' });
 }
 
+/** Delete a giveaway with its entries and winners. Admin only; kept in the audit log. */
+export async function deleteGiveaway(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  const id = str(fd, 'id');
+  const before = await getGiveaway(id);
+  if (!before) back('/admin/giveaways', { error: 'Giveaway not found.' });
+  await db.delete(giveaways).where(eq(giveaways.id, id));
+  await audit(staff.id, 'giveaway.delete', 'giveaway', id, before, null);
+  back('/admin/giveaways', { ok: `Deleted “${before.prize}”.` });
+}
+
 export async function markGiveawayPaid(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const giveawayId = str(fd, 'giveawayId');
