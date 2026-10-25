@@ -57,7 +57,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
               )}
               <form action={approveRoobet}>
                 <input type="hidden" name="userId" value={p.userId} />
-                <button className="btn btn--primary" type="submit" disabled={!c || Boolean(c.takenBy)}>
+                <button className="btn btn--primary" type="submit" disabled={Boolean(c?.takenBy)}>
                   Approve
                 </button>
               </form>
@@ -79,7 +79,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
             <div className="admin-row__body">
               <div style={{ fontWeight: 500 }}>{a.requestedUsername}</div>
               <div className="meta">
-                Discord {a.discordUsername} · uid {a.roobetUid?.slice(0, 8)}… · by {a.reviewerName ?? '—'}
+                Discord {a.discordUsername} · {a.roobetUid ? `uid ${a.roobetUid.slice(0, 8)}…` : 'waiting for Roobet data'} · by {a.reviewerName ?? '—'}
                 {a.reviewedAt ? ` ${formatAgo(a.reviewedAt)}` : ''}
               </div>
             </div>

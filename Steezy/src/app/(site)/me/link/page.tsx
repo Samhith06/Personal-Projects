@@ -44,6 +44,7 @@ export default async function LinkAccountsPage({
       {error ? <p className="notice notice--danger">{error}</p> : null}
       {params.kick === 'linked' ? <p className="notice notice--ok">Kick account linked.</p> : null}
       {params.roobet === 'submitted' ? <p className="notice notice--ok">Submitted. An admin will review it soon.</p> : null}
+      {params.roobet === 'approved' ? <p className="notice notice--ok">Found under code STZY and approved.</p> : null}
 
       <section className="card account-row">
         <span className="account-mark account-mark--discord">D</span>

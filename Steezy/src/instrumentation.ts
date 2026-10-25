@@ -16,6 +16,7 @@ export async function register() {
     const { freezeEndedLeaderboards } = await import('@/server/services/leaderboards');
     const { announceLeaderboardChanges, postDailyStandings } = await import('@/server/services/leaderboard-announce');
     const { closeStaleSessions } = await import('@/server/kick/sessions');
+    const { autoApprovePendingRoobet } = await import('@/server/services/admin');
     const { closeEndedRaffles } = await import('@/server/services/raffles');
     const { closeExpiredGiveaways } = await import('@/server/services/giveaways');
     const config = roobetConfigFromEnv();
@@ -39,6 +40,11 @@ export async function register() {
             return false;
           });
           if (daily) console.log('[leaderboard] posted daily standings to Discord');
+          const autoApproved = await autoApprovePendingRoobet().catch((error) => {
+            console.warn('[roobet] auto-approve failed', error);
+            return 0;
+          });
+          if (autoApproved) console.log(`[roobet] auto-approved ${autoApproved} username(s)`);
         }
       }
       // After the pull, so a board ending now freezes on the final numbers.

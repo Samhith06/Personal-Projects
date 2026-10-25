@@ -34,25 +34,28 @@ export async function approveRoobet(fd: FormData): Promise<void> {
   if (!link || link.status !== 'pending') back('/admin/approvals', { error: 'That request is no longer pending.' });
 
   const candidate = await findRoobetCandidate(link!.requestedUsername, userId);
-  if (!candidate) back('/admin/approvals', { error: `“${link!.requestedUsername}” isn’t in STZY affiliate data — reject it instead.` });
-  if (candidate!.takenBy) back('/admin/approvals', { error: 'That Roobet account is already approved for another member.' });
+  if (candidate?.takenBy) back('/admin/approvals', { error: 'That Roobet account is already approved for another member.' });
 
   const now = new Date();
   await db
     .update(roobetLinks)
-    // Store Roobet's own spelling so payouts are tipped to the exact name.
+    // Found: store Roobet's own spelling and id. Not found (staff vouch for it): the sync fills in the id once Roobet lists the name.
     .set({
       status: 'approved',
-      roobetUid: candidate!.uid,
-      requestedUsername: candidate!.username,
+      roobetUid: candidate?.uid ?? null,
+      requestedUsername: candidate?.username ?? link!.requestedUsername,
       rejectReason: null,
       reviewedBy: staff.id,
       reviewedAt: now,
       updatedAt: now,
     })
     .where(eq(roobetLinks.userId, userId));
-  await audit(staff.id, 'roobet.approve', 'user', userId, { status: link!.status }, { username: link!.requestedUsername, uid: candidate!.uid });
-  back('/admin/approvals', { ok: `Approved ${link!.requestedUsername}.` });
+  await audit(staff.id, 'roobet.approve', 'user', userId, { status: link!.status }, { username: link!.requestedUsername, uid: candidate?.uid ?? null });
+  back('/admin/approvals', {
+    ok: candidate
+      ? `Approved ${link!.requestedUsername}.`
+      : `Approved ${link!.requestedUsername}. Their wagers count once Roobet lists the name under STZY.`,
+  });
 }
 
 export async function rejectRoobet(fd: FormData): Promise<void> {

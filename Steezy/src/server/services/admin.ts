@@ -18,6 +18,7 @@ import {
   users,
 } from '@/server/db/schema';
 import { dayKey } from './wagers';
+import { audit } from './audit';
 import { fetchRoobetStats, type RoobetRow } from '@/server/roobet/client';
 import { roobetConfigFromEnv } from '@/server/roobet/sync';
 
@@ -109,6 +110,60 @@ export async function findRoobetCandidate(username: string, forUserId: string) {
       .limit(1),
   ]);
   return { ...hit, lifetime: remote ? remote.wagered : lifetime.total, takenBy: taken?.userId ?? null };
+}
+
+/**
+ * Approve a member's pending Roobet username without staff when it's found
+ * under STZY (in synced wagers or Roobet's own list) and no other member holds
+ * that account. Anything else stays pending for a human. Returns true if approved.
+ */
+export async function autoApproveRoobet(userId: string): Promise<boolean> {
+  const [link] = await db
+    .select()
+    .from(roobetLinks)
+    .where(and(eq(roobetLinks.userId, userId), eq(roobetLinks.status, 'pending')))
+    .limit(1);
+  if (!link) return false;
+  const candidate = await findRoobetCandidate(link.requestedUsername, userId);
+  if (!candidate || candidate.takenBy) return false;
+
+  const now = new Date();
+  const updated = await db
+    .update(roobetLinks)
+    // Roobet's own spelling, so payouts are tipped to the exact name.
+    .set({ status: 'approved', roobetUid: candidate.uid, requestedUsername: candidate.username, rejectReason: null, reviewedBy: null, reviewedAt: now, updatedAt: now })
+    .where(and(eq(roobetLinks.userId, userId), eq(roobetLinks.status, 'pending')))
+    .returning({ userId: roobetLinks.userId });
+  if (!updated.length) return false;
+  await audit(null, 'roobet.auto_approve', 'user', userId, { status: 'pending' }, { username: candidate.username, uid: candidate.uid });
+  return true;
+}
+
+/**
+ * Background job: auto-approve every pending username that can be, and fill in
+ * the Roobet id for usernames staff approved before Roobet listed them.
+ * Returns how many were approved.
+ */
+export async function autoApprovePendingRoobet(): Promise<number> {
+  const pending = await db.select({ userId: roobetLinks.userId }).from(roobetLinks).where(eq(roobetLinks.status, 'pending'));
+  let approved = 0;
+  // One at a time, so two members claiming the same account can't both get it.
+  for (const p of pending) if (await autoApproveRoobet(p.userId)) approved++;
+
+  const missingId = await db
+    .select({ userId: roobetLinks.userId, username: roobetLinks.requestedUsername })
+    .from(roobetLinks)
+    .where(and(eq(roobetLinks.status, 'approved'), isNull(roobetLinks.roobetUid)));
+  for (const m of missingId) {
+    const candidate = await findRoobetCandidate(m.username, m.userId);
+    if (!candidate || candidate.takenBy) continue;
+    await db
+      .update(roobetLinks)
+      .set({ roobetUid: candidate.uid, requestedUsername: candidate.username, updatedAt: new Date() })
+      .where(and(eq(roobetLinks.userId, m.userId), isNull(roobetLinks.roobetUid)));
+    await audit(null, 'roobet.uid_found', 'user', m.userId, null, { username: candidate.username, uid: candidate.uid });
+  }
+  return approved;
 }
 
 export async function roobetLinksByStatus(status: 'pending' | 'approved' | 'rejected', limit = 100) {

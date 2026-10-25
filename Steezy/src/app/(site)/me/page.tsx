@@ -78,6 +78,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <span className="kicker">Linked accounts</span>
         {kick === 'linked' ? <p className="notice notice--ok">Kick account linked.</p> : null}
         {roobetParam === 'submitted' ? <p className="notice notice--ok">Roobet username submitted. An admin will review it soon.</p> : null}
+        {roobetParam === 'approved' ? <p className="notice notice--ok">Roobet username found under code STZY and approved.</p> : null}
         {error ? <p className="notice notice--danger">{error}</p> : null}
         <div className="account-row">
           <span className="account-mark account-mark--discord">D</span>

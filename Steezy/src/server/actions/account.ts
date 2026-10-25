@@ -7,6 +7,7 @@ import { db } from '@/server/db';
 import { roobetLinks, users } from '@/server/db/schema';
 import { requireUser } from '@/server/auth/session';
 import { startVerification } from '@/server/kick/chat-verification';
+import { autoApproveRoobet } from '@/server/services/admin';
 
 /** Public-profile privacy. Unchecked boxes are absent from the form, so absence means off. */
 export async function savePrivacy(formData: FormData): Promise<void> {
@@ -37,7 +38,8 @@ const roobetUsername = z
   .regex(/^[A-Za-z0-9_.-]{3,32}$/, 'That doesn’t look like a Roobet username.');
 
 /**
- * Submit (or resubmit after a rejection) a Roobet username for admin approval.
+ * Submit (or resubmit after a rejection) a Roobet username. It's approved at once when
+ * found under STZY, otherwise it goes to the admin queue.
  * An approved username is locked: only an owner can unlock it from the admin panel.
  */
 export async function submitRoobetUsername(formData: FormData): Promise<void> {
@@ -58,5 +60,7 @@ export async function submitRoobetUsername(formData: FormData): Promise<void> {
       target: roobetLinks.userId,
       set: { requestedUsername: parsed.data, status: 'pending', rejectReason: null, reviewedBy: null, reviewedAt: null, updatedAt: now },
     });
-  redirect(`${page}?roobet=submitted`);
+  // Found under STZY? Approved straight away; otherwise it waits for staff (and the sync retries it).
+  const approved = await autoApproveRoobet(user.id).catch(() => false);
+  redirect(`${page}?roobet=${approved ? 'approved' : 'submitted'}`);
 }
