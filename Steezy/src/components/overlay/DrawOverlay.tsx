@@ -7,6 +7,8 @@ const POLL_MS = 2000;
 /** A draw younger than this plays the reel when the overlay sees it; older ones go straight to the winner card. */
 const ANIMATE_WITHIN_MS = 90_000;
 const REEL_MS = 6500;
+/** How long the winner card stays up before the overlay clears itself. */
+const WINNER_MS = 30_000;
 
 function useCountdown(iso: string | null) {
   const [now, setNow] = useState(() => Date.now());
@@ -60,7 +62,7 @@ function JoinList({ names }: { names: string[] }) {
  * The 1920×1080 OBS browser source for a giveaway or raffle.
  *   open   → entry panel (keyword, timer, live count, newest joins)
  *   closed → "entries closed" panel
- *   drawn  → name reel that slows to a stop on the winner, then the winner card
+ *   drawn  → name reel that slows to a stop on the winner, then the winner card for 30 s, then nothing
  * `?preview=1` paints a dark stand-in for the stream so the layout is visible in a browser.
  */
 export function DrawOverlay({ kind, token, initial, preview }: { kind: string; token: string; initial: OverlayState; preview: boolean }) {
@@ -70,6 +72,8 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
     () => initial.status === 'drawn' && (!initial.drawnAt || Date.now() - new Date(initial.drawnAt).getTime() > ANIMATE_WITHIN_MS),
   );
   const played = useRef<string | null>(revealed ? initial.drawnAt : null);
+  // Once the giveaway is over the overlay shows nothing: a draw that was already done when OBS loaded starts hidden.
+  const [finished, setFinished] = useState(revealed);
   const countdown = useCountdown(state.status === 'open' ? state.closesAt : null);
 
   useEffect(() => {
@@ -98,6 +102,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
     const s = latest.current;
     if (s.status !== 'drawn' || !s.drawnAt || played.current === s.drawnAt) return;
     played.current = s.drawnAt;
+    setFinished(false);
     const winner = s.winners[0]?.name ?? null;
     const pool = s.reel.length ? s.reel : winner ? [winner] : [];
     if (!winner || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -125,6 +130,13 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
     step();
     return () => clearTimeout(timer);
   }, [state.status, state.drawnAt]);
+
+  // Clear the winner card WINNER_MS after it's revealed.
+  useEffect(() => {
+    if (state.status !== 'drawn' || !revealed || finished) return;
+    const t = setTimeout(() => setFinished(true), WINNER_MS);
+    return () => clearTimeout(t);
+  }, [state.status, revealed, finished]);
 
   const drawing = reelName !== null;
 
@@ -192,7 +204,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
         </section>
       ) : null}
 
-      {state.status === 'drawn' && revealed && !drawing ? (
+      {state.status === 'drawn' && revealed && !finished && !drawing ? (
         <section className="ov-center ov-winner" aria-live="polite">
           <span className="ov-eyebrow">{state.winners.length > 1 ? 'Winners' : 'Winner'}</span>
           {state.winners.length ? (
@@ -216,10 +228,12 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
         </section>
       ) : null}
 
-      <div className="ov-brand">
-        <span className="ov-dot" />
-        SteezySpins <span>· code</span> <i>STZY</i>
-      </div>
+      {finished ? null : (
+        <div className="ov-brand">
+          <span className="ov-dot" />
+          SteezySpins <span>· code</span> <i>STZY</i>
+        </div>
+      )}
     </div>
   );
 }
