@@ -18,6 +18,8 @@ import {
   users,
 } from '@/server/db/schema';
 import { dayKey } from './wagers';
+import { fetchRoobetStats, type RoobetRow } from '@/server/roobet/client';
+import { roobetConfigFromEnv } from '@/server/roobet/sync';
 
 export async function queueCounts() {
   const count = sql<number>`count(*)::int`;
@@ -60,13 +62,39 @@ export async function overviewStats() {
  * recent day first. Also reports whether that Roobet account is already
  * approved for a different member.
  */
+/** How far back the Roobet fallback looks for a referred player. */
+const LOOKBACK_FROM = new Date('2023-01-01T00:00:00Z');
+let referredCache: { at: number; rows: RoobetRow[] } | null = null;
+
+/**
+ * Every player Roobet reports under STZY since LOOKBACK_FROM, for usernames
+ * that haven't wagered inside the days we've synced. Cached for 10 minutes so
+ * the approvals page doesn't hit Roobet once per row.
+ */
+async function referredPlayers(): Promise<RoobetRow[]> {
+  if (referredCache && Date.now() - referredCache.at < 10 * 60_000) return referredCache.rows;
+  const config = roobetConfigFromEnv();
+  if (!config) return [];
+  try {
+    const rows = await fetchRoobetStats(config, LOOKBACK_FROM, new Date());
+    referredCache = { at: Date.now(), rows };
+    return rows;
+  } catch (error) {
+    console.warn('[approvals] Roobet lookup failed', error);
+    return referredCache?.rows ?? [];
+  }
+}
+
 export async function findRoobetCandidate(username: string, forUserId: string) {
-  const [hit] = await db
-    .select({ uid: roobetDailyWager.roobetUid, username: roobetDailyWager.username, lastDay: roobetDailyWager.day })
+  const [synced] = await db
+    .select({ uid: roobetDailyWager.roobetUid, username: roobetDailyWager.username })
     .from(roobetDailyWager)
     .where(sql`lower(${roobetDailyWager.username}) = lower(${username})`)
     .orderBy(desc(roobetDailyWager.day))
     .limit(1);
+  // Not in the synced days: ask Roobet directly (players who signed up under STZY but haven't wagered lately).
+  const remote = synced ? null : (await referredPlayers()).find((r) => r.username.toLowerCase() === username.toLowerCase());
+  const hit = synced ?? (remote ? { uid: remote.uid, username: remote.username } : null);
   if (!hit) return null;
 
   const [[lifetime], [taken]] = await Promise.all([
@@ -80,7 +108,7 @@ export async function findRoobetCandidate(username: string, forUserId: string) {
       .where(and(eq(roobetLinks.roobetUid, hit.uid), eq(roobetLinks.status, 'approved'), ne(roobetLinks.userId, forUserId)))
       .limit(1),
   ]);
-  return { ...hit, lifetime: lifetime.total, takenBy: taken?.userId ?? null };
+  return { ...hit, lifetime: remote ? remote.wagered : lifetime.total, takenBy: taken?.userId ?? null };
 }
 
 export async function roobetLinksByStatus(status: 'pending' | 'approved' | 'rejected', limit = 100) {
