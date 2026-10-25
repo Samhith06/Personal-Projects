@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/admin/Flash';
 import { LeaderboardForm } from '@/components/admin/LeaderboardForm';
-import { setLeaderboardStatus } from '@/server/actions/admin';
+import { deleteLeaderboard, setLeaderboardStatus } from '@/server/actions/admin';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { getLeaderboard, getStandings } from '@/server/services/leaderboards';
 import { formatUsd } from '@/lib/format';
 
@@ -95,6 +96,25 @@ export default async function EditLeaderboard({
           </table>
           {standings.length === 0 ? <p className="meta" style={{ padding: 8 }}>No wagers in this window yet.</p> : null}
         </div>
+      </section>
+
+      <section className="card row" style={{ justifyContent: 'space-between' }}>
+        <span className="meta" style={{ flex: '1 1 300px' }}>
+          Deletes the board and its final standings. Can&apos;t be undone.
+        </span>
+        <form action={deleteLeaderboard}>
+          <input type="hidden" name="id" value={board.id} />
+          <ConfirmSubmit
+            className="btn btn--danger"
+            message={
+              board.status === 'frozen' || board.status === 'published'
+                ? `Delete “${board.name}”? Its final standings go too, and any unpaid prizes disappear from Payouts.`
+                : `Delete “${board.name}”?`
+            }
+          >
+            Delete leaderboard
+          </ConfirmSubmit>
+        </form>
       </section>
     </div>
   );

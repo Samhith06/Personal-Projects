@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { LeaderboardForm } from '@/components/admin/LeaderboardForm';
+import { deleteLeaderboard } from '@/server/actions/admin';
 import { listLeaderboards } from '@/server/services/leaderboards';
 import { formatUsd } from '@/lib/format';
 
@@ -13,6 +15,12 @@ const STATUS_TAG: Record<string, string> = {
   frozen: 'tag tag--warn',
   published: 'tag tag--neutral',
 };
+
+/** What a delete takes with it, for the confirm prompt. */
+const deleteWarning = (name: string, status: string) =>
+  status === 'frozen' || status === 'published'
+    ? `Delete “${name}”? Its final standings go too, and any unpaid prizes disappear from Payouts. This can't be undone.`
+    : `Delete “${name}”? This can't be undone.`;
 
 export default async function LeaderboardsAdmin({ searchParams }: { searchParams: FlashParams }) {
   const flash = await searchParams;
@@ -28,8 +36,14 @@ export default async function LeaderboardsAdmin({ searchParams }: { searchParams
       </div>
       <Flash {...flash} />
 
+      <section className="card stack">
+        <strong>New leaderboard</strong>
+        <LeaderboardForm />
+      </section>
+
       <section className="card">
-        {boards.length === 0 ? <p className="meta">No leaderboards yet. Create one below.</p> : null}
+        <strong>History</strong>
+        {boards.length === 0 ? <p className="meta">No leaderboards yet.</p> : null}
         {boards.map((b) => (
           <div key={b.id} className="admin-row">
             <div className="admin-row__body">
@@ -41,13 +55,14 @@ export default async function LeaderboardsAdmin({ searchParams }: { searchParams
               </div>
             </div>
             <span className={STATUS_TAG[b.status] ?? 'tag tag--neutral'}>{b.status}</span>
+            <form action={deleteLeaderboard}>
+              <input type="hidden" name="id" value={b.id} />
+              <ConfirmSubmit className="btn btn--danger" message={deleteWarning(b.name, b.status)}>
+                Delete
+              </ConfirmSubmit>
+            </form>
           </div>
         ))}
-      </section>
-
-      <section className="card stack">
-        <strong>New leaderboard</strong>
-        <LeaderboardForm />
       </section>
     </div>
   );

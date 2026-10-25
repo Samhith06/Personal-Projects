@@ -202,6 +202,17 @@ export async function setLeaderboardStatus(fd: FormData): Promise<void> {
   back(path, { ok: `Status: ${to}.` });
 }
 
+/** Delete a leaderboard and its frozen results. Admin only; kept in the audit log. */
+export async function deleteLeaderboard(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  const id = str(fd, 'id');
+  const board = await getLeaderboard(id);
+  if (!board) back('/admin/leaderboards', { error: 'Leaderboard not found.' });
+  await db.delete(leaderboards).where(eq(leaderboards.id, id));
+  await audit(staff.id, 'leaderboard.delete', 'leaderboard', id, board, null);
+  back('/admin/leaderboards', { ok: `Deleted “${board!.name}”.` });
+}
+
 /* ----------------------------------------------------------------- Milestones */
 
 const milestoneForm = z.object({
