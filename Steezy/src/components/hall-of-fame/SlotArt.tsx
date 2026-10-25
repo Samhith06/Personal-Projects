@@ -41,7 +41,7 @@ export type WinCardProps = {
   payout: number | null;
 };
 
-/** One 500x club entry: the slot's art full-bleed, the multiplier on top, the player underneath. */
+/** One win club entry: the slot's art full-bleed, the multiplier on top, the player underneath. */
 export function WinCard({ multiplier, gameTitle, image, name, handle, day, wagered, payout }: WinCardProps) {
   const date = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   return (

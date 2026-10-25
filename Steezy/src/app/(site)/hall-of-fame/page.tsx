@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BIG_WIN_MULTIPLIER, bigWins, biggestHits, champions, records } from '@/server/services/hall-of-fame';
-import { SlotThumb, WinCard } from '@/components/hall-of-fame/SlotArt';
-import { formatBet, formatUsd, ordinal } from '@/lib/format';
+import { CLUBS, champions, clubWins, records } from '@/server/services/hall-of-fame';
+import { WinCard } from '@/components/hall-of-fame/SlotArt';
+import { formatUsd, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Hall of Fame' };
 
@@ -21,7 +21,11 @@ function Person({ name, handle }: { name: string; handle: string | null }) {
 }
 
 export default async function HallOfFamePage() {
-  const [champs, hits, wins, recs] = await Promise.all([champions(), biggestHits(), bigWins(), records()]);
+  const [champs, clubs, recs] = await Promise.all([
+    champions(),
+    Promise.all(CLUBS.map(async (club) => ({ club, wins: await clubWins(club.min, club.max) }))),
+    records(),
+  ]);
 
   return (
     <div className="container page" style={{ gap: 48 }}>
@@ -29,7 +33,7 @@ export default async function HallOfFamePage() {
         <span className="kicker">Hall of Fame</span>
         <h1 className="hof-title">The ones chat remembers.</h1>
         <p className="meta" style={{ fontSize: 15, maxWidth: '56ch' }}>
-          Monthly champions, the biggest multipliers under code STZY, the {BIG_WIN_MULTIPLIER}× club, and the community&apos;s records.
+          Monthly champions, mega wins and the 2,000×, 1,000× and 500× clubs under code STZY, and the community&apos;s records.
         </p>
       </div>
 
@@ -94,77 +98,32 @@ export default async function HallOfFamePage() {
         )}
       </section>
 
-      <section className="stack">
-        <div>
-          <h2 style={{ fontSize: 26, marginBottom: 6 }}>Biggest multipliers</h2>
-          <span className="meta">Each player&apos;s best hit on Roobet under STZY, from affiliate data</span>
-        </div>
-        <div className="card" style={{ padding: '8px 16px' }}>
-          {hits.length ? (
-            <div className="table-wrap">
-              <table className="table" style={{ minWidth: 600 }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 48 }}>#</th>
-                    <th>Player</th>
-                    <th>Game</th>
-                    <th style={{ textAlign: 'right' }}>Bet</th>
-                    <th style={{ textAlign: 'right' }}>Paid</th>
-                    <th style={{ textAlign: 'right' }}>Multiplier</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {hits.map((h, i) => (
-                    <tr key={i}>
-                      <td className="meta num">{i + 1}</td>
-                      <td style={{ fontWeight: 500 }}>
-                        <Person name={h.name} handle={h.handle} />
-                      </td>
-                      <td className="meta">
-                        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
-                          <SlotThumb name={h.gameTitle} image={h.image} />
-                          {h.gameTitle}
-                        </span>
-                      </td>
-                      <td className="num" style={{ textAlign: 'right' }}>
-                        {h.wagered === null ? '—' : formatBet(h.wagered)}
-                      </td>
-                      <td className="num" style={{ textAlign: 'right' }}>
-                        {h.payout === null ? '—' : formatUsd(h.payout)}
-                      </td>
-                      <td className="num" style={{ textAlign: 'right', color: 'var(--color-accent)', fontSize: 17, fontWeight: 600 }}>
-                        {multi(h.multiplier)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {clubs.map(({ club, wins }) => (
+        <section key={club.key} className="stack">
+          <div>
+            <h2 style={{ fontSize: 26, marginBottom: 6 }}>{club.title}</h2>
+            <span className="meta">
+              {club.max === null
+                ? `Every hit of ${multi(club.min)} or more under STZY, newest first`
+                : `Every hit from ${multi(club.min)} up to ${multi(club.max)} under STZY, newest first`}
+            </span>
+          </div>
+          {wins.length ? (
+            <div className="win-grid">
+              {wins.map((w, i) => (
+                <WinCard key={i} {...w} />
+              ))}
             </div>
           ) : (
-            <p className="meta" style={{ padding: 8 }}>
-              No hits recorded yet.
-            </p>
+            <div className="card">
+              <p className="meta">
+                {club.key === 'mega' ? 'No mega wins yet.' : `Nobody in the ${multi(club.min)} club yet.`} The first one shows up here within
+                minutes of landing.
+              </p>
+            </div>
           )}
-        </div>
-      </section>
-
-      <section className="stack">
-        <div>
-          <h2 style={{ fontSize: 26, marginBottom: 6 }}>The {BIG_WIN_MULTIPLIER}× club</h2>
-          <span className="meta">Every hit of {BIG_WIN_MULTIPLIER}× or more under STZY lands here automatically, newest first</span>
-        </div>
-        {wins.length ? (
-          <div className="win-grid">
-            {wins.map((w, i) => (
-              <WinCard key={i} {...w} />
-            ))}
-          </div>
-        ) : (
-          <div className="card">
-            <p className="meta">No {BIG_WIN_MULTIPLIER}× hits yet. The first one shows up here within minutes of landing.</p>
-          </div>
-        )}
-      </section>
+        </section>
+      ))}
 
       {recs.length ? (
         <section className="stat-grid">

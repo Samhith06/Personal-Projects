@@ -4,7 +4,7 @@ import { env } from '@/lib/env';
 import { SOCIALS } from '@/lib/socials';
 
 /**
- * "Meet Steeze." from the SteezeSpins Home design. Socials only list the
+ * "Meet Steezy." from the SteezeSpins Home design. Socials only list the
  * channels we actually have links for (Kick, Discord, Instagram, X, YouTube,
  * Roobet). The photo is served resized and as
  * WebP/AVIF by next/image (the original PNG is ~800 KB).
@@ -22,7 +22,7 @@ export function AboutSection() {
       <div className="stack about__text">
         <span className="kicker">About</span>
         <h2 id="about-title" className="about__title">
-          Meet Steeze.
+          Meet Steezy.
         </h2>
         <p className="about__lede">Slots streamer on Kick. Most nights it&apos;s bonus hunts, slot tournaments and giveaways for the people in chat.</p>
         <p className="meta" style={{ fontSize: 15, lineHeight: 1.7, maxWidth: '56ch' }}>
@@ -47,7 +47,7 @@ export function AboutSection() {
       <div className="about__photo">
         <Image
           src={steeze}
-          alt="Steeze snowboarding above the clouds"
+          alt="Steezy snowboarding above the clouds"
           placeholder="blur"
           sizes="(max-width: 760px) 100vw, 440px"
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '62% 70%' }}

@@ -1,6 +1,6 @@
 /**
- * Hall of Fame: monthly champions, biggest multipliers under code STZY, the
- * 500x club (every big hit, added automatically as wagers sync), and
+ * Hall of Fame: monthly champions, the win clubs (mega wins of 10,000x+, then
+ * the 2000x, 1000x and 500x clubs, added automatically as wagers sync), and
  * community records. Members only appear by name if they left "show my name"
  * on; Roobet players who never linked an account are masked.
  */
@@ -92,35 +92,24 @@ function toHit(r: HitDbRow, art: Map<string, string>): HitRow {
   };
 }
 
-/** Each player's best multiplier, highest first. */
-export async function biggestHits(limit = 10): Promise<HitRow[]> {
-  const art = await slotArt();
-  const rows = await db.execute(sql`
-    select distinct on (d.roobet_uid)
-      d.roobet_uid, d.username, d.highest_multiplier as hit,
-      u.kick_username, u.discord_username, u.discord_global_name, u.name_on_leaderboards, u.wager_public
-    from ${roobetDailyWager} d
-    left join ${roobetLinks} l on l.roobet_uid = d.roobet_uid and l.status = 'approved'
-    left join ${users} u on u.id = l.user_id
-    where d.highest_multiplier is not null and (u.blocked_from_rewards is not true)
-    order by d.roobet_uid, (d.highest_multiplier->>'multiplier')::float8 desc nulls last
-  `);
-  return (rows.rows as HitDbRow[])
-    .filter((r) => r.hit?.multiplier)
-    .map((r) => toHit(r, art))
-    .sort((a, b) => b.multiplier - a.multiplier)
-    .slice(0, limit);
-}
-
-/** A hit at or above this multiplier joins the 500x club. */
-export const BIG_WIN_MULTIPLIER = 500;
+/**
+ * Win clubs, biggest first. Each is a band up to the next club's floor, so a
+ * hit only shows in the highest club it reached.
+ */
+export const CLUBS = [
+  { key: 'mega', title: 'Mega wins', min: 10000, max: null },
+  { key: '2000', title: 'The 2,000× club', min: 2000, max: 10000 },
+  { key: '1000', title: 'The 1,000× club', min: 1000, max: 2000 },
+  { key: '500', title: 'The 500× club', min: 500, max: 1000 },
+] as const;
 
 /**
- * Every big hit, newest day first. Roobet only reports each player's best
- * multiplier per synced day, so this is at most one hit per player per day.
+ * Every hit in [min, max), newest day first. Roobet only reports each player's
+ * best multiplier per synced day, so this is at most one hit per player per day.
  */
-export async function bigWins(limit = 30): Promise<(HitRow & { day: string })[]> {
+export async function clubWins(min: number, max: number | null, limit = 30): Promise<(HitRow & { day: string })[]> {
   const art = await slotArt();
+  const m = sql`(d.highest_multiplier->>'multiplier')::float8`;
   const rows = await db.execute(sql`
     select
       d.username, d.day::text as day, d.highest_multiplier as hit,
@@ -128,8 +117,8 @@ export async function bigWins(limit = 30): Promise<(HitRow & { day: string })[]>
     from ${roobetDailyWager} d
     left join ${roobetLinks} l on l.roobet_uid = d.roobet_uid and l.status = 'approved'
     left join ${users} u on u.id = l.user_id
-    where (d.highest_multiplier->>'multiplier')::float8 >= ${BIG_WIN_MULTIPLIER} and (u.blocked_from_rewards is not true)
-    order by d.day desc, (d.highest_multiplier->>'multiplier')::float8 desc
+    where ${m} >= ${min} ${max === null ? sql`` : sql`and ${m} < ${max}`} and (u.blocked_from_rewards is not true)
+    order by d.day desc, ${m} desc
     limit ${limit}
   `);
   return (rows.rows as HitDbRow[]).map((r) => ({ ...toHit(r, art), day: r.day! }));

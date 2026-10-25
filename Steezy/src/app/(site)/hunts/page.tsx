@@ -7,7 +7,6 @@ import { getCurrentUser } from '@/server/auth/session';
 import { requestersBySlot, requestsFor, requestsOpen } from '@/server/services/hunt-requests';
 import {
   bestMulti,
-  completedHunts,
   currentHunt,
   guessCount,
   guessList,
@@ -44,20 +43,19 @@ const shortDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', d
 
 export default async function HuntPage({ searchParams }: { searchParams: Promise<{ guess?: string }> }) {
   const { guess } = await searchParams;
-  const [hunt, user, past, art, tournament] = await Promise.all([currentHunt(), getCurrentUser(), completedHunts(8), slotArt(), openForRequests()]);
+  const [hunt, user, art, tournament] = await Promise.all([currentHunt(), getCurrentUser(), slotArt(), openForRequests()]);
   const message = guess ? GUESS_MSG[guess] : null;
 
   const s = hunt ? huntStats(hunt) : null;
   const bonuses = hunt ? huntBonuses(hunt) : [];
   const final = hunt?.completed ? (s?.totalWinnings ?? null) : null;
-  const [count, mine, winnerName, pending, requesters, closest, pastWinners] = await Promise.all([
+  const [count, mine, winnerName, pending, requesters, closest] = await Promise.all([
     hunt ? guessCount(hunt.id) : 0,
     hunt && user ? myGuess(hunt.id, user.id) : null,
     hunt ? huntWinnerName(hunt) : null,
     hunt && requestsOpen(hunt) ? requestsFor(hunt.id) : [],
     hunt ? requestersBySlot(hunt.id) : new Map<string, string>(),
     hunt?.settledAt && final !== null ? guessList(hunt.id, final).then((l) => l.slice(0, 10)) : [],
-    Promise.all(past.map(huntWinnerName)),
   ]);
 
   const live = Boolean(hunt && !hunt.completed);
@@ -69,7 +67,6 @@ export default async function HuntPage({ searchParams }: { searchParams: Promise
   const best = opened.reduce<HuntBonus | null>((top, b) => ((b.multiplier ?? 0) > (top?.multiplier ?? 0) ? b : top), null);
   // A tournament taking sign-ups gets `!sr` first, so hunt suggestions pause meanwhile.
   const srOpen = hunt ? requestsOpen(hunt) && !tournament : false;
-  const history = past.filter((h) => h.id !== hunt?.id);
 
   return (
     <div className="container page" style={{ gap: 28 }}>
@@ -179,7 +176,7 @@ export default async function HuntPage({ searchParams }: { searchParams: Promise
             </div>
           </section>
 
-          <section className="stack" style={{ gap: 12 }}>
+          <section className="stack" style={{ gap: 12, width: '100%', maxWidth: 880 }}>
             <h2 className="sec-title">Bonuses</h2>
             {bonuses.length === 0 ? (
               <div className="emptyq">No bonuses collected yet.</div>
@@ -306,60 +303,6 @@ export default async function HuntPage({ searchParams }: { searchParams: Promise
         <div className="emptyq">No bonus hunts yet — they show up here as soon as Steezy starts one on bonushunt.gg.</div>
       )}
 
-      {history.length ? (
-        <section className="stack" style={{ gap: 12 }}>
-          <div>
-            <span className="kicker">History</span>
-            <h2 className="sec-title">Past hunts</h2>
-          </div>
-          <div className="card" style={{ padding: '6px 12px' }}>
-            <div className="table-wrap">
-              <table className="table" style={{ minWidth: 720 }}>
-                <thead>
-                  <tr>
-                    <th>Hunt</th>
-                    <th>Date</th>
-                    <th style={{ textAlign: 'right' }}>Bonuses</th>
-                    <th style={{ textAlign: 'right' }}>Start</th>
-                    <th style={{ textAlign: 'right' }}>Won</th>
-                    <th style={{ textAlign: 'right' }}>Profit</th>
-                    <th style={{ textAlign: 'right' }}>Best</th>
-                    <th>Closest guess</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h) => {
-                    const hs = huntStats(h);
-                    const pl = hs.profitLoss ?? (hs.totalWinnings ?? 0) - h.startCost;
-                    return (
-                      <tr key={h.id}>
-                        <td style={{ fontWeight: 500 }}>{h.title}</td>
-                        <td className="meta">{shortDate(h.remoteCreatedAt)}</td>
-                        <td className="num" style={{ textAlign: 'right' }}>
-                          {hs.bonusCount ?? huntBonuses(h).length}
-                        </td>
-                        <td className="num" style={{ textAlign: 'right' }}>
-                          {formatUsd(h.startCost)}
-                        </td>
-                        <td className="num" style={{ textAlign: 'right' }}>
-                          {money2(hs.totalWinnings ?? 0)}
-                        </td>
-                        <td className="num" style={{ textAlign: 'right', color: pl >= 0 ? 'var(--color-accent)' : 'var(--color-danger)' }}>
-                          {signed(pl)}
-                        </td>
-                        <td className="num" style={{ textAlign: 'right' }}>
-                          {bestMulti(h) ? multi(bestMulti(h)) : '—'}
-                        </td>
-                        <td className="meta">{pastWinners[past.indexOf(h)] ?? '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

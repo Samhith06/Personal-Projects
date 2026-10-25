@@ -39,7 +39,7 @@ After changing `src/server/db/schema.ts`: `npm run db:generate` (writes a new SQ
 | `/giveaways`: site Enter button or chat `!join`, eligibility rules, auto-close, multi-winner draws | done |
 | OBS overlay `/overlay/{giveaway,raffle}/<token>` (add `?preview=1` to see it in a browser): entries panel → name reel → winner card | done |
 | Home hero: animated 3D casino-chip background (three.js, `src/components/home/`), lazy-loaded, pauses off-screen, still frame for reduced motion | done |
-| `/hall-of-fame`: monthly champions, biggest multipliers, community records | done |
+| `/hall-of-fame`: monthly champions, mega wins and the 500×–2,000× clubs, community records | done |
 | `/u/<kick or discord name>` public profiles: badges, stats, finishes, biggest hit, trophies; privacy toggles on `/me` | done |
 | `/hunts`: bonus hunts mirrored from bonushunt.gg every 30 s (`GET /api/public/hunts`, Bearer key) | done |
 | Guess the balance: `!guess 4200` or on the site; locks when the opening starts; closest guess wins on completion | done |

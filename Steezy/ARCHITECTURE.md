@@ -220,7 +220,7 @@ Motion: `[data-reveal]` fade-up on scroll, pulsing live dot (`ssPulse`), hero pa
 
 | Design page | Route | Contents |
 |---|---|---|
-| Home | `/` | Fixed blurred header (logo dot, nav, LIVE/Offline tag, Roobet·STZY button, "Log in" with Discord icon); full-height hero ("Every spin, counted together.", live/offline tags with stream title + viewers, or "Offline" (no next-stream time — schedule dropped), Watch on Kick / Join Discord CTAs); **Roobet partner band** (big click-to-copy `STZY`, 3 steps, Open Roobet, 18+ note); **Biggest wins** (featured Kick clip + ranked list, sort by multiplier/payout, clip modal); **About / Meet Steeze** (bio, socials list, photo) |
+| Home | `/` | Fixed blurred header (logo dot, nav, LIVE/Offline tag, Roobet·STZY button, "Log in" with Discord icon); full-height hero ("Every spin, counted together.", live/offline tags with stream title + viewers, or "Offline" (no next-stream time — schedule dropped), Watch on Kick / Join Discord CTAs); **Roobet partner band** (big click-to-copy `STZY`, 3 steps, Open Roobet, 18+ note); **Biggest wins** (featured Kick clip + ranked list, sort by multiplier/payout, clip modal); **About / Meet Steezy** (bio, socials list, photo) |
 | Leaderboard | `/leaderboard` | "$3,000 prize pool", countdown, paid places; 3-step podium (medal rings, prize); table rank/member/wagered/prize; "Roobet affiliate data · verified · updated N min ago"; link to previous winners |
 | Milestones | `/milestones` | Sticky card: lifetime wager, next tier progress bar, Claim CTA; vertical rail of tiers with claim buttons |
 | Giveaways | `/giveaways` | Cards: status tag, time left, prize, eligibility rule, entry count, Enter button |
@@ -282,4 +282,4 @@ See `.env.example`. Real values live in `Steezy/.env` (gitignored by the repo-ro
 4. Chip background: hero only (recommended) or fixed behind the whole site? Green or Red STZY chips?
 5. Watch-time constants (10-min gap / 5-min flat) and badge thresholds — streamer's call.
 6. Leaderboard metric: raw `wagered` or `weightedWagered`? (Design copy says "by total wager" → raw.)
-7. Real social handles (Kick, YouTube, Instagram, Telegram, X, TikTok) and a photo of Steeze for the About section.
+7. Real social handles (Kick, YouTube, Instagram, Telegram, X, TikTok) and a photo of Steezy for the About section.
