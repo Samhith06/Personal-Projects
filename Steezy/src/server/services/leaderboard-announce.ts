@@ -6,11 +6,13 @@
  * and post one message listing every climb, e.g. "Matt**** passed Jose**** and
  * is now 4th". The first look at a board only records the order, so a deploy
  * or a new board doesn't flood the channel. Names stay masked, as on the site.
+ * Once a day it also posts the board's current top places.
  */
 import { eq } from 'drizzle-orm';
 import { db } from '@/server/db';
 import { syncState } from '@/server/db/schema';
 import { formatUsd, metricLabel, ordinal } from '@/lib/format';
+import { siteUrl } from '@/lib/env';
 import { currentLeaderboard, getStandings, type Standing } from './leaderboards';
 
 /** Places we watch: the paid places, but at least this many. */
@@ -96,4 +98,59 @@ export async function announceLeaderboardChanges(): Promise<number> {
     .values({ key, lastRunAt: now, lastOkAt: now, detail: snapshot })
     .onConflictDoUpdate({ target: syncState.key, set: { lastRunAt: now, lastOkAt: now, detail: snapshot } });
   return lines.length;
+}
+
+/** UTC hour after which the daily standings go out (default 18:00 UTC). */
+const dailyHour = () => {
+  const h = Number(process.env.LEADERBOARD_DAILY_HOUR_UTC ?? 18);
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : 18;
+};
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function timeLeft(endsAt: Date, now: Date) {
+  const hours = Math.max(0, Math.floor((endsAt.getTime() - now.getTime()) / 3_600_000));
+  const days = Math.floor(hours / 24);
+  return days ? `${days}d ${hours % 24}h` : `${hours}h`;
+}
+
+/**
+ * Once a day, after LEADERBOARD_DAILY_HOUR_UTC, post the live board's top
+ * places. The last posted day is kept in `sync_state` so restarts and the
+ * 10-minute sync loop don't post twice. Returns true when a post went out.
+ */
+export async function postDailyStandings(now = new Date()): Promise<boolean> {
+  const url = process.env.DISCORD_LEADERBOARD_WEBHOOK_URL?.trim();
+  if (!url || now.getUTCHours() < dailyHour()) return false;
+  const board = await currentLeaderboard();
+  if (!board || board.status !== 'live') return false;
+
+  const day = now.toISOString().slice(0, 10);
+  const key = `leaderboard-daily:${board.id}`;
+  const [row] = await db.select({ detail: syncState.detail }).from(syncState).where(eq(syncState.key, key)).limit(1);
+  if ((row?.detail as { day?: string } | null)?.day === day) return false;
+
+  const top = (await getStandings(board)).filter((s) => s.wagered > 0).slice(0, Math.max(MIN_TRACKED, board.prizes.length));
+  if (top.length) {
+    const label = metricLabel(board.metric);
+    const lines = top.map(
+      (s) =>
+        `${MEDALS[s.rank - 1] ?? `**${ordinal(s.rank)}**`} **${md(s.displayName)}** · ${formatUsd(s.wagered)} ${label}${s.prize ? ` · wins ${formatUsd(s.prize)}` : ''}`,
+    );
+    await post(
+      url,
+      [
+        `📊 **${md(board.name)}** — daily standings (${timeLeft(board.endsAt, now)} left)`,
+        ...lines,
+        `Full board: <${siteUrl('/leaderboard')}>`,
+      ].join('\n'),
+    );
+  }
+
+  // Mark the day done even when nobody has wagered yet, so an empty board isn't re-checked all evening.
+  await db
+    .insert(syncState)
+    .values({ key, lastRunAt: now, lastOkAt: now, detail: { day } })
+    .onConflictDoUpdate({ target: syncState.key, set: { lastRunAt: now, lastOkAt: now, detail: { day } } });
+  return top.length > 0;
 }

@@ -2,7 +2,7 @@
  * Runs once when the server boots (pattern from FTDWEBSITE).
  *
  * Keeps Roobet wagers in step — pull now, then every ROOBET_SYNC_INTERVAL_MS —
- * posts leaderboard climbs to Discord, freezes live leaderboards whose window has ended, closes ended draws, and
+ * posts leaderboard climbs and daily standings to Discord, freezes live leaderboards whose window has ended, closes ended draws, and
  * mirrors bonushunt.gg hunts every BONUSHUNT_SYNC_INTERVAL_MS.
  * This needs a server that stays up; on serverless hosting, run
  * `npm run roobet:sync` from a scheduler instead. The Kick chat worker, badge
@@ -14,7 +14,7 @@ export async function register() {
   try {
     const { roobetConfigFromEnv, syncRoobetRecent } = await import('@/server/roobet/sync');
     const { freezeEndedLeaderboards } = await import('@/server/services/leaderboards');
-    const { announceLeaderboardChanges } = await import('@/server/services/leaderboard-announce');
+    const { announceLeaderboardChanges, postDailyStandings } = await import('@/server/services/leaderboard-announce');
     const { closeStaleSessions } = await import('@/server/kick/sessions');
     const { closeEndedRaffles } = await import('@/server/services/raffles');
     const { closeExpiredGiveaways } = await import('@/server/services/giveaways');
@@ -31,6 +31,11 @@ export async function register() {
             return 0;
           });
           if (climbs) console.log(`[leaderboard] posted ${climbs} climb(s) to Discord`);
+          const daily = await postDailyStandings().catch((error) => {
+            console.warn('[leaderboard] daily Discord standings failed', error);
+            return false;
+          });
+          if (daily) console.log('[leaderboard] posted daily standings to Discord');
         }
       }
       // After the pull, so a board ending now freezes on the final numbers.

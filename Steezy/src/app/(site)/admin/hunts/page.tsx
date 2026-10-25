@@ -26,6 +26,7 @@ import { currentHunt, listHunts, guessList, huntWinnerName } from '@/server/serv
 import { syncStatus } from '@/server/services/sync-status';
 import { siteUrl } from '@/lib/env';
 import { formatAgo, formatBet } from '@/lib/format';
+import { CopyLink } from '@/components/admin/CopyLink';
 
 export const metadata: Metadata = { title: 'Bonus hunt' };
 
@@ -102,7 +103,7 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
       <details className="card hunt-fold">
         <summary>OBS overlay</summary>
         <div className="stack" style={{ gap: 8, marginTop: 12 }}>
-          <code className="hash">{siteUrl(`/overlay/hunt/${token}`)}</code>
+          <CopyLink value={siteUrl(`/overlay/hunt/${token}`)} />
           <span className="meta">
             Add it as a Browser source at 1920×1080; the background is transparent. Shows the current hunt, the guess count and the
             leaderboard ticker. Add ?preview=1 to check it in a browser.

@@ -1964,3 +1964,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* OBS links: the link fills the row, the copy button sits at the end. */
+.copy-link {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.copy-link .hash {
+  flex: 1;
+  min-width: 0;
+}
+.copy-link .btn {
+  flex: none;
+  min-width: 92px;
+}

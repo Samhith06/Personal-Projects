@@ -112,7 +112,7 @@ const giveawayForm = z.object({
     .transform((s) => (s ? (s.startsWith('!') ? s : `!${s}`).toLowerCase() : null))
     .refine((s) => s === null || /^![a-z0-9_]{2,20}$/.test(s), 'Keyword must be like !join'),
   winnersCount: z.coerce.number().int().min(1).max(50),
-  closesAt: z.string().trim(),
+  timerMinutes: z.coerce.number().int().min(1, 'Timer must be at least a minute').max(180, 'Timer can be at most 3 hours').nullable(),
   kickLinked: z.boolean(),
   roobetApproved: z.boolean(),
   minDiscordAgeDays: z.coerce.number().int().min(0),
@@ -128,7 +128,7 @@ export async function saveGiveaway(fd: FormData): Promise<void> {
     prize: str(fd, 'prize'),
     entryKeyword: str(fd, 'entryKeyword'),
     winnersCount: str(fd, 'winnersCount') || '1',
-    closesAt: str(fd, 'closesAt'),
+    timerMinutes: str(fd, 'timerMinutes') || null,
     kickLinked: fd.get('kickLinked') === 'on',
     roobetApproved: fd.get('roobetApproved') === 'on',
     minDiscordAgeDays: str(fd, 'minDiscordAgeDays') || '0',
@@ -136,15 +136,13 @@ export async function saveGiveaway(fd: FormData): Promise<void> {
   });
   if (!parsed.success) back(path, { error: parsed.error.issues[0].message });
   const v = parsed.data;
-  // datetime-local inputs are entered and shown in UTC.
-  const closesAt = v.closesAt ? new Date(`${v.closesAt}:00.000Z`) : null;
-  if (closesAt && Number.isNaN(closesAt.getTime())) back(path, { error: 'Close time is not a valid date.' });
   const values = {
     title: v.title,
     prize: v.prize,
     entryKeyword: v.entryKeyword,
     winnersCount: v.winnersCount,
-    closesAt,
+    // The close time is set from the timer when the giveaway opens.
+    timerMinutes: v.timerMinutes,
     eligibility: {
       kickLinked: v.kickLinked,
       roobetApproved: v.roobetApproved,

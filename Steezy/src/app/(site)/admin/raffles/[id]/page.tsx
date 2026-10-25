@@ -7,6 +7,7 @@ import { markRafflePrizePaid, raffleStep } from '@/server/actions/draws';
 import { getRaffle, getRaffleWinners, getTickets } from '@/server/services/raffles';
 import { siteUrl } from '@/lib/env';
 import { formatUsd, ordinal } from '@/lib/format';
+import { CopyLink } from '@/components/admin/CopyLink';
 
 export const metadata: Metadata = { title: 'Raffle' };
 
@@ -56,7 +57,7 @@ export default async function RaffleAdmin({ params, searchParams }: { params: Pr
 
       <section className="card stack" style={{ gap: 8 }}>
         <strong>OBS browser source</strong>
-        <code className="hash">{siteUrl(`/overlay/raffle/${raffle.overlayToken}`)}</code>
+        <CopyLink value={siteUrl(`/overlay/raffle/${raffle.overlayToken}`)} />
         <span className="meta">1920×1080, transparent background. Keep this link private — anyone with it can watch the overlay.</span>
         {raffle.seedHash ? (
           <>

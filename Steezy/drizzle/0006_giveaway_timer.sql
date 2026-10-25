@@ -1,0 +1,1 @@
+ALTER TABLE "giveaways" ADD COLUMN "timer_minutes" integer;

@@ -7,6 +7,7 @@ import { giveawayStep, markGiveawayPaid } from '@/server/actions/draws';
 import { entrantNames, entryCount, getGiveaway, getGiveawayWinners } from '@/server/services/giveaways';
 import { siteUrl } from '@/lib/env';
 import { ordinal } from '@/lib/format';
+import { CopyLink } from '@/components/admin/CopyLink';
 
 export const metadata: Metadata = { title: 'Giveaway' };
 
@@ -55,7 +56,7 @@ export default async function GiveawayAdmin({ params, searchParams }: { params: 
 
       <section className="card stack" style={{ gap: 8 }}>
         <strong>OBS browser source</strong>
-        <code className="hash">{siteUrl(`/overlay/giveaway/${g.overlayToken}`)}</code>
+        <CopyLink value={siteUrl(`/overlay/giveaway/${g.overlayToken}`)} />
         <span className="meta">1920×1080, transparent background. Keep this link private.</span>
         {g.seedHash ? (
           <>

@@ -176,7 +176,10 @@ export async function openGiveaway(id: string, actorId: string | null) {
   const g = await getGiveaway(id);
   if (!g || g.status !== 'draft') return 'not_draft' as const;
   const seed = g.seed ?? newSeed();
-  await db.update(giveaways).set({ status: 'open', seed, seedHash: hashSeed(seed), opensAt: new Date() }).where(eq(giveaways.id, id));
+  const opensAt = new Date();
+  // The timer starts when the giveaway opens, so the countdown matches the stream.
+  const closesAt = g.timerMinutes ? new Date(opensAt.getTime() + g.timerMinutes * 60_000) : null;
+  await db.update(giveaways).set({ status: 'open', seed, seedHash: hashSeed(seed), opensAt, closesAt }).where(eq(giveaways.id, id));
   await audit(actorId, 'giveaway.open', 'giveaway', id, null, { seedHash: hashSeed(seed) });
   return 'ok' as const;
 }

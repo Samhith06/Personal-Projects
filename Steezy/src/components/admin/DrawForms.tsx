@@ -56,6 +56,8 @@ export function RaffleForm({ raffle }: { raffle?: Raffle }) {
   );
 }
 
+const TIMER_MINUTES = [2, 3, 5, 7, 10, 15, 30];
+
 export function GiveawayForm({ giveaway }: { giveaway?: Giveaway }) {
   const e = (giveaway?.eligibility ?? { kickLinked: true, minDiscordAgeDays: 7 }) as Eligibility;
   return (
@@ -80,14 +82,15 @@ export function GiveawayForm({ giveaway }: { giveaway?: Giveaway }) {
             <input id="g-win" name="winnersCount" type="number" min="1" max="50" className="input" defaultValue={giveaway?.winnersCount ?? 1} />
           </div>
           <div className="field">
-            <label htmlFor="g-close">Auto-close at (UTC, optional)</label>
-            <input
-              id="g-close"
-              name="closesAt"
-              type="datetime-local"
-              className="input"
-              defaultValue={giveaway?.closesAt ? giveaway.closesAt.toISOString().slice(0, 16) : ''}
-            />
+            <label htmlFor="g-timer">Timer (starts when opened)</label>
+            <select id="g-timer" name="timerMinutes" className="input" defaultValue={giveaway ? String(giveaway.timerMinutes ?? '') : '5'}>
+              <option value="">No timer, close by hand</option>
+              {TIMER_MINUTES.map((m) => (
+                <option key={m} value={m}>
+                  {m} minutes
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field">
             <label htmlFor="g-age">Min Discord account age (days)</label>

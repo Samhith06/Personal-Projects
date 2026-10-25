@@ -374,6 +374,8 @@ export const giveaways = pgTable('giveaways', {
   winnersCount: integer('winners_count').notNull().default(1),
   opensAt: ts('opens_at'),
   closesAt: ts('closes_at'),
+  /** Minutes entries stay open once the giveaway opens; sets closesAt on open. Null = closed by hand. */
+  timerMinutes: integer('timer_minutes'),
   seedHash: text('seed_hash'),
   seed: text('seed'),
   /** Secret path segment for the OBS browser source. */
