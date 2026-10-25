@@ -121,6 +121,20 @@ export default async function LeaderboardPage() {
           </p>
         </div>
       )}
+
+      {weighted ? (
+        // Wording required by Roobet for weighted leaderboards.
+        <div className="card stack" style={{ gap: 8, fontSize: 14 }}>
+          <strong>How wagers are counted</strong>
+          <p className="meta">Leaderboard wager amounts may differ from your statistics on Roobet, depending on the games you are playing:</p>
+          <ul className="meta" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7 }}>
+            <li>Games with RTP of 97% or lower → 100% of wager is counted</li>
+            <li>Games with RTP between 97.01% and 98.99% → 50% of wager is counted</li>
+            <li>Games with RTP of 99% and over → 10% of wager is counted</li>
+          </ul>
+          <p className="meta">Any abuse found by STZY or Roobet may result in your prize being forfeit.</p>
+        </div>
+      ) : null}
     </div>
   );
 }

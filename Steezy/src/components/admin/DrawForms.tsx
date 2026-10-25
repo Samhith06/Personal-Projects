@@ -71,7 +71,7 @@ export function GiveawayForm({ giveaway }: { giveaway?: Giveaway }) {
           </div>
           <div className="field">
             <label htmlFor="g-prize">Prize (shown publicly)</label>
-            <input id="g-prize" name="prize" className="input" defaultValue={giveaway?.prize ?? '$100 Roobet tip'} required />
+            <input id="g-prize" name="prize" className="input" defaultValue={giveaway?.prize ?? '$10 Roobet tip'} required />
           </div>
           <div className="field">
             <label htmlFor="g-kw">Chat keyword (blank = site only)</label>

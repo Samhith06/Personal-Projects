@@ -12,7 +12,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
   try {
-    const { roobetConfigFromEnv, syncRoobetRecent } = await import('@/server/roobet/sync');
+    const { roobetConfigFromEnv, syncLiveBoardWindows, syncRoobetRecent } = await import('@/server/roobet/sync');
     const { freezeEndedLeaderboards } = await import('@/server/services/leaderboards');
     const { announceLeaderboardChanges, postDailyStandings } = await import('@/server/services/leaderboard-announce');
     const { closeStaleSessions } = await import('@/server/kick/sessions');
@@ -20,9 +20,12 @@ export async function register() {
     const { closeExpiredGiveaways } = await import('@/server/services/giveaways');
     const config = roobetConfigFromEnv();
 
+    // The first run after boot fills in every day of the live board; later runs re-pull yesterday and today.
+    let firstRun = true;
     const run = async () => {
       if (config) {
-        const result = await syncRoobetRecent(config);
+        const result = firstRun ? await syncLiveBoardWindows(config) : await syncRoobetRecent(config);
+        firstRun = false;
         if (result.ok) console.log(`[roobet] synced ${result.rows} player-days over ${result.days} days`);
         else console.warn(`[roobet] sync failed — ${result.error}`);
         if (result.ok) {

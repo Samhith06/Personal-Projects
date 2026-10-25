@@ -9,9 +9,9 @@
  * No `server-only` import: the backfill CLI (`npm run roobet:sync`) runs this
  * file directly under tsx.
  */
-import { sql } from 'drizzle-orm';
+import { and, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '@/server/db';
-import { roobetDailyWager, syncState } from '@/server/db/schema';
+import { leaderboards, roobetDailyWager, syncState } from '@/server/db/schema';
 import { fetchRoobetStats, type RoobetConfig } from './client';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -91,4 +91,18 @@ export async function syncRoobetRange(config: RoobetConfig, from: Date, to = new
 /** The regular run: yesterday and today. */
 export async function syncRoobetRecent(config: RoobetConfig) {
   return syncRoobetRange(config, new Date(Date.now() - DAY_MS));
+}
+
+/**
+ * Every day of the running leaderboards, so a board that started before the
+ * server (or before the last deploy) still counts its first days. Falls back
+ * to the regular run when no board is live.
+ */
+export async function syncLiveBoardWindows(config: RoobetConfig) {
+  const [row] = await db
+    .select({ from: sql<Date | null>`min(${leaderboards.startsAt})` })
+    .from(leaderboards)
+    .where(and(inArray(leaderboards.status, ['live', 'draft']), lte(leaderboards.startsAt, new Date()), gte(leaderboards.endsAt, new Date())));
+  const from = row?.from ? new Date(row.from) : null;
+  return from && from.getTime() < Date.now() - DAY_MS ? syncRoobetRange(config, from) : syncRoobetRecent(config);
 }
