@@ -42,11 +42,13 @@ const roobetUsername = z
  */
 export async function submitRoobetUsername(formData: FormData): Promise<void> {
   const user = await requireUser();
+  // Submitted from the profile page or the linking page; go back where it came from.
+  const page = formData.get('from') === 'me' ? '/me' : '/me/link';
   const parsed = roobetUsername.safeParse(formData.get('username'));
-  if (!parsed.success) redirect(`/me/link?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
+  if (!parsed.success) redirect(`${page}?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
 
   const [existing] = await db.select().from(roobetLinks).where(eq(roobetLinks.userId, user.id)).limit(1);
-  if (existing?.status === 'approved') redirect('/me/link?error=Your%20Roobet%20username%20is%20already%20approved%20and%20locked.');
+  if (existing?.status === 'approved') redirect(`${page}?error=Your%20Roobet%20username%20is%20already%20approved%20and%20locked.`);
 
   const now = new Date();
   await db
@@ -56,5 +58,5 @@ export async function submitRoobetUsername(formData: FormData): Promise<void> {
       target: roobetLinks.userId,
       set: { requestedUsername: parsed.data, status: 'pending', rejectReason: null, reviewedBy: null, reviewedAt: null, updatedAt: now },
     });
-  redirect('/me/link?roobet=submitted');
+  redirect(`${page}?roobet=submitted`);
 }

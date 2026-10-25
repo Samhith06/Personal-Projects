@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { discordAvatarUrl } from '@/lib/discord';
 import { getCurrentUser } from '@/server/auth/session';
-import { savePrivacy } from '@/server/actions/account';
+import { savePrivacy, submitRoobetUsername } from '@/server/actions/account';
+import { env, features } from '@/lib/env';
 import { getMemberStats } from '@/server/services/member';
 import { profilePath } from '@/server/services/profiles';
 import { formatMinutes, formatUsd } from '@/lib/format';
@@ -16,8 +17,8 @@ const ROOBET_STATUS = {
   rejected: { label: 'Rejected', cls: 'tag tag--danger' },
 } as const;
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  const { saved } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ saved?: string; kick?: string; roobet?: string; error?: string }> }) {
+  const { saved, kick, roobet: roobetParam, error } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect('/login?returnTo=/me');
 
@@ -73,8 +74,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </div>
       </section>
 
-      <section className="card stack">
+      <section className="card stack" id="accounts">
         <span className="kicker">Linked accounts</span>
+        {kick === 'linked' ? <p className="notice notice--ok">Kick account linked.</p> : null}
+        {roobetParam === 'submitted' ? <p className="notice notice--ok">Roobet username submitted. An admin will review it soon.</p> : null}
+        {error ? <p className="notice notice--danger">{error}</p> : null}
         <div className="account-row">
           <span className="account-mark account-mark--discord">D</span>
           <div className="account-row__body">
@@ -89,7 +93,17 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <div className="account-row__name">Kick</div>
             <div className="meta">{user.kickUsername ?? 'Not linked yet'}</div>
           </div>
-          <span className={user.kickUserId ? 'tag tag--accent' : 'tag tag--neutral'}>{user.kickUserId ? 'Connected' : 'Not linked'}</span>
+          {user.kickUserId ? (
+            <span className="tag tag--accent">Connected</span>
+          ) : features.kickAuth ? (
+            <a className="btn btn--primary" href="/api/auth/kick">
+              Link Kick
+            </a>
+          ) : (
+            <Link className="btn btn--secondary" href="/me/link">
+              Link with a chat code
+            </Link>
+          )}
         </div>
         <div className="account-row">
           <span className="account-mark account-mark--roobet">R</span>
@@ -99,6 +113,26 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </div>
           <span className={roobet?.cls ?? 'tag tag--neutral'}>{roobet?.label ?? 'Not linked'}</span>
         </div>
+        {stats.link?.status === 'rejected' && stats.link.rejectReason ? (
+          <p className="notice notice--danger">Not approved: {stats.link.rejectReason}</p>
+        ) : null}
+        {!stats.link || stats.link.status === 'rejected' ? (
+          <form action={submitRoobetUsername} className="row" style={{ gap: 10, alignItems: 'flex-end' }}>
+            <input type="hidden" name="from" value="me" />
+            <div className="field" style={{ flex: '1 1 260px' }}>
+              <label htmlFor="me-roobet">Roobet username</label>
+              <input id="me-roobet" name="username" className="input" placeholder="Exactly as it appears on Roobet" required />
+            </div>
+            <button className="btn btn--primary" type="submit">
+              Submit for approval
+            </button>
+            <a className="btn btn--secondary" href={env.roobetReferralUrl} target="_blank" rel="noopener sponsored">
+              No account? Sign up with STZY
+            </a>
+          </form>
+        ) : stats.link.status === 'pending' ? (
+          <p className="meta">Waiting for an admin to approve it — usually within 24 hours.</p>
+        ) : null}
       </section>
 
       <section className="card stack" id="privacy">

@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
   try {
     const kick = await exchangeKickCode(code, verifier);
     const result = await linkKickAccount(user.id, kick, 'oauth');
-    return done(result === 'linked' ? 'kick=linked' : 'error=kick_taken');
+    // Success goes back to the profile; problems stay on the linking page, which has the chat-code fallback.
+    if (result === 'linked') return NextResponse.redirect(siteUrl('/me?kick=linked'));
+    return done('error=kick_taken');
   } catch (error) {
     console.error('[auth] Kick callback failed', error);
     return done('error=kick_failed');

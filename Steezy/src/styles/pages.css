@@ -32,16 +32,16 @@
 
 .hero {
   position: relative;
-  min-height: 86vh;
+  min-height: 64vh;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
 }
 
 .hero__content {
   position: relative;
   width: 100%;
-  padding-top: 120px;
-  padding-bottom: 96px;
+  padding-top: 56px;
+  padding-bottom: 72px;
   display: flex;
   flex-direction: column;
   gap: 20px;
