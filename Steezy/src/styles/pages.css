@@ -713,48 +713,49 @@
     0 30px 60px rgb(0 0 0 / 0.45);
 }
 
-.socials {
+.social-icons {
   list-style: none;
   margin: 8px 0 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  column-gap: 32px;
-}
-
-.socials a {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-surface-2);
+}
+
+/* Round icon buttons: muted until hovered, then the brand's own colour. */
+.social-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-surface-2);
   color: var(--color-text);
+  font-weight: 800;
+  font-size: 18px;
   text-decoration: none;
+  transition:
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
 }
 
-.socials a:hover {
-  color: var(--color-accent);
-}
-
-.socials__mark {
+.social-icon svg {
   width: 22px;
-  color: var(--color-accent);
-  font-weight: 700;
-  text-align: center;
+  height: 22px;
+  fill: currentColor;
 }
 
-.socials__name {
-  font-weight: 500;
+.social-icon:hover,
+.social-icon:focus-visible {
+  color: var(--brand, var(--color-accent));
+  box-shadow: inset 0 0 0 1px var(--brand, var(--color-accent));
+  transform: translateY(-2px);
 }
 
-.socials__handle {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--color-muted);
+.social-icon--roobet {
+  color: var(--color-roobet);
 }
 
 /* Leaderboard race hero (reference: wager race card with countdown + stage podium) */

@@ -1,21 +1,24 @@
 import Image from 'next/image';
 import steeze from '../../../public/brand/steeze.png';
 import { env } from '@/lib/env';
-import { SOCIALS } from '@/lib/socials';
+import type { CSSProperties } from 'react';
+import { siDiscord, siKick } from 'simple-icons';
+import { SOCIALS, type Social } from '@/lib/socials';
 
 /**
- * "Meet Steezy." from the SteezySpins Home design. Socials only list the
- * channels we actually have links for (Kick, Discord, Instagram, X, YouTube,
- * Roobet). The photo is served resized and as
+ * "Meet Steezy." from the SteezySpins Home design. Socials are a row of
+ * brand icons (simple-icons) for the channels we have links for, plus
+ * Roobet. The photo is served resized and as
  * WebP/AVIF by next/image (the original PNG is ~800 KB).
  */
 export function AboutSection() {
-  const socials = [
-    env.kickChannelSlug ? { name: 'Kick', handle: `kick.com/${env.kickChannelSlug}`, href: `https://kick.com/${env.kickChannelSlug}`, mark: 'K' } : null,
-    { name: 'Discord', handle: env.discordInviteUrl.replace(/^https?:\/\//, ''), href: env.discordInviteUrl, mark: 'D' },
+  const socials: Social[] = [
+    ...(env.kickChannelSlug
+      ? [{ name: 'Kick', handle: `kick.com/${env.kickChannelSlug}`, href: `https://kick.com/${env.kickChannelSlug}`, icon: siKick }]
+      : []),
+    { name: 'Discord', handle: env.discordInviteUrl.replace(/^https?:\/\//, ''), href: env.discordInviteUrl, icon: siDiscord },
     ...SOCIALS,
-    { name: 'Roobet', handle: 'code STZY', href: env.roobetReferralUrl, mark: 'R' },
-  ].filter((s): s is NonNullable<typeof s> => s !== null);
+  ];
 
   return (
     <section className="container home-section about" id="about" aria-labelledby="about-title">
@@ -29,19 +32,37 @@ export function AboutSection() {
           Everything on this site ties back to the stream. Wager numbers come straight from Roobet affiliate data under code STZY.
           Watching without signing up is completely fine — join the Discord and hang out.
         </p>
-        <ul className="socials">
+        <ul className="social-icons">
           {socials.map((s) => (
             <li key={s.name}>
-              <a href={s.href} target="_blank" rel={s.name === 'Roobet' ? 'noopener sponsored' : 'noopener'}>
-                <span className="socials__mark" aria-hidden="true">
-                  {s.mark}
-                </span>
-                <span className="socials__name">{s.name}</span>
-                <span className="socials__handle">{s.handle}</span>
-                <span aria-hidden="true">↗</span>
+              <a
+                className="social-icon"
+                href={s.href}
+                target="_blank"
+                rel="noopener"
+                title={`${s.name} · ${s.handle}`}
+                aria-label={`${s.name} (${s.handle})`}
+                // X's brand colour is black; use the text colour so it shows on the dark theme.
+                style={{ ['--brand' as string]: s.icon.hex === '000000' ? 'var(--color-text)' : `#${s.icon.hex}` } as CSSProperties}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d={s.icon.path} />
+                </svg>
               </a>
             </li>
           ))}
+          <li>
+            <a
+              className="social-icon social-icon--roobet"
+              href={env.roobetReferralUrl}
+              target="_blank"
+              rel="noopener sponsored"
+              title="Roobet · code STZY"
+              aria-label="Roobet (code STZY)"
+            >
+              R
+            </a>
+          </li>
         </ul>
       </div>
       <div className="about__photo">
