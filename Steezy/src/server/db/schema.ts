@@ -273,6 +273,8 @@ export const leaderboardResults = pgTable(
     wagered: money('wagered').notNull(),
     prize: money('prize').notNull().default(0),
     paidAt: ts('paid_at'),
+    /** Prize forfeited by staff (kept for the record, out of the payout queue). */
+    deniedAt: ts('denied_at'),
   },
   (t) => [primaryKey({ columns: [t.leaderboardId, t.rank] })],
 );
@@ -297,7 +299,7 @@ export const milestoneClaims = pgTable(
     milestoneId: uuid('milestone_id')
       .notNull()
       .references(() => milestones.id, { onDelete: 'cascade' }),
-    /** claimed | paid | rejected */
+    /** claimed | paid | rejected (denied from Payouts) */
     status: text('status').notNull().default('claimed'),
     claimedAt: createdAt(),
     paidAt: ts('paid_at'),
@@ -359,6 +361,8 @@ export const raffleWinners = pgTable(
       .references(() => users.id),
     prize: money('prize').notNull(),
     paidAt: ts('paid_at'),
+    /** Prize forfeited by staff (kept for the record, out of the payout queue). */
+    deniedAt: ts('denied_at'),
   },
   (t) => [primaryKey({ columns: [t.raffleId, t.position] })],
 );
@@ -414,6 +418,8 @@ export const giveawayWinners = pgTable(
       .references(() => users.id),
     drawnAt: createdAt(),
     paidAt: ts('paid_at'),
+    /** Prize forfeited by staff (kept for the record, out of the payout queue). */
+    deniedAt: ts('denied_at'),
   },
   (t) => [primaryKey({ columns: [t.giveawayId, t.position] })],
 );

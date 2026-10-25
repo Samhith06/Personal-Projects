@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { LeaderboardForm } from '@/components/admin/LeaderboardForm';
-import { deleteLeaderboard } from '@/server/actions/admin';
+import { deleteLeaderboard, postStandingsNow } from '@/server/actions/admin';
 import { listLeaderboards } from '@/server/services/leaderboards';
 import { formatUsd } from '@/lib/format';
 
@@ -35,6 +35,17 @@ export default async function LeaderboardsAdmin({ searchParams }: { searchParams
         <p className="meta">Draft → live → frozen (final standings locked, prizes go to Payouts) → published. Live boards freeze automatically when they end.</p>
       </div>
       <Flash {...flash} />
+
+      <section className="card row" style={{ justifyContent: 'space-between' }}>
+        <span className="meta" style={{ flex: '1 1 300px' }}>
+          The live board&apos;s top places go to the Discord #leaderboard channel once a day. Post them now as well:
+        </span>
+        <form action={postStandingsNow}>
+          <button className="btn btn--secondary" type="submit">
+            Post standings to Discord
+          </button>
+        </form>
+      </section>
 
       <section className="card stack">
         <strong>New leaderboard</strong>

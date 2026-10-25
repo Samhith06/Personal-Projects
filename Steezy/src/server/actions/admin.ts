@@ -18,6 +18,7 @@ import { requireRole } from '@/server/auth/session';
 import { findRoobetCandidate } from '@/server/services/admin';
 import { audit } from '@/server/services/audit';
 import { freezeLeaderboard, getLeaderboard } from '@/server/services/leaderboards';
+import { postStandings } from '@/server/services/leaderboard-announce';
 
 function back(path: string, params: Record<string, string>): never {
   redirect(`${path}?${new URLSearchParams(params)}`);
@@ -200,6 +201,16 @@ export async function setLeaderboardStatus(fd: FormData): Promise<void> {
   await db.update(leaderboards).set({ status: to }).where(eq(leaderboards.id, id));
   await audit(staff.id, 'leaderboard.status', 'leaderboard', id, { status: board!.status }, { status: to });
   back(path, { ok: `Status: ${to}.` });
+}
+
+/** Post the live board's standings to the Discord #leaderboard webhook right now. */
+export async function postStandingsNow(): Promise<void> {
+  const staff = await requireRole('admin');
+  const posted = await postStandings().catch(() => null);
+  if (posted === null) back('/admin/leaderboards', { error: 'Discord didn’t accept the post. Check the webhook URL.' });
+  if (!posted) back('/admin/leaderboards', { error: 'Nothing to post: no webhook set, no live board, or no wagers yet.' });
+  await audit(staff.id, 'leaderboard.discord_post', 'leaderboard', null);
+  back('/admin/leaderboards', { ok: 'Standings posted to Discord.' });
 }
 
 /** Delete a leaderboard and its frozen results. Admin only; kept in the audit log. */

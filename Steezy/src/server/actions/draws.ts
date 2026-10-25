@@ -175,6 +175,17 @@ export async function giveawayStep(fd: FormData): Promise<void> {
   back(path, { ok: { open: 'Open — entries are being accepted.', close: 'Closed — entries frozen.', draw: 'Drawn — winner on the overlay now.' }[step] ?? 'Done.' });
 }
 
+/** Delete a raffle with its frozen tickets and winners. Admin only; kept in the audit log. */
+export async function deleteRaffle(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  const id = str(fd, 'id');
+  const before = await getRaffle(id);
+  if (!before) back('/admin/raffles', { error: 'Raffle not found.' });
+  await db.delete(raffles).where(eq(raffles.id, id));
+  await audit(staff.id, 'raffle.delete', 'raffle', id, before, null);
+  back('/admin/raffles', { ok: `Deleted “${before.name}”.` });
+}
+
 /** Delete a giveaway with its entries and winners. Admin only; kept in the audit log. */
 export async function deleteGiveaway(fd: FormData): Promise<void> {
   const staff = await requireRole('admin');

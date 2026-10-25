@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
+import { PayoutActions } from '@/components/admin/PayoutActions';
 import { markMilestonePaid, markPrizePaid } from '@/server/actions/admin';
 import { markGiveawayPaid, markRafflePrizePaid } from '@/server/actions/draws';
 import { unpaidDrawPrizes, unpaidLeaderboardPrizes } from '@/server/services/admin';
@@ -19,7 +20,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
       <div>
         <span className="kicker">Queue</span>
         <h1 className="admin__title">Payouts</h1>
-        <p className="meta">Tip each reward on Roobet to the username shown, then mark it paid here.</p>
+        <p className="meta">Tip each reward on Roobet to the username shown, then mark it paid here. Deny forfeits a prize; delete removes it.</p>
       </div>
       <Flash {...flash} />
 
@@ -45,6 +46,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
                 Mark paid
               </button>
             </form>
+            <PayoutActions kind="milestone" id={c.id} label={`${c.userName}’s ${c.milestone} claim`} />
           </div>
         ))}
       </section>
@@ -78,6 +80,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
                 Mark paid
               </button>
             </form>
+            <PayoutActions kind="leaderboard" id={p.leaderboardId} place={p.rank} label={`the ${p.board} ${ordinal(p.rank)} prize`} />
           </div>
         ))}
       </section>
@@ -105,6 +108,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
                 Mark paid
               </button>
             </form>
+            <PayoutActions kind="raffle" id={r.drawId} place={r.position} label={`the ${r.draw} ${ordinal(r.position)} prize`} />
           </div>
         ))}
         {draws.giveawayRows.map((g) => (
@@ -125,6 +129,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
                 Mark paid
               </button>
             </form>
+            <PayoutActions kind="giveaway" id={g.drawId} place={g.position} label={`the ${g.draw} giveaway prize`} />
           </div>
         ))}
       </section>

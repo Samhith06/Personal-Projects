@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/admin/Flash';
 import { RaffleForm } from '@/components/admin/DrawForms';
-import { markRafflePrizePaid, raffleStep } from '@/server/actions/draws';
+import { deleteRaffle, markRafflePrizePaid, raffleStep } from '@/server/actions/draws';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { getRaffle, getRaffleWinners, getTickets } from '@/server/services/raffles';
 import { siteUrl } from '@/lib/env';
 import { formatUsd, ordinal } from '@/lib/format';
@@ -131,6 +132,25 @@ export default async function RaffleAdmin({ params, searchParams }: { params: Pr
           </table>
           {tickets.length === 0 ? <p className="meta" style={{ padding: 8 }}>No tickets yet.</p> : null}
         </div>
+      </section>
+
+      <section className="card row" style={{ justifyContent: 'space-between' }}>
+        <span className="meta" style={{ flex: '1 1 300px' }}>
+          Deletes the raffle with its tickets and winners. Can&apos;t be undone.
+        </span>
+        <form action={deleteRaffle}>
+          <input type="hidden" name="id" value={raffle.id} />
+          <ConfirmSubmit
+            className="btn btn--danger"
+            message={
+              winners.some((w) => !w.paidAt && w.prize > 0)
+                ? `Delete “${raffle.name}”? It has unpaid winners, and they'll disappear from Payouts too.`
+                : `Delete “${raffle.name}”?`
+            }
+          >
+            Delete raffle
+          </ConfirmSubmit>
+        </form>
       </section>
     </div>
   );

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { RaffleForm } from '@/components/admin/DrawForms';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
+import { deleteRaffle } from '@/server/actions/draws';
 import { listRaffles } from '@/server/services/raffles';
 import { formatUsd } from '@/lib/format';
 
@@ -21,7 +23,12 @@ export default async function RafflesAdmin({ searchParams }: { searchParams: Fla
         <p className="meta">Draft → open (seed fingerprint published) → closed (tickets frozen, automatic at the end date) → drawn live on stream.</p>
       </div>
       <Flash {...flash} />
+      <section className="card stack">
+        <strong>New raffle</strong>
+        <RaffleForm />
+      </section>
       <section className="card">
+        <strong>History</strong>
         {rows.length === 0 ? <p className="meta">No raffles yet.</p> : null}
         {rows.map((r) => (
           <div key={r.id} className="admin-row">
@@ -34,12 +41,17 @@ export default async function RafflesAdmin({ searchParams }: { searchParams: Fla
               </div>
             </div>
             <span className={TAG[r.status] ?? 'tag tag--neutral'}>{r.status}</span>
+            <form action={deleteRaffle}>
+              <input type="hidden" name="id" value={r.id} />
+              <ConfirmSubmit
+                className="btn btn--danger"
+                message={`Delete “${r.name}”?${r.status === 'drawn' ? ' Its winners go too, and any unpaid prizes disappear from Payouts.' : ''} This can't be undone.`}
+              >
+                Delete
+              </ConfirmSubmit>
+            </form>
           </div>
         ))}
-      </section>
-      <section className="card stack">
-        <strong>New raffle</strong>
-        <RaffleForm />
       </section>
     </div>
   );

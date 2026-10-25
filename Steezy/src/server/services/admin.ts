@@ -27,10 +27,10 @@ export async function queueCounts() {
     db
       .select({ n: count })
       .from(leaderboardResults)
-      .where(and(gt(leaderboardResults.prize, 0), isNull(leaderboardResults.paidAt))),
+      .where(and(gt(leaderboardResults.prize, 0), isNull(leaderboardResults.paidAt), isNull(leaderboardResults.deniedAt))),
     db.select({ n: count }).from(abuseFlags).where(eq(abuseFlags.status, 'open')),
-    db.select({ n: count }).from(raffleWinners).where(and(gt(raffleWinners.prize, 0), isNull(raffleWinners.paidAt))),
-    db.select({ n: count }).from(giveawayWinners).where(isNull(giveawayWinners.paidAt)),
+    db.select({ n: count }).from(raffleWinners).where(and(gt(raffleWinners.prize, 0), isNull(raffleWinners.paidAt), isNull(raffleWinners.deniedAt))),
+    db.select({ n: count }).from(giveawayWinners).where(and(isNull(giveawayWinners.paidAt), isNull(giveawayWinners.deniedAt))),
   ]);
   return { approvals: approvals.n, payouts: payouts.n + prizes.n + raffle.n + giveaway.n, flags: flags.n };
 }
@@ -124,7 +124,7 @@ export async function unpaidLeaderboardPrizes() {
     .innerJoin(leaderboards, eq(leaderboards.id, leaderboardResults.leaderboardId))
     .leftJoin(users, eq(users.id, leaderboardResults.userId))
     .leftJoin(roobetLinks, eq(roobetLinks.userId, leaderboardResults.userId))
-    .where(and(gt(leaderboardResults.prize, 0), isNull(leaderboardResults.paidAt)))
+    .where(and(gt(leaderboardResults.prize, 0), isNull(leaderboardResults.paidAt), isNull(leaderboardResults.deniedAt)))
     .orderBy(desc(leaderboards.endsAt), asc(leaderboardResults.rank));
 }
 
@@ -144,7 +144,7 @@ export async function unpaidDrawPrizes() {
       .innerJoin(raffles, eq(raffles.id, raffleWinners.raffleId))
       .innerJoin(users, eq(users.id, raffleWinners.userId))
       .leftJoin(roobetLinks, eq(roobetLinks.userId, raffleWinners.userId))
-      .where(and(gt(raffleWinners.prize, 0), isNull(raffleWinners.paidAt)))
+      .where(and(gt(raffleWinners.prize, 0), isNull(raffleWinners.paidAt), isNull(raffleWinners.deniedAt)))
       .orderBy(asc(raffles.endsAt), asc(raffleWinners.position)),
     db
       .select({
@@ -159,7 +159,7 @@ export async function unpaidDrawPrizes() {
       .innerJoin(giveaways, eq(giveaways.id, giveawayWinners.giveawayId))
       .innerJoin(users, eq(users.id, giveawayWinners.userId))
       .leftJoin(roobetLinks, eq(roobetLinks.userId, giveawayWinners.userId))
-      .where(isNull(giveawayWinners.paidAt))
+      .where(and(isNull(giveawayWinners.paidAt), isNull(giveawayWinners.deniedAt)))
       .orderBy(asc(giveawayWinners.drawnAt), asc(giveawayWinners.position)),
   ]);
   return { raffleRows, giveawayRows };

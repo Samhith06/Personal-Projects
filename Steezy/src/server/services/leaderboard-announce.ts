@@ -52,11 +52,13 @@ export function overtakeLines(prev: Snapshot, after: Standing[], label: string) 
   return lines;
 }
 
-async function post(url: string, content: string) {
+/** Plain text, or a full webhook body (e.g. with embeds). */
+async function post(url: string, message: string | Record<string, unknown>) {
+  const body = typeof message === 'string' ? { content: message } : message;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+    body: JSON.stringify({ ...body, allowed_mentions: { parse: [] } }),
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Discord webhook returned ${res.status}`);
@@ -108,10 +110,49 @@ const dailyHour = () => {
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-function timeLeft(endsAt: Date, now: Date) {
-  const hours = Math.max(0, Math.floor((endsAt.getTime() - now.getTime()) / 3_600_000));
-  const days = Math.floor(hours / 24);
-  return days ? `${days}d ${hours % 24}h` : `${hours}h`;
+/** Embed colour: the site accent green. */
+const ACCENT = 0x4fd08a;
+
+const unix = (d: Date) => Math.floor(d.getTime() / 1000);
+
+/**
+ * The standings card: three players per row (Discord inline fields), medals
+ * for the podium, wager and prize under each name. `<t:…>` timestamps show
+ * in each reader's own time zone.
+ */
+function standingsEmbed(board: { name: string; metric: string; endsAt: Date }, top: Standing[], now: Date) {
+  const label = metricLabel(board.metric);
+  return {
+    embeds: [
+      {
+        title: `📊 Live Leaderboard — Top ${top.length}`,
+        url: siteUrl('/leaderboard'),
+        color: ACCENT,
+        description: `**${md(board.name)}** · updated <t:${unix(now)}:f> · ends <t:${unix(board.endsAt)}:R>
+Ranked by ${label}.`,
+        fields: top.map((s) => ({
+          name: `${MEDALS[s.rank - 1] ?? `#${s.rank}`} ${md(s.displayName)}`,
+          value: `${formatUsd(s.wagered)}${s.prize ? `
+🏆 ${formatUsd(s.prize)}` : ''}`,
+          inline: true,
+        })),
+        footer: { text: 'SteezySpins Leaderboard' },
+        timestamp: now.toISOString(),
+      },
+    ],
+  };
+}
+
+/** Post the live board's top places now. Returns false when there's no webhook, no live board or no wagers yet. */
+export async function postStandings(now = new Date()): Promise<boolean> {
+  const url = process.env.DISCORD_LEADERBOARD_WEBHOOK_URL?.trim();
+  if (!url) return false;
+  const board = await currentLeaderboard();
+  if (!board || board.status !== 'live') return false;
+  const top = (await getStandings(board)).filter((s) => s.wagered > 0).slice(0, Math.max(MIN_TRACKED, board.prizes.length));
+  if (!top.length) return false;
+  await post(url, standingsEmbed(board, top, now));
+  return true;
 }
 
 /**
@@ -126,31 +167,17 @@ export async function postDailyStandings(now = new Date()): Promise<boolean> {
   if (!board || board.status !== 'live') return false;
 
   const day = now.toISOString().slice(0, 10);
-  const key = `leaderboard-daily:${board.id}`;
+  // v2: the embed format. Bumping the key lets the first run after that change post once in the new style.
+  const key = `leaderboard-daily:v2:${board.id}`;
   const [row] = await db.select({ detail: syncState.detail }).from(syncState).where(eq(syncState.key, key)).limit(1);
   if ((row?.detail as { day?: string } | null)?.day === day) return false;
 
-  const top = (await getStandings(board)).filter((s) => s.wagered > 0).slice(0, Math.max(MIN_TRACKED, board.prizes.length));
-  if (top.length) {
-    const label = metricLabel(board.metric);
-    const lines = top.map(
-      (s) =>
-        `${MEDALS[s.rank - 1] ?? `**${ordinal(s.rank)}**`} **${md(s.displayName)}** · ${formatUsd(s.wagered)} ${label}${s.prize ? ` · wins ${formatUsd(s.prize)}` : ''}`,
-    );
-    await post(
-      url,
-      [
-        `📊 **${md(board.name)}** — daily standings (${timeLeft(board.endsAt, now)} left)`,
-        ...lines,
-        `Full board: <${siteUrl('/leaderboard')}>`,
-      ].join('\n'),
-    );
-  }
+  const posted = await postStandings(now);
 
   // Mark the day done even when nobody has wagered yet, so an empty board isn't re-checked all evening.
   await db
     .insert(syncState)
     .values({ key, lastRunAt: now, lastOkAt: now, detail: { day } })
     .onConflictDoUpdate({ target: syncState.key, set: { lastRunAt: now, lastOkAt: now, detail: { day } } });
-  return top.length > 0;
+  return posted;
 }

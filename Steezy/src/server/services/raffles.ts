@@ -32,10 +32,9 @@ export async function listRaffles() {
   return db.select().from(raffles).orderBy(desc(raffles.startsAt));
 }
 
-/** The open raffle, if any. */
-export async function openRaffle() {
-  const [row] = await db.select().from(raffles).where(eq(raffles.status, 'open')).orderBy(desc(raffles.startsAt)).limit(1);
-  return row ?? null;
+/** Every open raffle, soonest to close first. */
+export async function openRaffles() {
+  return db.select().from(raffles).where(eq(raffles.status, 'open')).orderBy(asc(raffles.endsAt));
 }
 
 export async function pastRaffles(limit = 6) {
