@@ -63,10 +63,6 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
               </form>
               <form action={rejectRoobet}>
                 <input type="hidden" name="userId" value={p.userId} />
-                <label className="visually-hidden" htmlFor={`reason-${p.userId}`}>
-                  Reason
-                </label>
-                <input id={`reason-${p.userId}`} name="reason" className="input" placeholder="Reason (shown to member)" style={{ width: 220 }} />
                 <button className="btn btn--danger" type="submit">
                   Reject
                 </button>
