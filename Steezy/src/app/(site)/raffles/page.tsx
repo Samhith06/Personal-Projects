@@ -6,12 +6,16 @@ import { formatCountdown, formatUsd, ordinal } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Raffles' };
 
+const shortDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
 export default async function RafflesPage() {
   const [raffle, user, past] = await Promise.all([openRaffle(), getCurrentUser(), pastRaffles()]);
   const tickets = raffle ? await getTickets(raffle) : [];
   const totalTickets = tickets.reduce((s, t) => s + t.tickets, 0);
   const mine = raffle && user ? await myRaffleStatus(raffle, user.id) : null;
   const pastWinners = await Promise.all(past.map((r) => getRaffleWinners(r.id)));
+  // An open raffle whose window hasn't begun: no wager counts yet.
+  const upcoming = raffle ? raffle.startsAt > new Date() : false;
 
   // Chance of at least one prize ≈ 1 − P(no win in any pick), approximated with replacement.
   const chance =
@@ -34,10 +38,14 @@ export default async function RafflesPage() {
         <section className="raffle-split">
           <div className="card raffle-hero stack" style={{ gap: 22 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span className="tag tag--accent">
-                <span className="dot dot--live" aria-hidden="true" />
-                Open · tickets counting
-              </span>
+              {upcoming ? (
+                <span className="tag tag--neutral">Tickets start counting {shortDay(raffle.startsAt)}</span>
+              ) : (
+                <span className="tag tag--accent">
+                  <span className="dot dot--live" aria-hidden="true" />
+                  Open · tickets counting
+                </span>
+              )}
               <span style={{ fontSize: 13, color: 'var(--color-accent-300)' }}>
                 Closes {raffle.endsAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })} UTC
               </span>
@@ -58,8 +66,8 @@ export default async function RafflesPage() {
             </div>
             <div className="row" style={{ gap: 28 }}>
               <div>
-                <div className="hero-label">Ends in</div>
-                <div className="num hero-value">{formatCountdown(raffle.endsAt) ?? 'Closing'}</div>
+                <div className="hero-label">{upcoming ? 'Starts in' : 'Ends in'}</div>
+                <div className="num hero-value">{formatCountdown(upcoming ? raffle.startsAt : raffle.endsAt) ?? 'Closing'}</div>
               </div>
               <div>
                 <div className="hero-label">Tickets issued</div>
