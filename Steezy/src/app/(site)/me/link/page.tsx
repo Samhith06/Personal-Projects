@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Link accounts' };
 const ERRORS: Record<string, string> = {
   kick_unconfigured: 'Kick login isn’t set up on this server yet — use the chat code instead.',
   kick_denied: 'Kick login was cancelled.',
-  kick_taken: 'That Kick account is already linked to another SteezeSpins member.',
+  kick_taken: 'That Kick account is already linked to another SteezySpins member.',
   kick_failed: 'Kick didn’t let us link that time. Please try again.',
   invalid_state: 'That link expired. Please try again.',
 };

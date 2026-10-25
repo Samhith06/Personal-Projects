@@ -1,6 +1,6 @@
 /**
  * Starting configuration: milestone tiers, badges and this month's leaderboard,
- * using the defaults from the SteezeSpins Home design. Only fills empty tables,
+ * using the defaults from the SteezySpins Home design. Only fills empty tables,
  * so it's safe to run on every deploy: `npm run db:seed`.
  */
 import 'dotenv/config';

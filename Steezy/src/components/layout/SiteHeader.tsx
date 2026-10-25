@@ -33,7 +33,7 @@ export function SiteHeader({
       <div className="container site-header__inner">
         <Link href="/" className="brand">
           <span className="brand__dot" aria-hidden="true" />
-          SteezeSpins
+          SteezySpins
         </Link>
         <nav className="site-nav" aria-label="Main">
           {NAV.map((item) => (

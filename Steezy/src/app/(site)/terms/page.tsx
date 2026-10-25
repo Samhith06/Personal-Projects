@@ -15,7 +15,7 @@ export default async function TermsPage({ searchParams }: { searchParams: Promis
         </h1>
         <p className="meta">Version [1.0] · effective [DATE]</p>
         <p className="notice notice--ok" style={{ marginTop: 20 }}>
-          SteezeSpins is a fan community site. It doesn&apos;t take bets or hold money. Wagering happens on Roobet, under
+          SteezySpins is a fan community site. It doesn&apos;t take bets or hold money. Wagering happens on Roobet, under
           Roobet&apos;s own terms.
         </p>
 

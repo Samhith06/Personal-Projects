@@ -4,7 +4,7 @@ import { env } from '@/lib/env';
 import { SOCIALS } from '@/lib/socials';
 
 /**
- * "Meet Steezy." from the SteezeSpins Home design. Socials only list the
+ * "Meet Steezy." from the SteezySpins Home design. Socials only list the
  * channels we actually have links for (Kick, Discord, Instagram, X, YouTube,
  * Roobet). The photo is served resized and as
  * WebP/AVIF by next/image (the original PNG is ~800 KB).

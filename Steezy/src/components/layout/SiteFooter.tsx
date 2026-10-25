@@ -5,7 +5,7 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="container site-footer__inner">
-        <span>© {new Date().getFullYear()} SteezeSpins · 18+ only · Gamble responsibly</span>
+        <span>© {new Date().getFullYear()} SteezySpins · 18+ only · Gamble responsibly</span>
         <div className="site-footer__links">
           {SOCIALS.map((s) => (
             <a key={s.name} href={s.href} target="_blank" rel="noopener">

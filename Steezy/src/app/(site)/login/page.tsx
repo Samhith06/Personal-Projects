@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <span className="kicker">Log in</span>
       <h1 className="page__title">Sign in with Discord</h1>
       <p className="meta" style={{ fontSize: 15 }}>
-        Your Discord account is your SteezeSpins account. We only read your Discord name and avatar.
+        Your Discord account is your SteezySpins account. We only read your Discord name and avatar.
       </p>
       {error ? <p className="notice notice--danger">{ERRORS[error] ?? 'Something went wrong. Please try again.'}</p> : null}
       <div>

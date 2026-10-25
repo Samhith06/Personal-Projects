@@ -114,7 +114,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
                   Type <b>{state.keyword}</b> in chat
                 </div>
               ) : (
-                <div className="ov-join">{state.kind === 'raffle' ? '1 ticket per $1k wagered · code STZY' : 'Enter on steezespins'}</div>
+                <div className="ov-join">{state.kind === 'raffle' ? '1 ticket per $1k wagered · code STZY' : 'Enter on SteezySpins'}</div>
               )}
               {countdown ? (
                 <div className="ov-timer">
@@ -190,7 +190,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
 
       <div className="ov-brand">
         <span className="ov-dot" />
-        SteezeSpins <span>· code</span> <i>STZY</i>
+        SteezySpins <span>· code</span> <i>STZY</i>
       </div>
     </div>
   );

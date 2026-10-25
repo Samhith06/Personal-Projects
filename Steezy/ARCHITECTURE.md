@@ -1,4 +1,4 @@
-# SteezeSpins — Architecture
+# SteezySpins — Architecture
 
 Community site for the gambling streamer **Steezy** (Kick). Users log in with Discord, link Kick and Roobet,
 and earn badges, leaderboard placings, milestones, raffle tickets and giveaway entries from watch time and wager.
@@ -192,7 +192,7 @@ settings(key*, value jsonb)                                          -- geo list
 
 ## 5. Design (from Claude Design exports, 2026-10-22)
 
-Sources: `SteezeSpins Home.html` and `Casino Chip Background.html` (Claude Design bundles, saved in `SteezyWebsite/`).
+Sources: `SteezySpins Home.html` and `Casino Chip Background.html` (Claude Design bundles, saved in `SteezyWebsite/`).
 They are self-unpacking bundles (React UMD + a `__bundler/manifest` of base64 resources), so they're a **reference**, not code to ship.
 
 ### 5.1 Visual system (Home)
@@ -236,7 +236,7 @@ Placeholder data in the design worth keeping as defaults (admin-editable):
 Social handles in the design are placeholders (`discord.gg/steezespins`, etc.). Use the real invite
 `https://discord.gg/PJpphDDS73`; other handles still needed from Steezy.
 
-**Remaining pages** are designed on the canvas "SteezeSpins — remaining pages"
+**Remaining pages** are designed on the canvas "SteezySpins — remaining pages"
 (https://claude.ai/artifact/MfVUDUWrbNLp5oLJWabtFk), same tokens as Home:
 `/me` profile, Kick/Roobet linking flow (interactive), public `/u/[handle]`, `/raffles`, `/hall-of-fame`, 18+ gate + geo
 banner (interactive), `/terms` (ToS, privacy, responsible gambling, regions), admin overview + admin user detail, and OBS

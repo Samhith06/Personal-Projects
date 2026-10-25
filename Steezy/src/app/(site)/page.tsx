@@ -23,7 +23,7 @@ export default async function HomePage() {
           <div className="container hero__content">
             <h1 className="hero__title">Every spin, counted together.</h1>
             <p className="hero__lede">
-              The SteezeSpins community hub — leaderboards, giveaways, bonus hunts and slot tournaments, tied to your Discord
+              The SteezySpins community hub — leaderboards, giveaways, bonus hunts and slot tournaments, tied to your Discord
               account.
             </p>
             <div className="row">

@@ -166,7 +166,7 @@ export function HuntOverlay({ token, initial, preview }: { token: string; initia
       <div className="hov-ticker">
         <span className="hov-ticker__brand">
           <span className="ov-dot" />
-          SteezeSpins
+          SteezySpins
         </span>
         {state.boardName ? <span className="hov-ticker__label">{state.boardName} leaderboard</span> : null}
         {state.ticker.map((t) => (

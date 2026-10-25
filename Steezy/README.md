@@ -1,4 +1,4 @@
-# SteezeSpins
+# SteezySpins
 
 Community site for Kick streamer Steezy. Next.js 16 (App Router), React 19, Drizzle ORM on Postgres, hand-written CSS.
 Design and decisions: [ARCHITECTURE.md](ARCHITECTURE.md). Patterns (sessions, OAuth, Kick webhook, boot-time sync) come from `../FTDWEBSITE`.

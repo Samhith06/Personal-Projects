@@ -9,10 +9,10 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? 'http://localhost:3000'),
-  title: { default: 'SteezeSpins', template: '%s · SteezeSpins' },
+  title: { default: 'SteezySpins', template: '%s · SteezySpins' },
   description:
-    'The SteezeSpins community hub — Roobet wager leaderboards, milestones, giveaways, raffles, bonus hunts and slot tournaments, tied to your Discord account.',
-  applicationName: 'SteezeSpins',
+    'The SteezySpins community hub — Roobet wager leaderboards, milestones, giveaways, raffles, bonus hunts and slot tournaments, tied to your Discord account.',
+  applicationName: 'SteezySpins',
 };
 
 export const viewport: Viewport = {

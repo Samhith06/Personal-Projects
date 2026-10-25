@@ -6,7 +6,7 @@ import { queueCounts } from '@/server/services/admin';
 import { syncStatus } from '@/server/services/sync-status';
 import { formatAgo } from '@/lib/format';
 
-export const metadata: Metadata = { title: { default: 'Admin', template: '%s · Admin · SteezeSpins' }, robots: { index: false } };
+export const metadata: Metadata = { title: { default: 'Admin', template: '%s · Admin · SteezySpins' }, robots: { index: false } };
 
 /**
  * The staff area, inside the normal site header (MattySpins layout). The amber

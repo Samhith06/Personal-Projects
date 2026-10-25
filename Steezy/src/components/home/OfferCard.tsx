@@ -23,7 +23,7 @@ export async function OfferCard() {
       <div className="offer__brand">
         <span className="offer__badge">Official partner</span>
         <img src="/brand/roobet-logo-gold.png" alt="Roobet" width={163} height={50} className="offer__logo" />
-        <span className="offer__meta">Exclusive SteezeSpins offer</span>
+        <span className="offer__meta">Exclusive SteezySpins offer</span>
       </div>
 
       <div className="offer__main">

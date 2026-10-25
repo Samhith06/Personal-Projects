@@ -1,5 +1,5 @@
 /**
- * SteezeSpins database schema (Postgres via Drizzle).
+ * SteezySpins database schema (Postgres via Drizzle).
  *
  * Mirrors the data model in ARCHITECTURE.md §4. Money is stored as numeric and
  * read as a JS number (USD, two decimals is plenty for wagers and prizes).

@@ -1,5 +1,5 @@
 /**
- * Discord OAuth2 — the only way into a SteezeSpins account.
+ * Discord OAuth2 — the only way into a SteezySpins account.
  *
  * Scope: `identify`. We keep the id, username and avatar hash and throw the
  * access token away.

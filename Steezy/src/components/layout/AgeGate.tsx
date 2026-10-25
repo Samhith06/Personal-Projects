@@ -28,7 +28,7 @@ export function AgeGate({ name }: { name: string | null }) {
         <span className="age-gate__badge" aria-hidden="true">
           18+
         </span>
-        <p className="kicker">{name ? `Welcome, ${name}` : 'Welcome to SteezeSpins'}</p>
+        <p className="kicker">{name ? `Welcome, ${name}` : 'Welcome to SteezySpins'}</p>
         <h2 id="age-gate-title">Are you 18 or older?</h2>
         <p className="meta" style={{ fontSize: 15, color: 'var(--color-text-2)' }}>
           This site is about online gambling content and links to a casino partner. You must be of legal gambling age where
