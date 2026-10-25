@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { OverlayState } from '@/server/services/overlay';
 
 const POLL_MS = 2000;
@@ -20,6 +20,40 @@ function useCountdown(iso: string | null) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Rows visible in the join list before it starts scrolling. */
+const VISIBLE_ROWS = 6;
+/** Scroll speed: seconds per name, so long lists still crawl slowly enough to read. */
+const SECONDS_PER_NAME = 1.8;
+
+/**
+ * Everyone who joined, newest first. A short list just sits there; a longer
+ * one scrolls slowly upward in a loop (the names are rendered twice so the
+ * wrap-around is seamless).
+ */
+function JoinList({ names }: { names: string[] }) {
+  if (!names.length) return null;
+  if (names.length <= VISIBLE_ROWS) {
+    return (
+      <ul className="ov-recent">
+        {names.map((name, i) => (
+          <li key={`${name}-${i}`}>{name}</li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <div className="ov-scroll" style={{ ['--rows' as string]: VISIBLE_ROWS } as CSSProperties}>
+      <ul className="ov-recent ov-scroll__track" style={{ animationDuration: `${names.length * SECONDS_PER_NAME}s` }}>
+        {[...names, ...names].map((name, i) => (
+          <li key={i} aria-hidden={i >= names.length || undefined}>
+            {name}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -95,7 +129,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
   const drawing = reelName !== null;
 
   return (
-    <div className={`ov${preview ? ' ov--preview' : ''}`}>
+    <div className={`ov ov--draw${preview ? ' ov--preview' : ''}`}>
       {preview ? <div className="ov__stand-in">Stream gameplay · transparent in OBS</div> : null}
 
       {state.status === 'open' && !drawing ? (
@@ -128,13 +162,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
               <b>{state.entries.toLocaleString('en-US')}</b>
             </div>
             {state.kind === 'raffle' && state.prizes.length > 1 ? <div className="ov-prizes">{state.prizes.join('   ·   ')}</div> : null}
-            <ul className="ov-recent">
-              {state.recent.map((name, i) => (
-                <li key={`${name}-${i}`} style={{ opacity: 1 - i * 0.18 }}>
-                  {name}
-                </li>
-              ))}
-            </ul>
+            <JoinList names={state.recent} />
           </div>
         </section>
       ) : null}
@@ -180,7 +208,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
                   ))}
                 </div>
               ) : null}
-              <div className="ov-winner__fair">Provably fair · verify at steezespins/fair</div>
+              <div className="ov-winner__fair">Provably fair · verify on SteezySpins /fair</div>
             </>
           ) : (
             <div className="ov-winner__prize">No entries</div>
