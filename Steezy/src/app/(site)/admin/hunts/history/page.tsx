@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { bestMulti, currentHunt, huntBonuses, huntStats, huntWinnerName, isOpened, listHunts } from '@/server/services/hunts';
 import { formatUsd } from '@/lib/format';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
+import { Flash, type FlashParams } from '@/components/admin/Flash';
+import { deleteHuntAction } from '@/server/actions/hunts';
+import { endedEarly, isLocalHunt } from '@/server/services/hunt-admin';
 
 export const metadata: Metadata = { title: 'Hunt history' };
 
@@ -9,7 +13,8 @@ const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDig
 const multi = (n: number) => `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}×`;
 
 /** Every hunt before the current one (hidden test hunts included), newest first. Click one for its full bonus list. */
-export default async function HuntHistory() {
+export default async function HuntHistory({ searchParams }: { searchParams: FlashParams }) {
+  const flash = await searchParams;
   const [all, current] = await Promise.all([listHunts(true), currentHunt()]);
   const rows = all.filter((h) => h.id !== current?.id);
   const winners = await Promise.all(rows.map(huntWinnerName));
@@ -23,6 +28,7 @@ export default async function HuntHistory() {
         <h1 className="admin__title">Hunt history</h1>
         <p className="admin__sub">{rows.length} previous hunt{rows.length === 1 ? '' : 's'}. Click a hunt for every slot that got in and how each paid.</p>
       </div>
+      <Flash {...flash} />
 
       {rows.length === 0 ? (
         <div className="emptyq">No previous hunts yet.</div>
@@ -41,6 +47,7 @@ export default async function HuntHistory() {
                   <th>Best multi</th>
                   <th>Highest payout</th>
                   <th>Closest guess</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -59,7 +66,7 @@ export default async function HuntHistory() {
                         <Link href={`/admin/hunts/${encodeURIComponent(h.id)}`} style={{ fontWeight: 600 }}>
                           {h.title}
                         </Link>{' '}
-                        {!h.completed ? <span className="tag tag--warn">unfinished</span> : null}
+                        {!h.completed ? <span className="tag tag--warn">unfinished</span> : endedEarly(h) ? <span className="tag tag--warn">ended early</span> : null}
                         {h.hidden ? <span className="tag tag--danger">hidden</span> : null}
                         <div className="meta">{h.casino ?? '—'}</div>
                       </td>
@@ -98,6 +105,18 @@ export default async function HuntHistory() {
                         )}
                       </td>
                       <td className="meta">{h.settledAt ? (winners[i] ?? 'nobody') : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {/* Same rule as the service: bonushunt.gg hunts sync back in, and a hunt that paid a prize stays on record. */}
+                        {isLocalHunt(h) && !(h.winnerUserId && h.guessPrize) ? (
+                          <form action={deleteHuntAction}>
+                            <input type="hidden" name="huntId" value={h.id} />
+                            <input type="hidden" name="back" value="/admin/hunts/history" />
+                            <ConfirmSubmit className="btn btn--danger-ghost" message={`Delete “${h.title}” with its bonuses and guesses? This can't be undone.`}>
+                              Delete
+                            </ConfirmSubmit>
+                          </form>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}

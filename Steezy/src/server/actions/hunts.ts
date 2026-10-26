@@ -14,7 +14,7 @@ import { bonushuntKey, syncHunts } from '@/server/bonushunt/sync';
 import { audit } from '@/server/services/audit';
 import { getHunt, huntBonuses, parseGuess, placeGuess } from '@/server/services/hunts';
 import { BONUS_TYPES, addRequest, setHuntRequestsOpen, setRequestStatus, type BonusType } from '@/server/services/hunt-requests';
-import { addBonus, deleteHunt, isLocalHunt, removeBonus, renameHunt, setPayout, setPhase, startHunt, type Phase } from '@/server/services/hunt-admin';
+import { addBonus, deleteHunt, endedEarly, isLocalHunt, removeBonus, renameHunt, setPayout, setPhase, startHunt, type Phase } from '@/server/services/hunt-admin';
 import { artFor, slotArt } from '@/server/services/slot-art';
 import {
   TOURNAMENT_SIZES,
@@ -180,8 +180,15 @@ export async function setPhaseAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
   const phase = str(fd, 'phase') as Phase;
   if (!['collecting', 'opening', 'finished'].includes(phase)) back('/admin/hunts', { error: 'Unknown step.' });
-  const ok = { collecting: 'Back to collecting.', opening: 'Opening — !sr and guessing are closed.', finished: 'Hunt finished and guesses settled.' };
-  done(await setPhase(str(fd, 'huntId'), phase, staff.id), ok[phase]);
+  const id = str(fd, 'huntId');
+  const err = await setPhase(id, phase, staff.id);
+  const after = err ? null : await getHunt(id);
+  const ok = {
+    collecting: 'Back to collecting.',
+    opening: 'Opening — !sr and guessing are closed.',
+    finished: after && endedEarly(after) ? 'Hunt ended early — no guess winner.' : 'Hunt finished and guesses settled.',
+  };
+  done(err, ok[phase]);
 }
 
 /** The control row: set the prize and open or close guessing in one go. */
@@ -197,7 +204,10 @@ export async function guessingAction(fd: FormData): Promise<void> {
 
 export async function deleteHuntAction(fd: FormData): Promise<void> {
   const staff = await requireRole('mod');
-  done(await deleteHunt(str(fd, 'huntId'), staff.id), 'Hunt deleted.');
+  // History deletes go back to the history list; only ever inside /admin.
+  const to = str(fd, 'back').startsWith('/admin') ? str(fd, 'back') : '/admin/hunts';
+  const err = await deleteHunt(str(fd, 'huntId'), staff.id);
+  back(to, err ? { error: err } : { ok: 'Hunt deleted.' });
 }
 
 /* ----------------------------------------------------------- tournaments */

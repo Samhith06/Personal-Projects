@@ -18,7 +18,7 @@ import {
   toggleHuntRequests,
 } from '@/server/actions/hunts';
 import { bonushuntKey } from '@/server/bonushunt/sync';
-import { isLocalHunt } from '@/server/services/hunt-admin';
+import { endedEarly, isLocalHunt } from '@/server/services/hunt-admin';
 import { BONUS_TYPES, requestsFor } from '@/server/services/hunt-requests';
 import { artFor, knownSlots, slotArt } from '@/server/services/slot-art';
 import { huntOverlayToken } from '@/server/services/hunt-overlay';
@@ -27,6 +27,7 @@ import { syncStatus } from '@/server/services/sync-status';
 import { siteUrl } from '@/lib/env';
 import { formatAgo, formatBet } from '@/lib/format';
 import { CopyLink } from '@/components/admin/CopyLink';
+import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 
 export const metadata: Metadata = { title: 'Bonus hunt' };
 
@@ -53,6 +54,7 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
   const added = requests.filter((r) => r.status === 'added');
   const phase = hunt ? huntPhase(hunt) : null;
   const local = hunt ? isLocalHunt(hunt) : false;
+  const early = hunt ? endedEarly(hunt) : false;
   const earlier = past.filter((h) => h.id !== hunt?.id).length;
 
   return (
@@ -139,7 +141,7 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
             <div className="hunt-tags">
               <span className={`tag ${PHASE_TAG[phase][1]}`}>{PHASE_TAG[phase][0]}</span>
               <span className="tag tag--neutral">
-                {hunt.settledAt ? 'Guesses settled' : hunt.guessesOpen && phase === 'collecting' ? 'Guessing open' : 'Guessing not open'}
+                {early ? 'Ended early' : hunt.settledAt ? 'Guesses settled' : hunt.guessesOpen && phase === 'collecting' ? 'Guessing open' : 'Guessing not open'}
               </span>
               {phase === 'collecting' ? <span className="tag tag--neutral">{hunt.requestsOpen ? '!sr open' : '!sr closed'}</span> : null}
               {hunt.guessPrize ? <span className="tag tag--warn">{hunt.guessPrize} prize</span> : null}
@@ -195,8 +197,18 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
                     {phase === 'opening' ? <PhaseButton huntId={hunt.id} phase="collecting" label="Back to collecting" /> : null}
                     {phase === 'collecting' ? (
                       <PhaseButton huntId={hunt.id} phase="opening" label="Start opening" primary disabled={n.bonuses.length === 0} />
+                    ) : null}
+                    {phase === 'opening' && n.left.length === 0 ? (
+                      <PhaseButton huntId={hunt.id} phase="finished" label="Finish hunt" primary />
                     ) : (
-                      <PhaseButton huntId={hunt.id} phase="finished" label="Finish hunt" primary disabled={n.left.length > 0} />
+                      <PhaseButton
+                        huntId={hunt.id}
+                        phase="finished"
+                        label="End hunt"
+                        confirm={`End “${hunt.title}” now? ${
+                          n.bonuses.length === 0 ? 'It has no bonuses' : `${n.left.length} bonus${n.left.length === 1 ? '' : 'es'} still unopened`
+                        }. The hunt closes at ${money2(n.won)} and nobody wins the guess prize.`}
+                      />
                     )}
                   </>
                 ) : (
@@ -212,7 +224,12 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
               </p>
             ) : null}
 
-            {hunt.settledAt ? (
+            {early ? (
+              <p>
+                Ended early at <b>{money2(n.won)}</b>
+                {n.left.length ? ` with ${n.left.length} bonus${n.left.length === 1 ? '' : 'es'} unopened` : ''}, so nobody won the guess.
+              </p>
+            ) : hunt.settledAt ? (
               <p>
                 Final balance <b>{money2(n.won)}</b> ·{' '}
                 {winnerName ? (
@@ -242,9 +259,9 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
                 {local && !(hunt.winnerUserId && hunt.guessPrize) ? (
                   <form action={deleteHuntAction}>
                     <input type="hidden" name="huntId" value={hunt.id} />
-                    <button className="btn btn--danger-ghost" type="submit">
+                    <ConfirmSubmit className="btn btn--danger-ghost" message={`Delete “${hunt.title}” with its bonuses and guesses? This can't be undone.`}>
                       Delete hunt
-                    </button>
+                    </ConfirmSubmit>
                   </form>
                 ) : null}
               </div>
@@ -437,14 +454,36 @@ export default async function HuntsAdmin({ searchParams }: { searchParams: Flash
   );
 }
 
-function PhaseButton({ huntId, phase, label, primary, disabled }: { huntId: string; phase: string; label: string; primary?: boolean; disabled?: boolean }) {
+function PhaseButton({
+  huntId,
+  phase,
+  label,
+  primary,
+  disabled,
+  confirm,
+}: {
+  huntId: string;
+  phase: string;
+  label: string;
+  primary?: boolean;
+  disabled?: boolean;
+  /** Ask before going ahead (ending a hunt early can't be undone). */
+  confirm?: string;
+}) {
+  const className = `btn ${primary ? 'btn--primary' : 'btn--secondary'}`;
   return (
     <form action={setPhaseAction}>
       <input type="hidden" name="huntId" value={huntId} />
       <input type="hidden" name="phase" value={phase} />
-      <button className={`btn ${primary ? 'btn--primary' : 'btn--secondary'}`} type="submit" disabled={disabled}>
-        {label}
-      </button>
+      {confirm ? (
+        <ConfirmSubmit className={className} message={confirm}>
+          {label}
+        </ConfirmSubmit>
+      ) : (
+        <button className={className} type="submit" disabled={disabled}>
+          {label}
+        </button>
+      )}
     </form>
   );
 }

@@ -360,12 +360,16 @@ export async function createChipScene(host: HTMLElement, options: ChipOptions = 
     };
   });
 
-  // Post: layer targets, blur, composite.
-  const HF = THREE.HalfFloatType;
+  // Post: layer targets, blur, composite. Many phone GPUs can't render into
+  // half-float targets (or multisample them) and silently draw nothing, which
+  // left phones with just the gradient; they fall back to 8-bit targets.
+  const fullFloat = r.extensions.has('EXT_color_buffer_float');
+  const halfFloat = fullFloat || r.extensions.has('EXT_color_buffer_half_float');
+  const HF = halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType;
   const rt = {
     far: new THREE.WebGLRenderTarget(1, 1, { type: HF }),
     farB: new THREE.WebGLRenderTarget(1, 1, { type: HF }),
-    mid: new THREE.WebGLRenderTarget(1, 1, { type: HF, samples: 4 }),
+    mid: new THREE.WebGLRenderTarget(1, 1, { type: HF, samples: halfFloat && !fullFloat ? 0 : 4 }),
     near: new THREE.WebGLRenderTarget(1, 1, { type: HF }),
     nearB: new THREE.WebGLRenderTarget(1, 1, { type: HF }),
   };

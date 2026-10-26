@@ -129,23 +129,32 @@ export async function setPayout(id: string, bonusId: string, payout: number | nu
 
 export type Phase = 'collecting' | 'opening' | 'finished';
 
+/** Ending with nothing added, or with bonuses still unopened, leaves only a partial balance. */
+const partial = (bonuses: HuntBonus[]) => bonuses.length === 0 || bonuses.some((b) => !isOpened(b));
+
+/** A hunt run here that was ended before every bonus was opened. It has no guess winner. */
+export const endedEarly = (h: Hunt) => isLocalHunt(h) && h.completed && partial(huntBonuses(h));
+
 export async function setPhase(id: string, phase: Phase, actorId: string) {
   const h = await editable(id);
   if (typeof h === 'string') return h;
   if (h.settledAt) return 'This hunt is settled.';
   const list = huntBonuses(h);
   if (phase === 'opening' && list.length === 0) return 'Add a bonus first.';
-  if (phase === 'finished' && list.some((b) => !isOpened(b))) return 'Enter a payout for every bonus first.';
+  // Finishing with bonuses still unopened ends the hunt early. The balance is
+  // only partial, so it's marked settled with no winner rather than handing
+  // the guess prize to whoever guessed lowest.
+  const early = phase === 'finished' && partial(list);
   // Opening closes !sr and guessing; going back to collecting leaves them for staff to reopen.
   const change =
     phase === 'collecting'
       ? { isOpening: false, completed: false }
       : phase === 'opening'
         ? { isOpening: true, completed: false, guessesOpen: false, requestsOpen: false }
-        : { isOpening: false, completed: true, guessesOpen: false, requestsOpen: false };
+        : { isOpening: false, completed: true, guessesOpen: false, requestsOpen: false, ...(early ? { settledAt: new Date() } : {}) };
   await saveBonuses(h, list, change);
-  await audit(actorId, `hunt.${phase}`, 'hunt', id);
-  if (phase === 'finished') await settleCompletedHunts();
+  await audit(actorId, early ? 'hunt.ended_early' : `hunt.${phase}`, 'hunt', id, null, early ? { unopened: list.filter((b) => !isOpened(b)).length } : null);
+  if (phase === 'finished' && !early) await settleCompletedHunts();
   return null;
 }
 

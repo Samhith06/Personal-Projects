@@ -61,6 +61,14 @@
     max-width: none;
     margin-left: 0;
   }
+
+  /* Home: the desktop scrim darkens the left 70% for the headline, which on a
+     phone is nearly the whole screen and hid the chips. Even, lighter shade instead. */
+  .home-stage__scrim {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--color-bg) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg) 30%, transparent) 55%, transparent 100%),
+      linear-gradient(0deg, var(--color-bg) 0%, transparent 12%);
+  }
 }
 
 @media (max-width: 900px) {
