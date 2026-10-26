@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { User } from '@/server/db/schema';
 import { avatarUrl, displayName } from '@/lib/identity';
 import { hasRole } from '@/server/auth/session';
-import { env, loginHref, loginLabel } from '@/lib/env';
+import { env } from '@/lib/env';
+import { LoginButton } from '@/components/LoginButton';
 
 const NAV = [
   { href: '/leaderboard', label: 'Leaderboard' },
@@ -83,9 +84,7 @@ export function SiteHeader({
               <span className="me-chip__name">{name}</span>
             </Link>
           ) : (
-            <a className="btn btn--primary" href={loginHref()}>
-              {loginLabel()}
-            </a>
+            <LoginButton />
           )}
         </div>
       </div>

@@ -62,11 +62,3 @@ export const features = {
 export function siteUrl(path: string) {
   return new URL(path, env.appUrl).toString();
 }
-
-/** Where "Log in" buttons go: straight to Discord, or to the picker once Telegram is set up too. */
-export function loginHref(returnTo?: string) {
-  const q = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
-  return features.telegramAuth ? `/login${q}` : `/api/auth/discord${q}`;
-}
-
-export const loginLabel = () => (features.telegramAuth ? 'Log in' : 'Log in with Discord');

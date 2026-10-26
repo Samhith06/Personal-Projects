@@ -11,7 +11,7 @@ import {
   type Eligibility,
 } from '@/server/services/giveaways';
 import { formatAgo, formatCountdown } from '@/lib/format';
-import { loginHref } from '@/lib/env';
+import { LoginButton } from '@/components/LoginButton';
 
 export const metadata: Metadata = { title: 'Giveaways' };
 
@@ -88,9 +88,7 @@ export default async function GiveawaysPage({
                   ) : null}
                 </span>
                 {!user ? (
-                  <a className="btn btn--primary" href={loginHref('/giveaways')}>
-                    Log in to enter
-                  </a>
+                  <LoginButton label="Log in to enter" returnTo="/giveaways" />
                 ) : entered[i] ? (
                   <span className="tag tag--accent">Entered</span>
                 ) : (
