@@ -42,7 +42,7 @@ export function SiteHeader({
             </Link>
           ))}
           {huntOn ? (
-            <Link href="/hunts" className="nav-live">
+            <Link href="/hunt" className="nav-live">
               <span className="dot dot--live" aria-hidden="true" />
               Hunt live
             </Link>

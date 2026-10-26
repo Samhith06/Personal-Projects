@@ -3,12 +3,14 @@
  *
  * Mirrors the data model in ARCHITECTURE.md §4. Money is stored as numeric and
  * read as a JS number (USD, two decimals is plenty for wagers and prizes).
- * Bonus hunts are mirrored from bonushunt.gg; guesses and slot tournaments are our own.
+ * Bonus hunts and slot tournaments are run on the site (MattySpins rules); see the section below.
  */
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   bigserial,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -436,153 +438,241 @@ export const giveawayWinners = pgTable(
 /*                     Bonus hunts and slot tournaments                       */
 /* -------------------------------------------------------------------------- */
 
-/**
- * A bonus hunt, mirrored from bonushunt.gg (`GET /api/public/hunts`). The API
- * fields are copied as they come; our own columns (guessing, prize, winner)
- * are never overwritten by a sync.
+/*
+ * Ported from MattySpins (migrations 015, 018 and 022) and read with raw SQL
+ * in src/server/services/{slots,hunts,tourney}.ts. The one change: prizes are
+ * free text ("$100 tip") that staff pay by hand and mark paid, where MattySpins
+ * paid site coins automatically.
  */
-export const hunts = pgTable(
-  'hunts',
-  {
-    /** bonushunt.gg hunt id. */
-    id: text('id').primaryKey(),
-    title: text('title').notNull(),
-    casino: text('casino'),
-    startCost: money('start_cost').notNull().default(0),
-    currency: text('currency').notNull().default('USD'),
-    isOpening: boolean('is_opening').notNull().default(false),
-    /** bonushunt.gg bonus id being opened right now. */
-    currentOpeningSlot: text('current_opening_slot'),
-    completed: boolean('completed').notNull().default(false),
-    /** `{ bonusCount, openedBonuses, totalWinnings, profitLoss, averagePayoutRequired, … }` */
-    stats: jsonb('stats').notNull().default(sql`'{}'::jsonb`),
-    /** `[{ id, slotName, provider, slotImage, betSize, payout, multiplier, order }]` */
-    bonuses: jsonb('bonuses').notNull().default(sql`'[]'::jsonb`),
-    remoteCreatedAt: ts('remote_created_at').notNull(),
-    remoteUpdatedAt: ts('remote_updated_at').notNull(),
-    syncedAt: ts('synced_at').notNull().defaultNow(),
 
-    /** Staff can close guessing early; it also closes on its own when the opening starts. */
-    guessesOpen: boolean('guesses_open').notNull().default(true),
-    guessPrize: text('guess_prize'),
-    /** Closest guess, set when the hunt completes. */
-    winnerUserId: uuid('winner_user_id').references(() => users.id, { onDelete: 'set null' }),
-    winnerGuess: money('winner_guess'),
-    settledAt: ts('settled_at'),
-    prizePaidAt: ts('prize_paid_at'),
-    /** Hidden from the site (test hunts). */
-    hidden: boolean('hidden').notNull().default(false),
-    /** `!sr` slot suggestions are taken while the hunt is being collected and this is on. */
-    requestsOpen: boolean('requests_open').notNull().default(true),
+const cash = (name: string) => numeric(name, { precision: 12, scale: 2, mode: 'number' });
+const id = () => bigserial('id', { mode: 'number' }).primaryKey();
+
+/**
+ * The slot catalog: what the hunt picks from and what `!sr` matches against.
+ * Filled from bonushunt.gg's public "new slots" feed and by hand. The feed only
+ * shows what is new, so rows accumulate and are never removed by a sync.
+ * `key` (name and provider, letters and digits only) de-duplicates a re-sync.
+ */
+export const slots = pgTable(
+  'slots',
+  {
+    id: id(),
+    key: text('key').notNull().unique(),
+    name: text('name').notNull(),
+    provider: text('provider').notNull().default(''),
+    imageUrl: text('image_url'),
+    playUrl: text('play_url'),
+    casinos: text('casinos').array().notNull().default(sql`'{}'::text[]`),
+    bonusBuy: boolean('bonus_buy'),
+    /** 'bonushunt' | 'manual' */
+    source: text('source').notNull().default('bonushunt'),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: updatedAt(),
   },
-  (t) => [index('hunts_created_idx').on(t.remoteCreatedAt)],
+  (t) => [
+    index('slots_name_idx').on(sql`lower(${t.name})`),
+    index('slots_provider_idx').on(t.provider),
+    index('slots_added_idx').on(t.addedAt.desc()),
+  ],
 );
 
-/** Slots chat suggested for a hunt with `!sr`. Staff add them on bonushunt.gg, then mark them here. */
-export const huntRequests = pgTable(
-  'hunt_requests',
+/**
+ * A hunt: collecting → opening → finished. Only one is ever unfinished (the
+ * partial unique index), so chat commands never have to say which. Guess the
+ * balance runs alongside: closed → open → locked → settled.
+ */
+export const bonusHunts = pgTable(
+  'bonus_hunts',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    huntId: text('hunt_id')
+    id: id(),
+    title: text('title').notNull(),
+    startCost: cash('start_cost').notNull(),
+    status: text('status').notNull().default('collecting'),
+    requestsOpen: boolean('requests_open').notNull().default(true),
+    gtbStatus: text('gtb_status').notNull().default('closed'),
+    /** What the closest guess wins, e.g. "$100 tip". Fixed when guessing opens. */
+    gtbPrize: text('gtb_prize'),
+    gtbPrizePaidAt: ts('gtb_prize_paid_at'),
+    /** Written once, at settlement, so a corrected payout can't move the result. */
+    finalBalance: cash('final_balance'),
+    gtbWinnerKickId: text('gtb_winner_kick_id'),
+    gtbWinnerName: text('gtb_winner_name'),
+    gtbWinnerUserId: uuid('gtb_winner_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    openingAt: ts('opening_at'),
+    finishedAt: ts('finished_at'),
+    settledAt: ts('settled_at'),
+  },
+  (t) => [
+    uniqueIndex('bonus_hunts_one_live_idx').on(sql`(${t.status} <> 'finished')`).where(sql`${t.status} <> 'finished'`),
+    check('bonus_hunts_start_cost_check', sql`${t.startCost} >= 0`),
+  ],
+);
+
+/** A bonus in a hunt. `payout` is null until opened. The slot is copied so editing the catalog can't rewrite history. */
+export const huntBonuses = pgTable(
+  'hunt_bonuses',
+  {
+    id: id(),
+    huntId: bigint('hunt_id', { mode: 'number' })
       .notNull()
-      .references(() => hunts.id, { onDelete: 'cascade' }),
+      .references(() => bonusHunts.id, { onDelete: 'cascade' }),
+    slotId: bigint('slot_id', { mode: 'number' }).references(() => slots.id, { onDelete: 'set null' }),
+    slotName: text('slot_name').notNull(),
+    provider: text('provider').notNull().default(''),
+    imageUrl: text('image_url'),
+    bet: cash('bet').notNull(),
+    payout: cash('payout'),
+    position: integer('position').notNull(),
+    requestedBy: text('requested_by'),
+    createdAt: createdAt(),
+    openedAt: ts('opened_at'),
+  },
+  (t) => [
+    index('hunt_bonuses_hunt_idx').on(t.huntId, t.position),
+    check('hunt_bonuses_bet_check', sql`${t.bet} > 0`),
+    check('hunt_bonuses_payout_check', sql`${t.payout} >= 0`),
+  ],
+);
+
+/** `!sr <slot>` from Kick chat. Any number per viewer; the same slot twice while pending is ignored. */
+export const slotRequests = pgTable(
+  'slot_requests',
+  {
+    id: id(),
+    huntId: bigint('hunt_id', { mode: 'number' })
+      .notNull()
+      .references(() => bonusHunts.id, { onDelete: 'cascade' }),
     kickUserId: text('kick_user_id').notNull(),
     kickUsername: text('kick_username').notNull(),
-    slot: text('slot').notNull(),
-    /** Lowercased letters and digits only, so "Sweet Bonanza" and "sweet-bonanza" are one request. */
-    slotKey: text('slot_key').notNull(),
-    /** pending | added | dismissed */
+    query: text('query').notNull(),
+    slotId: bigint('slot_id', { mode: 'number' }).references(() => slots.id, { onDelete: 'set null' }),
+    /** 'pending' | 'added' | 'dismissed' */
     status: text('status').notNull().default('pending'),
-    /** Set when staff add it: the base bet it was bought at, and the kind of bonus. */
-    bet: money('bet'),
-    /** normal | super | hidden */
-    bonusType: text('bonus_type'),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex('hunt_requests_once_idx').on(t.huntId, t.kickUserId, t.slotKey), index('hunt_requests_hunt_idx').on(t.huntId, t.status)],
+  (t) => [
+    index('slot_requests_hunt_idx').on(t.huntId, t.status, t.createdAt),
+    index('slot_requests_viewer_idx').on(t.huntId, t.kickUserId, t.status),
+  ],
 );
 
-/** One guess per member per hunt; guessing again replaces it until guessing closes. */
-export const huntGuesses = pgTable(
-  'hunt_guesses',
+/** `!gtb <amount>`: one guess per chatter per hunt, replaceable while guessing is open. */
+export const gtbGuesses = pgTable(
+  'gtb_guesses',
   {
-    huntId: text('hunt_id')
+    huntId: bigint('hunt_id', { mode: 'number' })
       .notNull()
-      .references(() => hunts.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    amount: money('amount').notNull(),
-    /** 'site' | 'chat' */
-    source: text('source').notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
+      .references(() => bonusHunts.id, { onDelete: 'cascade' }),
+    kickUserId: text('kick_user_id').notNull(),
+    kickUsername: text('kick_username').notNull(),
+    guess: cash('guess').notNull(),
+    guessedAt: timestamp('guessed_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.huntId, t.userId] })],
+  (t) => [primaryKey({ columns: [t.huntId, t.kickUserId] }), check('gtb_guesses_guess_check', sql`${t.guess} >= 0`)],
 );
 
 /**
- * Slot tournament (not in the bonushunt.gg API, so run from the admin panel).
- * Single elimination; each match is two players' slots, highest multiplier wins.
+ * A slot tournament. Chat signs up with `!sr <slot>`; seeding draws a 4, 8 or
+ * 16 bracket at random (shrunk, with byes, if fewer signed up); each match is
+ * one bonus buy a side and the higher multiplier goes through. Only one is
+ * ever live, so `!sr` never has to say which.
  */
-export const tournaments = pgTable('tournaments', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  prize: text('prize'),
-  /** Most players the bracket holds: 4, 8 or 16. */
-  size: integer('size').notNull().default(8),
-  /** signup | live | finished */
-  status: text('status').notNull().default('signup'),
-  /** `!sr` sign-ups (and, once live, slot changes) are taken while this is on. */
-  requestsOpen: boolean('requests_open').notNull().default(true),
-  createdAt: createdAt(),
-  startedAt: ts('started_at'),
-  finishedAt: ts('finished_at'),
-});
-
-/** Who signed up in chat with `!sr <slot>`, and the slot they'll play. One entry per Kick account. */
-export const tournamentEntries = pgTable(
-  'tournament_entries',
+export const tourneyGames = pgTable(
+  'tourney_games',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tournamentId: uuid('tournament_id')
-      .notNull()
-      .references(() => tournaments.id, { onDelete: 'cascade' }),
-    /** Null for players staff added by hand. */
-    kickUserId: text('kick_user_id'),
-    kickUsername: text('kick_username').notNull(),
-    slot: text('slot').notNull(),
+    id: id(),
+    title: text('title').notNull(),
+    size: integer('size').notNull(),
+    /** What the champion wins, e.g. "$250". */
+    prize: text('prize'),
+    prizePaidAt: ts('prize_paid_at'),
+    /** 'signup' | 'running' | 'finished' */
+    status: text('status').notNull().default('signup'),
+    requestsOpen: boolean('requests_open').notNull().default(true),
     createdAt: createdAt(),
-    updatedAt: updatedAt(),
+    startedAt: ts('started_at'),
+    finishedAt: ts('finished_at'),
   },
-  (t) => [uniqueIndex('tournament_entries_kick_idx').on(t.tournamentId, t.kickUserId)],
+  (t) => [
+    uniqueIndex('tourney_games_one_live_idx').on(sql`(${t.status} <> 'finished')`).where(sql`${t.status} <> 'finished'`),
+    check('tourney_games_size_check', sql`${t.size} IN (2, 4, 8, 16)`),
+  ],
 );
 
-export const tournamentMatches = pgTable(
-  'tournament_matches',
+/** Sign-ups: one per chatter per tournament, with the slot they'll play. `seeded` = made the bracket. */
+export const tourneyEntries = pgTable(
+  'tourney_entries',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tournamentId: uuid('tournament_id')
+    id: id(),
+    gameId: bigint('game_id', { mode: 'number' })
       .notNull()
-      .references(() => tournaments.id, { onDelete: 'cascade' }),
-    /** 1 = first round; the final is the last round. */
-    round: integer('round').notNull(),
-    /** Position within the round, 0-based; winners of 2k and 2k+1 meet next round. */
-    slot: integer('slot').notNull(),
-    playerA: text('player_a'),
-    slotA: text('slot_a'),
-    multiA: numeric('multi_a', { precision: 12, scale: 2, mode: 'number' }),
-    playerB: text('player_b'),
-    slotB: text('slot_b'),
-    multiB: numeric('multi_b', { precision: 12, scale: 2, mode: 'number' }),
-    /** 'a' | 'b' once decided. A level result leaves it null and both buy again. */
-    winner: text('winner'),
-    /** Every bonus bought in this match (ties included), and what they cost and paid, for profit. */
-    buys: integer('buys').notNull().default(0),
-    cost: money('cost').notNull().default(0),
-    payout: money('payout').notNull().default(0),
+      .references(() => tourneyGames.id, { onDelete: 'cascade' }),
+    kickUserId: text('kick_user_id').notNull(),
+    kickUsername: text('kick_username').notNull(),
+    query: text('query').notNull(),
+    slotId: bigint('slot_id', { mode: 'number' }).references(() => slots.id, { onDelete: 'set null' }),
+    seeded: boolean('seeded').notNull().default(false),
+    createdAt: createdAt(),
   },
-  (t) => [uniqueIndex('tournament_matches_pos_idx').on(t.tournamentId, t.round, t.slot)],
+  (t) => [uniqueIndex('tourney_entries_game_kick_idx').on(t.gameId, t.kickUserId)],
+);
+
+/** Every match of every round, made at seeding. A bye is a round 1 match with no second player. */
+export const tourneyMatches = pgTable(
+  'tourney_matches',
+  {
+    id: id(),
+    gameId: bigint('game_id', { mode: 'number' })
+      .notNull()
+      .references(() => tourneyGames.id, { onDelete: 'cascade' }),
+    round: integer('round').notNull(),
+    position: integer('position').notNull(),
+    aEntryId: bigint('a_entry_id', { mode: 'number' }).references(() => tourneyEntries.id, { onDelete: 'set null' }),
+    bEntryId: bigint('b_entry_id', { mode: 'number' }).references(() => tourneyEntries.id, { onDelete: 'set null' }),
+    bye: boolean('bye').notNull().default(false),
+    winnerEntryId: bigint('winner_entry_id', { mode: 'number' }).references(() => tourneyEntries.id, { onDelete: 'set null' }),
+    /** 'played' | 'bye' | 'forfeit', once there is a winner. */
+    decidedBy: text('decided_by'),
+    decidedAt: ts('decided_at'),
+  },
+  (t) => [uniqueIndex('tourney_matches_pos_idx').on(t.gameId, t.round, t.position)],
+);
+
+/** Every buy, kept as history. Scores are read from these, never stored. */
+export const tourneyTurns = pgTable(
+  'tourney_turns',
+  {
+    id: id(),
+    gameId: bigint('game_id', { mode: 'number' })
+      .notNull()
+      .references(() => tourneyGames.id, { onDelete: 'cascade' }),
+    matchId: bigint('match_id', { mode: 'number' })
+      .notNull()
+      .references(() => tourneyMatches.id, { onDelete: 'cascade' }),
+    entryId: bigint('entry_id', { mode: 'number' }).references(() => tourneyEntries.id, { onDelete: 'set null' }),
+    /** 'a' | 'b' */
+    side: text('side').notNull(),
+    kickUsername: text('kick_username').notNull(),
+    slotId: bigint('slot_id', { mode: 'number' }).references(() => slots.id, { onDelete: 'set null' }),
+    slotName: text('slot_name').notNull(),
+    provider: text('provider').notNull().default(''),
+    imageUrl: text('image_url'),
+    /** 'playing' | 'played' | 'skipped' */
+    status: text('status').notNull().default('playing'),
+    buyCost: cash('buy_cost'),
+    payout: cash('payout'),
+    drawnAt: timestamp('drawn_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: ts('resolved_at'),
+  },
+  (t) => [
+    index('tourney_turns_match_idx').on(t.matchId, t.drawnAt),
+    uniqueIndex('tourney_turns_one_playing_idx').on(t.gameId).where(sql`${t.status} = 'playing'`),
+    check('tourney_turns_side_check', sql`${t.side} IN ('a', 'b')`),
+    check('tourney_turns_cost_check', sql`${t.buyCost} > 0`),
+    check('tourney_turns_payout_check', sql`${t.payout} >= 0`),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */

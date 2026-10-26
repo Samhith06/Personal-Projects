@@ -47,3 +47,34 @@ export function maskName(name: string) {
 
 /** What a board's numbers are: Roobet's weighted wager, or the raw total. */
 export const metricLabel = (metric: string) => (metric === 'weighted' ? 'weighted wager' : 'wagered');
+
+/* Bonus hunt and slot tournament figures (same output as MattySpins' lib/format). */
+
+/** "$1,234" or "$1,234.50": cents only when there are some. */
+export function money(amount: number): string {
+  const hasCents = Math.abs(amount % 1) > 0.0001;
+  return amount.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0,
+  });
+}
+
+/** A multiplier to two places at most: "12.35×", "130×". */
+export function mult(m: number): string {
+  if (m === 0) return '0×';
+  return `${m.toFixed(2).replace(/\.?0+$/, '')}×`;
+}
+
+const UTC = { timeZone: 'UTC' } as const;
+
+/** "26 Oct 2026". */
+export function dateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { ...UTC, day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** "26 Oct, 14:05 UTC". */
+export function dateTime(iso: string): string {
+  return `${new Date(iso).toLocaleString('en-GB', { ...UTC, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} UTC`;
+}

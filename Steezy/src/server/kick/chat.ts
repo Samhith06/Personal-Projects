@@ -1,14 +1,13 @@
 /**
  * Everything that happens when a chat message arrives from Kick's webhook:
- * `!verify` codes, watch time (only while live), giveaway `!join`, `!guess`,
- * `!sr` slot requests / tournament sign-ups and bot commands.
+ * `!verify` codes, watch time (only while live), giveaway `!join`, the bonus
+ * hunt and slot tournament's `!sr` / `!gtb`, and bot commands.
  */
 import { handleJoinCommand } from '@/server/services/giveaways';
-import { handleGuessCommand, type GuessResult } from '@/server/services/hunts';
 import { handleVerifyCommand } from './chat-verification';
 import { parseCommand, replyFor, takeCooldown } from './commands';
 import { sendChat, type SendChat } from './bot';
-import { handleSlotRequest } from './slot-requests';
+import { handleHuntCommand, type HuntCommandOutcome } from './hunt-commands';
 import { openSession } from './sessions';
 import { recordChat, type ChatEvent } from './watchtime';
 
@@ -17,14 +16,13 @@ export type ChatOutcome = {
   recorded: boolean;
   counted: boolean;
   joined: boolean;
-  guess: GuessResult | null;
-  /** What `!sr` did, if the message was one, as `target:result`. */
-  slotRequest: string | null;
+  /** What `!sr` or `!gtb` did, if the message was one. */
+  huntCommand: HuntCommandOutcome | null;
   reply: string | null;
 };
 
 export async function handleChatEvent(msg: ChatEvent, broadcasterUserId: string, send: SendChat = sendChat): Promise<ChatOutcome> {
-  const outcome: ChatOutcome = { verified: false, recorded: false, counted: false, joined: false, guess: null, slotRequest: null, reply: null };
+  const outcome: ChatOutcome = { verified: false, recorded: false, counted: false, joined: false, huntCommand: null, reply: null };
 
   outcome.verified = await handleVerifyCommand(msg);
 
@@ -40,19 +38,9 @@ export async function handleChatEvent(msg: ChatEvent, broadcasterUserId: string,
   // `!join` (or a giveaway's own keyword) — silent: the overlay shows who joined, so chat isn't flooded with replies.
   const joins = await handleJoinCommand(msg.senderId, msg.content);
   outcome.joined = joins.some((j) => j.result === 'entered');
-  // `!guess 4200` for the current bonus hunt — also silent; the hunt overlay shows the guess count.
-  outcome.guess = await handleGuessCommand(msg.senderId, msg.content);
-
-  // `!sr Sweet Bonanza`: tournament sign-up / slot change first, else a hunt suggestion. Answered, with a cooldown.
-  const sr = await handleSlotRequest(msg.senderId, msg.senderUsername, msg.content);
-  if (sr) {
-    outcome.slotRequest = `${sr.target}:${sr.result}`;
-    if (sr.reply) {
-      outcome.reply = `@${msg.senderUsername} ${sr.reply}`;
-      await send({ broadcasterUserId, content: outcome.reply, replyToMessageId: msg.messageId });
-    }
-    return outcome;
-  }
+  // `!sr Sweet Bonanza` (tournament first, else the hunt) and `!gtb 4200` — silent too; the overlays show them.
+  outcome.huntCommand = await handleHuntCommand(msg);
+  if (outcome.huntCommand) return outcome;
 
   const command = parseCommand(msg.content);
   if (command && takeCooldown(command, msg.senderId)) {

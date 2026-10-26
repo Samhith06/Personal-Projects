@@ -1,0 +1,556 @@
+/* ------------------------------------------------------------------------ */
+/* Bonus hunt, slot tournament and slot catalog (ported from MattySpins).   */
+/* The pages reuse pages.css/admin.css; these are the pieces they add.      */
+/* ------------------------------------------------------------------------ */
+
+/* The add-bonus type-ahead, hung under its input. */
+.slot-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 4px;
+  overflow: hidden;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 10px;
+  background: var(--color-surface-2);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+}
+
+.slot-suggest button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slot-suggest button:hover,
+.slot-suggest button:focus-visible {
+  background: var(--color-surface);
+  outline: none;
+}
+
+.slot-suggest span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slot-suggest small {
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+
+/* Name / bracket / prize / button, and the catalog's add form. */
+.tourney-form,
+.slot-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.slot-form {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr) auto auto;
+}
+
+.slot-form .check {
+  padding-bottom: 12px;
+}
+
+.tourney-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.tourney-form .field label,
+.slot-form .field label,
+.tourney-result .field label {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@media (max-width: 760px) {
+  .tourney-form,
+  .slot-form,
+  .tourney-result {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The match being played beside the buy in play. */
+.tourney-admin {
+  display: grid;
+  grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .tourney-admin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* One OBS source per line: what it is, the size to make it, the link. */
+.overlay-link {
+  display: grid;
+  grid-template-columns: 170px 220px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .overlay-link {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.signup-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--color-line);
+}
+
+/* The player buying right now, in the bracket and head to head. */
+.tb-row.is-live {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.tb-row.is-live b {
+  color: var(--color-accent);
+}
+
+.tv-side.is-live .tv-label {
+  color: var(--color-accent);
+}
+
+.tv-side.is-live .slot-thumb {
+  box-shadow: 0 0 0 2px var(--color-accent), 0 0 18px -2px var(--color-accent);
+}
+
+/* ------------------------------------------------------------------------ */
+/* OBS overlays: /overlay/hunt and /overlay/tournament                       */
+/* ------------------------------------------------------------------------ */
+
+/* MattySpins' overlay rules below, on SteezySpins' palette. */
+.ovl {
+  --text: var(--color-text);
+  --muted: var(--color-muted);
+  --muted-2: #66726b;
+  --panel: var(--color-surface);
+  --panel-2: var(--color-surface-2);
+  --panel-3: var(--color-line);
+  --edge: var(--color-line);
+  --edge-2: var(--color-line-strong);
+  --blue: var(--color-accent);
+  --green: var(--color-accent-400);
+  --gold: var(--medal-gold);
+  --red: #ff7a6b;
+  --warn: var(--color-warn);
+  --display: var(--font-sans);
+  --body: var(--font-sans);
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* Transparent so the source sits over the game capture. Scoped with :has so
+   only the overlay route loses the site's background. */
+html:has(.ovl),
+body:has(.ovl) {
+  background: transparent !important;
+  min-height: 0;
+}
+
+.ovl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.ovl-card {
+  background: rgba(10, 15, 12, 0.84);
+  border: 1px solid rgba(79, 208, 138, 0.28);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ovl .gold { color: var(--gold); }
+.ovl .green { color: var(--green); }
+.ovl .red { color: var(--red); }
+.ovl .blue { color: var(--blue); }
+
+.ovl-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ovl code {
+  font-family: var(--mono);
+  color: var(--blue);
+  background: rgba(79, 208, 138, 0.1);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.ovl small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Header ------------------------------------------------------------------ */
+.ovl-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.ovl-head b {
+  font-family: var(--display);
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-phase {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--edge-2);
+  color: var(--muted);
+}
+
+.ovl-phase.opening {
+  color: var(--blue);
+  border-color: rgba(79, 208, 138, 0.5);
+}
+
+.ovl-phase.collecting {
+  color: var(--gold);
+  border-color: rgba(255, 198, 26, 0.45);
+}
+
+/* Stats — wraps into a block in a narrow source, a strip in a wide one ---- */
+.ovl-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 14px;
+}
+
+.ovl-stats > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ovl-stats span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ovl-stats b {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Now opening ------------------------------------------------------------- */
+.ovl-now {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border-color: rgba(79, 208, 138, 0.55);
+}
+
+.ovl-now-text {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ovl-now-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ovl-now-name {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.ovl-now-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.ovl-now-meta b {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.ovl-cta {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Slot art ---------------------------------------------------------------- */
+.ovl-art {
+  flex: none;
+  width: 30px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.ovl-art.big {
+  width: 72px;
+  height: 96px;
+  border-radius: 8px;
+}
+
+.ovl-art.slot-thumb--ph {
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+.ovl-art.big.slot-thumb--ph {
+  font-size: 22px;
+}
+
+/* Bonus list -------------------------------------------------------------- */
+.ovl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px;
+}
+
+.ovl-row {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 7px;
+  transition: background-color 0.4s ease;
+}
+
+.ovl-row.now {
+  background: rgba(79, 208, 138, 0.14);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.ovl-row.pending:not(.now) {
+  opacity: 0.62;
+}
+
+.ovl-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.ovl-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ovl-name b {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-name small {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovl-x {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ovl-x small {
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.ovl-x.dim { color: var(--muted); }
+.ovl-x.gold { color: var(--gold); }
+
+.ovl-x.best {
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 198, 26, 0.55);
+}
+
+.ovl-more {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* Guess the balance ------------------------------------------------------- */
+.ovl-gtb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ovl-gtb.open {
+  border-color: rgba(127, 222, 164, 0.55);
+}
+
+.ovl-gtb.settled {
+  border-color: rgba(255, 198, 26, 0.55);
+}
+
+.ovl-gtb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.ovl-gtb-head b {
+  font-family: var(--mono);
+}
+
+.ovl-winner {
+  display: flex;
+  flex-direction: column;
+}
+
+.ovl-winner span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ovl-winner b {
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ovl-row {
+    transition: none;
+  }
+}
+
+
+/* The champion card. */
+.ovl-champ {
+  border-color: rgba(255, 198, 26, 0.7);
+}
+
+.ovl-champ .ovl-now-name {
+  font-size: 34px;
+}
+
+/* The tournament's stats strip on its own: five figures always on one row,
+   so it fits the 520 × 90 source the admin screen asks for. */
+.ovl-p-stats.ovl-tourney .ovl-stats {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ovl-p-stats.ovl-tourney .ovl-stats span {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+}
+
+.ovl-p-stats.ovl-tourney .ovl-stats b {
+  font-size: 16px;
+}
+
+/* On stream: the bracket fills the source and reads from across the room. */
+.tb--ovl {
+  min-width: 0;
+}
+
+.tb--ovl .tb-row {
+  padding: 7px 10px;
+  font-size: 14px;
+}
+
+.tb--ovl .tb-match {
+  background: rgba(22, 30, 25, 0.85);
+}
+
+.ovl-tourney .tv {
+  padding: 4px;
+  border: 0;
+  background-color: rgba(10, 15, 12, 0.6);
+}
+
+/* An OBS source is sized by staff, not a phone: the two players always face
+   each other, whatever the source's width. */
+.ovl-tourney .tv-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.ovl-tourney .tv-side:last-child {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.ovl-tourney .tv-vs {
+  font-size: 20px;
+}

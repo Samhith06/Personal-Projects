@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'roobet.com' },
     ],
   },
+  // The bonus hunt and tournament moved to MattySpins' paths; old links and bookmarks still land.
+  async redirects() {
+    return [
+      { source: '/hunts', destination: '/hunt', permanent: true },
+      { source: '/admin/hunts/:path*', destination: '/admin/hunt', permanent: true },
+      { source: '/admin/hunts', destination: '/admin/hunt', permanent: true },
+      { source: '/admin/tournaments/:path*', destination: '/admin/tournament', permanent: true },
+      { source: '/admin/tournaments', destination: '/admin/tournament', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

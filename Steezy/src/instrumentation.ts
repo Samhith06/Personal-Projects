@@ -3,7 +3,7 @@
  *
  * Keeps Roobet wagers in step — pull now, then every ROOBET_SYNC_INTERVAL_MS —
  * posts leaderboard climbs and daily standings to Discord, freezes live leaderboards whose window has ended, closes ended draws, and
- * mirrors bonushunt.gg hunts every BONUSHUNT_SYNC_INTERVAL_MS.
+ * refreshes the slot catalog from bonushunt.gg's new-slots feed every six hours.
  * This needs a server that stays up; on serverless hosting, run
  * `npm run roobet:sync` from a scheduler instead. The Kick chat worker, badge
  * and watch-time jobs will be started from here as they're built.
@@ -67,26 +67,26 @@ export async function register() {
     console.error('[instrumentation] could not start the Roobet sync', error);
   }
 
-  await startHuntSync();
+  startSlotCatalogSync();
 }
 
-/** Mirror bonushunt.gg hunts every BONUSHUNT_SYNC_INTERVAL_MS (30 s) so the hunt overlay keeps up with the opening. */
-async function startHuntSync() {
-  try {
-    const { bonushuntKey, syncHunts } = await import('@/server/bonushunt/sync');
-    const key = bonushuntKey();
-    if (!key) return;
-    let lastError: string | null = null;
-    const run = async () => {
-      const result = await syncHunts(key);
-      // Log failures once, not every 30 seconds.
-      if (!result.ok && result.error !== lastError) console.warn(`[bonushunt] sync failed — ${result.error}`);
-      if (result.ok && result.settled) console.log(`[bonushunt] settled ${result.settled} hunt(s)`);
-      lastError = result.ok ? null : result.error;
-    };
-    await run();
-    setInterval(run, Math.max(15_000, Number(process.env.BONUSHUNT_SYNC_INTERVAL_MS ?? 30_000))).unref?.();
-  } catch (error) {
-    console.error('[instrumentation] could not start the bonushunt.gg sync', error);
-  }
+/**
+ * The slot catalog the hunt and `!sr` match against. bonushunt.gg's feed only
+ * covers the last week and refreshes hourly, so every six hours misses nothing
+ * while keeping the load on their free API small. The first run waits a
+ * minute so a deploy's boot isn't spent crawling ~20 pages.
+ */
+function startSlotCatalogSync() {
+  const run = async () => {
+    try {
+      const { syncCatalog } = await import('@/server/services/slots');
+      const result = await syncCatalog();
+      if (result.ok) console.log(`[slots] read ${result.seen} slot(s) from bonushunt.gg; catalog holds ${result.total}`);
+      else console.warn(`[slots] catalog sync failed — ${result.detail}`);
+    } catch (error) {
+      console.warn('[slots] catalog sync failed', error);
+    }
+  };
+  setTimeout(run, 60_000).unref?.();
+  setInterval(run, 6 * 60 * 60 * 1000).unref?.();
 }

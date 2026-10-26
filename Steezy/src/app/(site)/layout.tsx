@@ -5,8 +5,8 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { getCurrentUser, needsAgeConfirmation } from '@/server/auth/session';
 import { openSession } from '@/server/kick/sessions';
-import { activeHunt } from '@/server/services/hunts';
-import { featuredTournament } from '@/server/services/tournaments';
+import { liveHunt } from '@/server/services/hunts';
+import { liveTourney } from '@/server/services/tourney';
 import { displayName } from '@/lib/identity';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
@@ -19,10 +19,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const showAgeGate = user ? await needsAgeConfirmation(user) : !(await cookies()).has(AGE_COOKIE);
   const [session, hunt, tournament] = await Promise.all([
     openSession().catch(() => null),
-    activeHunt().catch(() => null),
-    featuredTournament().catch(() => null),
+    liveHunt().catch(() => null),
+    liveTourney().catch(() => null),
   ]);
-  const tournamentOn = tournament?.status === 'live' || tournament?.status === 'signup' ? tournament.status : null;
+  const tournamentOn = tournament ? (tournament.status === 'running' ? 'live' : 'signup') : null;
 
   return (
     <>

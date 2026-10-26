@@ -41,10 +41,11 @@ After changing `src/server/db/schema.ts`: `npm run db:generate` (writes a new SQ
 | Home hero: animated 3D casino-chip background (three.js, `src/components/home/`), lazy-loaded, pauses off-screen, still frame for reduced motion | done |
 | `/hall-of-fame`: monthly champions, mega wins and the 500×–2,000× clubs, community records | done |
 | `/u/<kick or discord name>` public profiles: badges, stats, finishes, biggest hit, trophies; privacy toggles on `/me` | done |
-| `/hunts`: bonus hunts mirrored from bonushunt.gg every 30 s (`GET /api/public/hunts`, Bearer key) | done |
-| Guess the balance: `!guess 4200` or on the site; locks when the opening starts; closest guess wins on completion | done |
-| Slot tournaments (not in the bonushunt.gg API): admin-run single-elimination brackets with byes | done |
-| OBS hunt overlay `/overlay/hunt/<token>`: one source that switches by phase — collecting (guessing open / locked), opening (closest guess right now), finished (results card) | done |
+| `/hunt`: bonus hunts run from `/admin/hunt` (MattySpins rules): collecting → opening → finished, bonuses from the slot catalog or `!sr` requests, payouts entered as each opens | done |
+| Guess the balance: `!gtb 1234.56` (or `!guess`) in Kick chat; open → locked when opening starts → settled to the closest linked guess; text prize marked paid by staff | done |
+| `/tournament`: slot tournaments run from `/admin/tournament` (MattySpins rules): `!sr` sign-ups, random seeding into 4/8/16 with byes, one buy a side per match, forfeits, undo | done |
+| Slot catalog `/admin/slots`: bonushunt.gg's new-slots feed every 6 h plus slots added by hand; `!sr` matches against it | done |
+| OBS overlays `/overlay/hunt` and `/overlay/tournament`, with `?panel=` for single panels (sizes on the admin screens) | done |
 | Hunts in the site nav only while a hunt or tournament is live; hunt + tournament controls on the admin overview | done |
 | Mobile: every page checked at 360px (no sideways overflow); header, admin menu, milestones and hunts tuned for phones (`src/styles/mobile.css`) | done |
 | Home: top-3 podium, About section (needs Steezy's photo + social handles) | done |

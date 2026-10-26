@@ -1,143 +1,135 @@
 import Link from 'next/link';
-import { ResultForm } from './ResultForm';
-import { toggleGuessing, toggleHuntRequests } from '@/server/actions/hunts';
-import { requestsFor } from '@/server/services/hunt-requests';
-import { activeHunt, bestMulti, guessCount, guessingOpen, huntBonuses, huntStats } from '@/server/services/hunts';
-import { featuredTournament, getEntries, getMatches, summarise } from '@/server/services/tournaments';
-import { formatUsd } from '@/lib/format';
+import { HuntSwitches } from '@/components/admin/HuntControls';
+import { TourneySwitches } from '@/components/admin/TourneyControls';
+import { roundName } from '@/lib/tourney';
+import { money, mult } from '@/lib/format';
+import { bonusesFor, guessesFor, huntStats, liveHunt, requestsFor } from '@/server/services/hunts';
+import { liveTourney, summariseTourney, tourneyEntriesFor, tourneyMatchesFor, tourneyTurnsFor } from '@/server/services/tourney';
 
-const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const PHASE = { collecting: 'Collecting', opening: 'Opening', finished: 'Finished' } as const;
 
 /**
  * Admin overview panel: the running bonus hunt and slot tournament, with the
- * on-stream actions (open/close guessing, enter the next match result) right
- * here instead of on separate pages.
+ * same switches as their own screens so the common moves are one click away.
  */
 export async function StreamGamesPanel() {
-  const [hunt, tournament] = await Promise.all([activeHunt(), featuredTournament()]);
-  const [count, matches, entries, pending] = await Promise.all([
-    hunt ? guessCount(hunt.id) : 0,
-    tournament ? getMatches(tournament.id) : [],
-    tournament ? getEntries(tournament.id) : [],
-    hunt ? requestsFor(hunt.id) : [],
+  const [hunt, tourney] = await Promise.all([liveHunt(), liveTourney()]);
+  const [bonuses, requests, guesses, entries, matches, turns] = await Promise.all([
+    hunt ? bonusesFor(hunt.id) : [],
+    hunt ? requestsFor(hunt.id, 'pending') : [],
+    hunt ? guessesFor(hunt.id) : [],
+    tourney ? tourneyEntriesFor(tourney.id) : [],
+    tourney ? tourneyMatchesFor(tourney.id) : [],
+    tourney ? tourneyTurnsFor(tourney.id) : [],
   ]);
-  const next = summarise(matches).current;
-
-  const s = hunt ? huntStats(hunt) : null;
-  const bonuses = hunt ? huntBonuses(hunt) : [];
-  const current = hunt ? bonuses.find((b) => b.id === hunt.currentOpeningSlot) : null;
-  const phase = !hunt ? null : hunt.isOpening ? 'Opening' : guessingOpen(hunt) ? 'Collecting · guessing open' : 'Collecting · guessing closed';
+  const stats = hunt ? huntStats(hunt, bonuses) : null;
+  const current = hunt?.status === 'opening' ? bonuses.find((b) => b.payout == null) : undefined;
+  const s = tourney ? summariseTourney(tourney, entries, matches, turns) : null;
+  const nextSide = s?.current?.state.next ?? null;
+  const nextPlayer = s?.current && nextSide ? s.current[nextSide] : null;
+  const last = turns[turns.length - 1];
 
   return (
     <section className="admin-split">
       <div className="card stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <strong>Bonus hunt</strong>
-          <Link href="/admin/hunts" style={{ fontSize: 13 }}>
-            Manage
+          <Link href="/admin/hunt" style={{ fontSize: 13 }}>
+            {hunt ? 'Manage' : 'Start one'}
           </Link>
         </div>
-        {hunt && s ? (
+        {hunt && stats ? (
           <>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span>
-                {hunt.title}
-                {hunt.casino ? <span className="meta"> · {hunt.casino}</span> : null}
-              </span>
-              <span className={hunt.isOpening ? 'tag tag--accent' : 'tag tag--warn'}>{phase}</span>
+              <span>{hunt.title}</span>
+              <span className={hunt.status === 'opening' ? 'tag tag--accent' : 'tag tag--warn'}>{PHASE[hunt.status]}</span>
             </div>
             <div className="hunt-stats">
               <div>
                 <span className="meta">Start</span>
-                <b className="num">{formatUsd(hunt.startCost)}</b>
+                <b className="num">{money(hunt.startCost)}</b>
               </div>
               <div>
                 <span className="meta">Opened</span>
                 <b className="num">
-                  {s.openedBonuses ?? 0}/{s.bonusCount ?? bonuses.length}
+                  {stats.opened}/{stats.bonuses}
                 </b>
               </div>
               <div>
                 <span className="meta">Won</span>
-                <b className="num">{money2(s.totalWinnings ?? 0)}</b>
+                <b className="num">{money(stats.won)}</b>
               </div>
               <div>
                 <span className="meta">Best</span>
-                <b className="num">{bestMulti(hunt) ? `${bestMulti(hunt)}×` : '—'}</b>
+                <b className="num">{stats.best?.payout != null ? mult(stats.best.payout / stats.best.bet) : '—'}</b>
               </div>
             </div>
             {current ? <span className="meta">Opening now: {current.slotName}</span> : null}
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <Link href="/admin/hunts" className="meta">
-                {pending.length} slot request{pending.length === 1 ? '' : 's'} waiting
-              </Link>
-              {!hunt.isOpening ? (
-                <form action={toggleHuntRequests}>
-                  <input type="hidden" name="huntId" value={hunt.id} />
-                  <input type="hidden" name="open" value={hunt.requestsOpen ? '0' : '1'} />
-                  <input type="hidden" name="back" value="/admin" />
-                  <button className="btn btn--secondary" type="submit">
-                    {hunt.requestsOpen ? 'Close !sr' : 'Open !sr'}
-                  </button>
-                </form>
-              ) : null}
-            </div>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span className="meta">
-                {count} guess{count === 1 ? '' : 'es'}
-                {hunt.isOpening ? ' · locked automatically while opening' : ''}
-              </span>
-              {!hunt.isOpening ? (
-                <form action={toggleGuessing}>
-                  <input type="hidden" name="huntId" value={hunt.id} />
-                  <input type="hidden" name="open" value={hunt.guessesOpen ? '0' : '1'} />
-                  <input type="hidden" name="back" value="/admin" />
-                  <button className={hunt.guessesOpen ? 'btn btn--secondary' : 'btn btn--primary'} type="submit">
-                    {hunt.guessesOpen ? 'Close guessing' : 'Open guessing'}
-                  </button>
-                </form>
-              ) : null}
-            </div>
+            <Link href="/admin/hunt" className="meta">
+              {requests.length} slot request{requests.length === 1 ? '' : 's'} waiting · {guesses.length} guess{guesses.length === 1 ? '' : 'es'}
+            </Link>
+            <HuntSwitches
+              huntId={hunt.id}
+              status={hunt.status}
+              requestsOpen={hunt.requestsOpen}
+              gtbStatus={hunt.gtbStatus}
+              gtbPrize={hunt.gtbPrize}
+              unopened={stats.bonuses - stats.opened}
+            />
           </>
         ) : (
-          <p className="meta">No hunt running. Start one on bonushunt.gg — it shows here and in the site nav within 30 seconds.</p>
+          <p className="meta">No hunt running.</p>
         )}
       </div>
 
       <div className="card stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <strong>Slot tournament</strong>
-          <Link href={tournament ? `/admin/tournaments/${tournament.id}` : '/admin/tournaments'} style={{ fontSize: 13 }}>
-            {tournament ? 'Bracket' : 'Create one'}
+          <Link href="/admin/tournament" style={{ fontSize: 13 }}>
+            {tourney ? 'Bracket' : 'Open one'}
           </Link>
         </div>
-        {tournament?.status === 'live' ? (
-          <>
-            <span>{tournament.name}</span>
-            {next ? (
-              <div className="stack" style={{ gap: 8 }}>
+        {tourney && s ? (
+          tourney.status === 'signup' ? (
+            <>
+              <span>{tourney.title}</span>
+              <span className="meta">
+                {entries.length} signed up for {tourney.size} places · !sr {tourney.requestsOpen ? 'open' : 'closed'}
+              </span>
+              <Link className="btn btn--primary" href="/admin/tournament" style={{ alignSelf: 'flex-start' }}>
+                Review sign-ups &amp; seed
+              </Link>
+            </>
+          ) : (
+            <>
+              <span>{tourney.title}</span>
+              {s.current?.a && s.current.b ? (
                 <span className="meta">
-                  Next: {next.roundName} · <b style={{ color: 'var(--color-text)' }}>{next.playerA}</b> ({next.slotA}) vs{' '}
-                  <b style={{ color: 'var(--color-text)' }}>{next.playerB}</b> ({next.slotB})
+                  {roundName(s.current.round, s.rounds)}: <b style={{ color: 'var(--color-text)' }}>{s.current.a.kickUsername}</b> vs{' '}
+                  <b style={{ color: 'var(--color-text)' }}>{s.current.b.kickUsername}</b>
+                  {s.playing ? ` · ${s.playing.kickUsername} is buying ${s.playing.slotName}` : ''}
                 </span>
-                <ResultForm match={next} tournamentId={tournament.id} back="/admin" />
-              </div>
-            ) : (
-              <span className="meta">Waiting for players to reach the next round.</span>
-            )}
-          </>
-        ) : tournament?.status === 'signup' ? (
-          <>
-            <span>{tournament.name}</span>
-            <span className="meta">
-              {entries.length} signed up for {tournament.size} places · !sr {tournament.requestsOpen ? 'open' : 'closed'}
-            </span>
-            <Link className="btn btn--primary" href={`/admin/tournaments/${tournament.id}`} style={{ alignSelf: 'flex-start' }}>
-              Review sign-ups &amp; draw
-            </Link>
-          </>
+              ) : s.champion ? (
+                <span className="meta">{s.champion.kickUsername} won the final.</span>
+              ) : null}
+              <TourneySwitches
+                gameId={tourney.id}
+                requestsOpen={tourney.requestsOpen}
+                nextLabel={nextPlayer && s.current ? `${nextPlayer.kickUsername}'s buy (${roundName(s.current.round, s.rounds)})` : null}
+                inPlay={s.playing != null}
+                decided={s.champion != null}
+                canUndo={last != null && last.status === 'played'}
+                current={null}
+              />
+              {s.playing ? (
+                <Link href="/admin/tournament" className="meta">
+                  Record the result on the tournament screen →
+                </Link>
+              ) : null}
+            </>
+          )
         ) : (
-          <p className="meta">{tournament ? `Last: ${tournament.name} (finished).` : 'No tournaments yet.'}</p>
+          <p className="meta">No tournament running.</p>
         )}
       </div>
     </section>

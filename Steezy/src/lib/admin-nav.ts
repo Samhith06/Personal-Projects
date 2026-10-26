@@ -21,8 +21,9 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   { href: '/admin/milestones', label: 'Milestones', group: 'work' },
   { href: '/admin/raffles', label: 'Raffles', group: 'work' },
   { href: '/admin/giveaways', label: 'Giveaways', group: 'work' },
-  { href: '/admin/hunts', label: 'Bonus hunts', group: 'games' },
-  { href: '/admin/tournaments', label: 'Tournaments', group: 'games' },
+  { href: '/admin/hunt', label: 'Bonus hunt', group: 'games' },
+  { href: '/admin/tournament', label: 'Slot tournament', group: 'games' },
+  { href: '/admin/slots', label: 'Slot catalog', group: 'games' },
   { href: '/admin/members', label: 'Members', group: 'data' },
   { href: '/admin/audit', label: 'Audit log', group: 'sys', count: 'flags' },
 ];
