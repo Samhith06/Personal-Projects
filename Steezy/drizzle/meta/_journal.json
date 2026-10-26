@@ -57,6 +57,13 @@
       "when": 1792958874976,
       "tag": "0007_payout_denied",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792988588304,
+      "tag": "0008_telegram_login",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { AboutSection } from '@/components/home/AboutSection';
 import { ChipBackground } from '@/components/home/ChipBackground';
 import { HomePodium } from '@/components/home/HomePodium';
 import { OfferCard } from '@/components/home/OfferCard';
-import { env } from '@/lib/env';
+import { env, loginHref, loginLabel } from '@/lib/env';
 import { getCurrentUser } from '@/server/auth/session';
 
 /**
@@ -32,8 +32,8 @@ export default async function HomePage() {
                   My profile
                 </a>
               ) : (
-                <a className="btn btn--primary" href="/api/auth/discord">
-                  Log in with Discord
+                <a className="btn btn--primary" href={loginHref()}>
+                  {loginLabel()}
                 </a>
               )}
               <a className="btn btn--secondary" href={env.discordInviteUrl} target="_blank" rel="noopener">

@@ -12,7 +12,7 @@ import { drawWinners, hashSeed, newSeed } from '@/lib/fair';
 import { discordAccountCreatedAt } from '@/lib/discord';
 import { watchTotals } from '@/server/kick/watchtime';
 import { audit } from './audit';
-import { publicName } from './people';
+import { personFields, publicName } from './people';
 import { approvedRoobetUid } from './wagers';
 
 export type Giveaway = typeof giveaways.$inferSelect;
@@ -54,7 +54,7 @@ export function describeEligibility(e: Eligibility) {
   const rules: string[] = [];
   if (e.kickLinked) rules.push('Kick account linked');
   if (e.roobetApproved) rules.push('Roobet username approved');
-  if (e.minDiscordAgeDays) rules.push(`Discord account older than ${e.minDiscordAgeDays} days`);
+  if (e.minDiscordAgeDays) rules.push(`Discord account (or SteezySpins account, for Telegram logins) older than ${e.minDiscordAgeDays} days`);
   if (e.minWatchMinutes) rules.push(`At least ${Math.round(e.minWatchMinutes / 60)}h watch time`);
   return rules.length ? rules : ['Open to every member'];
 }
@@ -69,8 +69,12 @@ export async function eligibilityProblems(g: Giveaway, userId: string) {
   if (e.kickLinked && !user.kickUserId) problems.push('Link your Kick account');
   if (e.roobetApproved && !(await approvedRoobetUid(userId))) problems.push('Get your Roobet username approved');
   if (e.minDiscordAgeDays) {
-    const days = (Date.now() - discordAccountCreatedAt(user.discordId).getTime()) / 86_400_000;
-    if (days < e.minDiscordAgeDays) problems.push(`Your Discord account must be older than ${e.minDiscordAgeDays} days`);
+    // Telegram has no account age to read, so Telegram-only members are held to their SteezySpins account's age.
+    const created = user.discordId ? discordAccountCreatedAt(user.discordId) : user.createdAt;
+    const days = (Date.now() - created.getTime()) / 86_400_000;
+    if (days < e.minDiscordAgeDays) {
+      problems.push(`Your ${user.discordId ? 'Discord' : 'SteezySpins'} account must be older than ${e.minDiscordAgeDays} days`);
+    }
   }
   if (e.minWatchMinutes) {
     const t = await watchTotals(userId);
@@ -120,10 +124,7 @@ export async function hasEntered(giveawayId: string, userId: string) {
 export async function entrantNames(giveawayId: string, limit = 40) {
   const rows = await db
     .select({
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(giveawayEntries)
     .innerJoin(users, eq(users.id, giveawayEntries.userId))
@@ -139,10 +140,7 @@ export async function getGiveawayWinners(giveawayId: string) {
       position: giveawayWinners.position,
       paidAt: giveawayWinners.paidAt,
       userId: giveawayWinners.userId,
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(giveawayWinners)
     .innerJoin(users, eq(users.id, giveawayWinners.userId))
@@ -156,10 +154,7 @@ export async function winnersFor(giveawayIds: string[]) {
   const rows = await db
     .select({
       giveawayId: giveawayWinners.giveawayId,
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(giveawayWinners)
     .innerJoin(users, eq(users.id, giveawayWinners.userId))

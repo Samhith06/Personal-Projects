@@ -11,7 +11,7 @@ import { db } from '@/server/db';
 import { raffles, raffleTickets, raffleWinners, users } from '@/server/db/schema';
 import { drawWinners, hashSeed, newSeed } from '@/lib/fair';
 import { audit } from './audit';
-import { publicName } from './people';
+import { personFields, publicName } from './people';
 import { approvedRoobetUid, wagerTotalFor, wagerTotals, type Metric } from './wagers';
 
 export type Raffle = typeof raffles.$inferSelect;
@@ -59,10 +59,7 @@ export async function getTickets(raffle: Raffle): Promise<TicketRow[]> {
         userId: raffleTickets.userId,
         tickets: raffleTickets.tickets,
         wagered: raffleTickets.wagered,
-        kickUsername: users.kickUsername,
-        discordGlobalName: users.discordGlobalName,
-        discordUsername: users.discordUsername,
-        nameOnLeaderboards: users.nameOnLeaderboards,
+        ...personFields,
       })
       .from(raffleTickets)
       .innerJoin(users, eq(users.id, raffleTickets.userId))
@@ -77,10 +74,7 @@ export async function getTickets(raffle: Raffle): Promise<TicketRow[]> {
   const people = await db
     .select({
       id: users.id,
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(users)
     .where(inArray(users.id, members.map((m) => m.userId!)));
@@ -108,10 +102,7 @@ export async function getRaffleWinners(raffleId: string) {
       prize: raffleWinners.prize,
       paidAt: raffleWinners.paidAt,
       userId: raffleWinners.userId,
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(raffleWinners)
     .innerJoin(users, eq(users.id, raffleWinners.userId))

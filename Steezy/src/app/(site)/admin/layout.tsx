@@ -5,6 +5,7 @@ import { getCurrentUser, hasRole } from '@/server/auth/session';
 import { queueCounts } from '@/server/services/admin';
 import { syncStatus } from '@/server/services/sync-status';
 import { formatAgo } from '@/lib/format';
+import { accountName } from '@/lib/identity';
 
 export const metadata: Metadata = { title: { default: 'Admin', template: '%s · Admin · SteezySpins' }, robots: { index: false } };
 
@@ -27,7 +28,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="staffbar">
         <span className="staffbar__title">◆ Staff area</span>
         <span className="staffbar__who">
-          Signed in as <b>{user.discordUsername}</b> · {user.role} · every action here is written to the audit log
+          Signed in as <b>{accountName(user)}</b> · {user.role} · every action here is written to the audit log
         </span>
         <span className={`staffbar__sync${stale ? ' is-stale' : ''}`}>
           <i />

@@ -193,6 +193,11 @@
   color: #c9ccff;
 }
 
+.account-mark--telegram {
+  background: #17364d;
+  color: #8fd3ff;
+}
+
 .account-mark--kick {
   background: var(--color-accent-900);
   color: var(--color-accent);

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getCurrentUser } from '@/server/auth/session';
 import { getRaffleWinners, getTickets, myRaffleStatus, openRaffles, pastRaffles, type Raffle } from '@/server/services/raffles';
 import { formatCountdown, formatUsd, ordinal } from '@/lib/format';
+import { loginHref } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Raffles' };
 
@@ -136,7 +137,7 @@ async function OpenRaffle({ raffle, userId }: { raffle: Raffle; userId: string |
       <div className="card stack" style={{ gap: 18 }}>
         <span className="kicker">Your tickets</span>
         {!user ? (
-          <a className="btn btn--primary" href="/api/auth/discord?returnTo=/raffles">
+          <a className="btn btn--primary" href={loginHref('/raffles')}>
             Log in to see your tickets
           </a>
         ) : !mine?.linked ? (

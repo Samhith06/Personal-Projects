@@ -31,16 +31,23 @@ const money = (name: string) => numeric(name, { precision: 14, scale: 2, mode: '
 /*                                   People                                   */
 /* -------------------------------------------------------------------------- */
 
-/** A community member. Identity always comes from Discord. */
+/** A community member. Identity comes from Discord or Telegram (either or both). */
 export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    discordId: text('discord_id').notNull(),
-    discordUsername: text('discord_username').notNull(),
+    discordId: text('discord_id'),
+    discordUsername: text('discord_username'),
     discordGlobalName: text('discord_global_name'),
     /** Avatar hash only; the CDN URL is derived at render time. */
     discordAvatar: text('discord_avatar'),
+
+    /** Telegram login (widget). The id and HMAC come from Telegram, never typed by the member. */
+    telegramId: text('telegram_id'),
+    telegramUsername: text('telegram_username'),
+    telegramName: text('telegram_name'),
+    telegramPhotoUrl: text('telegram_photo_url'),
+    telegramLinkedAt: ts('telegram_linked_at'),
 
     /** 'member' | 'mod' | 'admin' | 'owner' — assigned from env on every login, never self-set. */
     role: text('role').notNull().default('member'),
@@ -75,6 +82,7 @@ export const users = pgTable(
   (t) => [
     uniqueIndex('users_discord_id_idx').on(t.discordId),
     uniqueIndex('users_kick_user_id_idx').on(t.kickUserId),
+    uniqueIndex('users_telegram_id_idx').on(t.telegramId),
   ],
 );
 

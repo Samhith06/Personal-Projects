@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { discordAvatarUrl } from '@/lib/discord';
-import { getCurrentUser } from '@/server/auth/session';
+import { avatarUrl, displayName } from '@/lib/identity';
+import { getCurrentUser, signLinkState } from '@/server/auth/session';
+import { TELEGRAM_CALLBACK_PATH } from '@/server/auth/telegram';
+import { TelegramLogin } from '@/components/TelegramLogin';
 import { savePrivacy, submitRoobetUsername } from '@/server/actions/account';
-import { env, features } from '@/lib/env';
+import { env, features, siteUrl } from '@/lib/env';
 import { getMemberStats } from '@/server/services/member';
 import { profilePath } from '@/server/services/profiles';
 import { formatMinutes, formatUsd } from '@/lib/format';
@@ -17,19 +19,23 @@ const ROOBET_STATUS = {
   rejected: { label: 'Rejected', cls: 'tag tag--danger' },
 } as const;
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ saved?: string; kick?: string; roobet?: string; error?: string }> }) {
-  const { saved, kick, roobet: roobetParam, error } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ saved?: string; kick?: string; telegram?: string; roobet?: string; error?: string }> }) {
+  const { saved, kick, telegram, roobet: roobetParam, error } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect('/login?returnTo=/me');
 
   const stats = await getMemberStats(user.id);
-  const name = user.discordGlobalName || user.discordUsername;
+  const name = displayName(user);
+  const telegramLinkUrl =
+    features.telegramAuth && !user.telegramId
+      ? siteUrl(`${TELEGRAM_CALLBACK_PATH}?link=1&state=${encodeURIComponent(await signLinkState(user.id))}`)
+      : null;
   const roobet = stats.link ? ROOBET_STATUS[stats.link.status as keyof typeof ROOBET_STATUS] : null;
 
   return (
     <div className="container page">
       <section className="account-row" style={{ gap: 24 }}>
-        <img className="avatar" src={discordAvatarUrl(user.discordId, user.discordAvatar, 256)} alt="" width={88} height={88} />
+        <img className="avatar" src={avatarUrl(user, 256)} alt="" width={88} height={88} />
         <div className="account-row__body stack" style={{ gap: 8 }}>
           <span className="kicker">My profile</span>
           <h1 className="page__title">{name}</h1>
@@ -77,17 +83,36 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       <section className="card stack" id="accounts">
         <span className="kicker">Linked accounts</span>
         {kick === 'linked' ? <p className="notice notice--ok">Kick account linked.</p> : null}
+        {telegram === 'linked' ? <p className="notice notice--ok">Telegram linked. You can now log in with either account.</p> : null}
         {roobetParam === 'submitted' ? <p className="notice notice--ok">Roobet username submitted. An admin will review it soon.</p> : null}
         {roobetParam === 'approved' ? <p className="notice notice--ok">Roobet username found under code STZY and approved.</p> : null}
         {error ? <p className="notice notice--danger">{error}</p> : null}
-        <div className="account-row">
-          <span className="account-mark account-mark--discord">D</span>
-          <div className="account-row__body">
-            <div className="account-row__name">Discord</div>
-            <div className="meta">{user.discordUsername} · login account</div>
+        {user.discordId ? (
+          <div className="account-row">
+            <span className="account-mark account-mark--discord">D</span>
+            <div className="account-row__body">
+              <div className="account-row__name">Discord</div>
+              <div className="meta">{user.discordUsername} · login account</div>
+            </div>
+            <span className="tag tag--accent">Connected</span>
           </div>
-          <span className="tag tag--accent">Connected</span>
-        </div>
+        ) : null}
+        {user.telegramId || telegramLinkUrl ? (
+          <div className="account-row">
+            <span className="account-mark account-mark--telegram">T</span>
+            <div className="account-row__body">
+              <div className="account-row__name">Telegram</div>
+              <div className="meta">
+                {user.telegramId ? `${user.telegramUsername ? `@${user.telegramUsername}` : user.telegramName} · login account` : 'Link it to log in with Telegram too'}
+              </div>
+            </div>
+            {user.telegramId ? (
+              <span className="tag tag--accent">Connected</span>
+            ) : (
+              <TelegramLogin bot={env.telegramBotUsername!} authUrl={telegramLinkUrl!} />
+            )}
+          </div>
+        ) : null}
         <div className="account-row">
           <span className="account-mark account-mark--kick">K</span>
           <div className="account-row__body">

@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { User } from '@/server/db/schema';
-import { discordAvatarUrl } from '@/lib/discord';
+import { avatarUrl, displayName } from '@/lib/identity';
 import { hasRole } from '@/server/auth/session';
-import { env } from '@/lib/env';
+import { env, loginHref, loginLabel } from '@/lib/env';
 
 const NAV = [
   { href: '/leaderboard', label: 'Leaderboard' },
@@ -27,7 +27,7 @@ export function SiteHeader({
   huntOn: boolean;
   tournamentOn: 'signup' | 'live' | null;
 }) {
-  const name = user ? user.discordGlobalName || user.discordUsername : null;
+  const name = user ? displayName(user) : null;
   return (
     <header className="site-header">
       <div className="container site-header__inner">
@@ -79,12 +79,12 @@ export function SiteHeader({
           ) : null}
           {user ? (
             <Link href="/me" className="me-chip" aria-label={`My profile (${name})`}>
-              <img className="avatar" src={discordAvatarUrl(user.discordId, user.discordAvatar, 64)} alt="" width={32} height={32} />
+              <img className="avatar" src={avatarUrl(user, 64)} alt="" width={32} height={32} />
               <span className="me-chip__name">{name}</span>
             </Link>
           ) : (
-            <a className="btn btn--primary" href="/api/auth/discord">
-              Log in with Discord
+            <a className="btn btn--primary" href={loginHref()}>
+              {loginLabel()}
             </a>
           )}
         </div>

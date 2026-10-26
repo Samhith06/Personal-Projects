@@ -11,6 +11,7 @@ import {
   type Eligibility,
 } from '@/server/services/giveaways';
 import { formatAgo, formatCountdown } from '@/lib/format';
+import { loginHref } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Giveaways' };
 
@@ -87,7 +88,7 @@ export default async function GiveawaysPage({
                   ) : null}
                 </span>
                 {!user ? (
-                  <a className="btn btn--primary" href="/api/auth/discord?returnTo=/giveaways">
+                  <a className="btn btn--primary" href={loginHref('/giveaways')}>
                     Log in to enter
                   </a>
                 ) : entered[i] ? (

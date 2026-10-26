@@ -35,13 +35,15 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
         {pending.length === 0 ? <p className="meta" style={{ marginTop: 8 }}>Nothing waiting.</p> : null}
         {pending.map((p, i) => {
           const c = candidates[i];
-          const discordAgeDays = Math.floor((Date.now() - discordAccountCreatedAt(p.discordId).getTime()) / 86_400_000);
+          // Telegram has no account age, so Telegram-only members show their SteezySpins account's age.
+          const created = p.discordId ? discordAccountCreatedAt(p.discordId) : p.createdAt;
+          const ageDays = Math.floor((Date.now() - created.getTime()) / 86_400_000);
           return (
             <div key={p.userId} className="admin-row">
               <div className="admin-row__body">
                 <div style={{ fontWeight: 500 }}>{p.requestedUsername}</div>
                 <div className="meta">
-                  Discord {p.discordUsername} ({discordAgeDays}d old) · Kick {p.kickUsername ?? '—'} · submitted {formatAgo(p.updatedAt)}
+                  {p.account} ({ageDays}d old) · Kick {p.kickUsername ?? '—'} · submitted {formatAgo(p.updatedAt)}
                 </div>
               </div>
               {c ? (
@@ -79,7 +81,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
             <div className="admin-row__body">
               <div style={{ fontWeight: 500 }}>{a.requestedUsername}</div>
               <div className="meta">
-                Discord {a.discordUsername} · {a.roobetUid ? `uid ${a.roobetUid.slice(0, 8)}…` : 'waiting for Roobet data'} · by {a.reviewerName ?? '—'}
+                {a.account} · {a.roobetUid ? `uid ${a.roobetUid.slice(0, 8)}…` : 'waiting for Roobet data'} · by {a.reviewerName ?? '—'}
                 {a.reviewedAt ? ` ${formatAgo(a.reviewedAt)}` : ''}
               </div>
             </div>
@@ -103,7 +105,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Fl
             <div className="admin-row__body">
               <div style={{ fontWeight: 500 }}>{r.requestedUsername}</div>
               <div className="meta">
-                Discord {r.discordUsername} · {r.rejectReason}
+                {r.account} · {r.rejectReason}
               </div>
             </div>
           </div>

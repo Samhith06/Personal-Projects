@@ -4,6 +4,7 @@ import { claimMilestoneAction } from '@/server/actions/milestones';
 import { getCurrentUser } from '@/server/auth/session';
 import { milestoneView } from '@/server/services/milestones';
 import { formatUsd } from '@/lib/format';
+import { loginHref, loginLabel } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Milestones' };
 
@@ -49,8 +50,8 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
           {!user ? (
             <>
               <p>Log in to track your progress and claim rewards.</p>
-              <a className="btn btn--primary" href="/api/auth/discord?returnTo=/milestones">
-                Log in with Discord
+              <a className="btn btn--primary" href={loginHref('/milestones')}>
+                {loginLabel()}
               </a>
             </>
           ) : !view.linked ? (

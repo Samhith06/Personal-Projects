@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCurrentUser, hasRole } from '@/server/auth/session';
 import { findByHandle, profileView, type Trophy } from '@/server/services/profiles';
-import { discordAvatarUrl } from '@/lib/discord';
+import { avatarUrl } from '@/lib/identity';
 import { formatMinutes, formatUsd, ordinal } from '@/lib/format';
 import { publicName } from '@/server/services/people';
 
@@ -35,7 +35,7 @@ export default async function PublicProfile({ params }: Params) {
     <>
       <section className="profile-hero">
         <div className="container profile-hero__inner">
-          <img className="avatar profile-hero__avatar" src={discordAvatarUrl(user.discordId, user.discordAvatar, 256)} alt="" width={120} height={120} />
+          <img className="avatar profile-hero__avatar" src={avatarUrl(user, 256)} alt="" width={120} height={120} />
           <div className="stack" style={{ gap: 10, flex: '1 1 260px' }}>
             <span className="profile-hero__url">steezespins/u/{handle}</span>
             <h1 className="profile-hero__name">{name}</h1>

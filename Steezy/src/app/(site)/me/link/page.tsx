@@ -5,6 +5,7 @@ import { requestKickCode, submitRoobetUsername } from '@/server/actions/account'
 import { getCurrentUser } from '@/server/auth/session';
 import { latestVerification } from '@/server/kick/chat-verification';
 import { getRoobetLink } from '@/server/services/member';
+import { accountName } from '@/lib/identity';
 
 export const metadata: Metadata = { title: 'Link accounts' };
 
@@ -50,7 +51,7 @@ export default async function LinkAccountsPage({
         <span className="account-mark account-mark--discord">D</span>
         <div className="account-row__body">
           <div className="account-row__name">Discord</div>
-          <div className="meta">Signed in as {user.discordUsername}</div>
+          <div className="meta">Signed in as {accountName(user)}</div>
         </div>
         <span className="tag tag--accent">Connected</span>
       </section>

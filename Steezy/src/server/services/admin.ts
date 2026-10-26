@@ -19,6 +19,7 @@ import {
 } from '@/server/db/schema';
 import { dayKey } from './wagers';
 import { audit } from './audit';
+import { accountLabelSql, accountNameSql } from './people';
 import { fetchRoobetStats, type RoobetRow } from '@/server/roobet/client';
 import { roobetConfigFromEnv } from '@/server/roobet/sync';
 
@@ -177,10 +178,11 @@ export async function roobetLinksByStatus(status: 'pending' | 'approved' | 'reje
       rejectReason: roobetLinks.rejectReason,
       reviewedAt: roobetLinks.reviewedAt,
       updatedAt: roobetLinks.updatedAt,
-      discordUsername: users.discordUsername,
+      account: accountLabelSql(),
       discordId: users.discordId,
+      createdAt: users.createdAt,
       kickUsername: users.kickUsername,
-      reviewerName: reviewer.discordUsername,
+      reviewerName: accountNameSql(reviewer),
     })
     .from(roobetLinks)
     .innerJoin(users, eq(users.id, roobetLinks.userId))
@@ -200,7 +202,7 @@ export async function unpaidLeaderboardPrizes() {
       displayName: leaderboardResults.displayName,
       roobetUid: leaderboardResults.roobetUid,
       prize: leaderboardResults.prize,
-      memberName: users.discordUsername,
+      memberName: accountNameSql(),
       roobetUsername: roobetLinks.requestedUsername,
     })
     .from(leaderboardResults)
@@ -220,7 +222,7 @@ export async function unpaidDrawPrizes() {
         draw: raffles.name,
         position: raffleWinners.position,
         prize: raffleWinners.prize,
-        memberName: users.discordUsername,
+        memberName: accountNameSql(),
         roobetUsername: roobetLinks.requestedUsername,
       })
       .from(raffleWinners)
@@ -234,7 +236,7 @@ export async function unpaidDrawPrizes() {
         drawId: giveawayWinners.giveawayId,
         draw: giveaways.prize,
         position: giveawayWinners.position,
-        memberName: users.discordUsername,
+        memberName: accountNameSql(),
         kickUsername: users.kickUsername,
         roobetUsername: roobetLinks.requestedUsername,
       })
@@ -257,7 +259,7 @@ export async function recentAudit(limit = 100) {
       targetId: auditLog.targetId,
       after: auditLog.after,
       createdAt: auditLog.createdAt,
-      actorName: users.discordUsername,
+      actorName: accountNameSql(),
     })
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorId))
@@ -272,8 +274,11 @@ export type MemberSort = (typeof MEMBER_SORTS)[number];
 
 export type MemberRow = {
   id: string;
-  discordUsername: string;
+  discordUsername: string | null;
   discordGlobalName: string | null;
+  telegramUsername: string | null;
+  telegramName: string | null;
+  telegramId: string | null;
   kickUsername: string | null;
   role: string;
   blocked: boolean;
@@ -300,21 +305,23 @@ const FILTER_SQL: Record<MemberFilter, ReturnType<typeof sql>> = {
 const SORT_SQL: Record<MemberSort, ReturnType<typeof sql>> = {
   recent: sql`u.last_seen_at desc`,
   joined: sql`u.created_at desc`,
-  name: sql`lower(u.discord_username) asc`,
+  name: sql`lower(coalesce(u.discord_username, u.telegram_username, u.telegram_name)) asc`,
   wager: sql`weighted desc nulls last`,
   watch: sql`watch_minutes desc`,
 };
 
-/** The staff member list: search by Discord, Kick or Roobet name, filter, sort, page. */
+/** The staff member list: search by Discord, Telegram, Kick or Roobet name, filter, sort, page. */
 export async function searchMembers(opts: { query?: string; filter: MemberFilter; sort: MemberSort; limit: number; offset: number }) {
   const q = opts.query?.trim() ? `%${opts.query.trim().toLowerCase()}%` : null;
   const where = sql`${FILTER_SQL[opts.filter]} and (${q}::text is null
-    or lower(u.discord_username) like ${q} or lower(coalesce(u.discord_global_name, '')) like ${q}
+    or lower(coalesce(u.discord_username, '')) like ${q} or lower(coalesce(u.discord_global_name, '')) like ${q}
+    or lower(coalesce(u.telegram_username, '')) like ${q} or lower(coalesce(u.telegram_name, '')) like ${q}
     or lower(coalesce(u.kick_username, '')) like ${q} or lower(coalesce(l.requested_username, '')) like ${q} or lower(coalesce(u.referred_by, '')) like ${q})`;
 
   const [rows, [{ total }]] = await Promise.all([
     db.execute(sql`
-      select u.id, u.discord_username, u.discord_global_name, u.kick_username, u.role, u.blocked_from_rewards,
+      select u.id, u.discord_username, u.discord_global_name, u.telegram_username, u.telegram_name, u.telegram_id,
+        u.kick_username, u.role, u.blocked_from_rewards,
         u.created_at, u.last_seen_at, u.referred_by, l.status as roobet_status, l.requested_username as roobet_username,
         (select sum(d.weighted_wagered)::float8 from ${roobetDailyWager} d where l.status = 'approved' and d.roobet_uid = l.roobet_uid) as weighted,
         coalesce((select sum(w.minutes)::int from watch_time w where w.user_id = u.id), 0) as watch_minutes
@@ -332,8 +339,11 @@ export async function searchMembers(opts: { query?: string; filter: MemberFilter
 
   type Raw = {
     id: string;
-    discord_username: string;
+    discord_username: string | null;
     discord_global_name: string | null;
+    telegram_username: string | null;
+    telegram_name: string | null;
+    telegram_id: string | null;
     kick_username: string | null;
     role: string;
     blocked_from_rewards: boolean;
@@ -349,6 +359,9 @@ export async function searchMembers(opts: { query?: string; filter: MemberFilter
     id: r.id,
     discordUsername: r.discord_username,
     discordGlobalName: r.discord_global_name,
+    telegramUsername: r.telegram_username,
+    telegramName: r.telegram_name,
+    telegramId: r.telegram_id,
     kickUsername: r.kick_username,
     role: r.role,
     blocked: r.blocked_from_rewards,

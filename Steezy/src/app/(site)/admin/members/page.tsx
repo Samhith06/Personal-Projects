@@ -5,6 +5,7 @@ import { handleFor } from '@/server/services/profiles';
 import { MemberFilters } from '@/components/admin/MemberFilters';
 import { ReferredByField } from '@/components/admin/ReferredByField';
 import { formatAgo, formatMinutes, formatUsd } from '@/lib/format';
+import { displayName } from '@/lib/identity';
 
 export const metadata: Metadata = { title: 'Members' };
 
@@ -99,9 +100,10 @@ export default async function MembersAdmin({ searchParams }: { searchParams: Pro
                   <tr key={m.id} style={m.blocked ? { opacity: 0.6 } : undefined}>
                     <td>
                       <Link className="person-link" href={`/u/${encodeURIComponent(handleFor(m))}`}>
-                        {m.discordGlobalName ?? m.discordUsername}
+                        {displayName(m)}
                       </Link>
-                      {m.discordGlobalName ? <span className="meta"> @{m.discordUsername}</span> : null}{' '}
+                      {m.discordGlobalName ? <span className="meta"> @{m.discordUsername}</span> : null}
+                      {!m.discordUsername ? <span className="meta"> · Telegram{m.telegramUsername ? ` @${m.telegramUsername}` : ''}</span> : null}{' '}
                       {m.blocked ? <span className="tag tag--danger">Blocked</span> : null}
                     </td>
                     <td>

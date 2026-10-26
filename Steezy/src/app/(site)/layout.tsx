@@ -7,6 +7,7 @@ import { getCurrentUser, needsAgeConfirmation } from '@/server/auth/session';
 import { openSession } from '@/server/kick/sessions';
 import { activeHunt } from '@/server/services/hunts';
 import { featuredTournament } from '@/server/services/tournaments';
+import { displayName } from '@/lib/identity';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser().catch((error) => {
@@ -28,7 +29,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <SiteHeader user={user} live={Boolean(session)} huntOn={Boolean(hunt)} tournamentOn={tournamentOn} />
       <main id="main">{children}</main>
       <SiteFooter />
-      {showAgeGate ? <AgeGate name={user ? user.discordGlobalName || user.discordUsername : null} /> : null}
+      {showAgeGate ? <AgeGate name={user ? displayName(user) : null} /> : null}
     </>
   );
 }

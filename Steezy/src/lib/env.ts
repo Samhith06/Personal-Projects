@@ -21,11 +21,19 @@ export const env = {
   ownerDiscordIds: ids(process.env.OWNER_DISCORD_IDS),
   adminDiscordIds: ids(process.env.ADMIN_DISCORD_IDS),
   modDiscordIds: ids(process.env.MOD_DISCORD_IDS),
+  ownerTelegramIds: ids(process.env.OWNER_TELEGRAM_IDS),
+  adminTelegramIds: ids(process.env.ADMIN_TELEGRAM_IDS),
+  modTelegramIds: ids(process.env.MOD_TELEGRAM_IDS),
 
   discordClientId: str(process.env.DISCORD_CLIENT_ID),
   discordClientSecret: str(process.env.DISCORD_CLIENT_SECRET),
   discordInviteUrl: str(process.env.DISCORD_INVITE_URL) ?? 'https://discord.gg/PJpphDDS73',
   discordLiveWebhookUrl: str(process.env.DISCORD_LIVE_WEBHOOK_URL),
+
+  /** From @BotFather. The bot's domain must be set to APP_URL's host with /setdomain. */
+  telegramBotToken: str(process.env.TELEGRAM_BOT_TOKEN),
+  /** Bot username without the @, used by the login widget. */
+  telegramBotUsername: str(process.env.TELEGRAM_BOT_USERNAME)?.replace(/^@/, ''),
 
   kickClientId: str(process.env.KICK_CLIENT_ID),
   kickClientSecret: str(process.env.KICK_CLIENT_SECRET),
@@ -42,6 +50,7 @@ export const env = {
 
 export const features = {
   discordAuth: Boolean(env.discordClientId && env.discordClientSecret),
+  telegramAuth: Boolean(env.telegramBotToken && env.telegramBotUsername),
   kickAuth: Boolean(env.kickClientId && env.kickClientSecret),
   roobetSync: Boolean(env.roobetUserId && env.roobetApiKey),
 };
@@ -53,3 +62,11 @@ export const features = {
 export function siteUrl(path: string) {
   return new URL(path, env.appUrl).toString();
 }
+
+/** Where "Log in" buttons go: straight to Discord, or to the picker once Telegram is set up too. */
+export function loginHref(returnTo?: string) {
+  const q = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+  return features.telegramAuth ? `/login${q}` : `/api/auth/discord${q}`;
+}
+
+export const loginLabel = () => (features.telegramAuth ? 'Log in' : 'Log in with Discord');

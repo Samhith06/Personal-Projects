@@ -11,7 +11,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/server/db';
 import { huntGuesses, hunts, users } from '@/server/db/schema';
 import { audit } from './audit';
-import { publicName } from './people';
+import { personFields, publicName } from './people';
 
 export type Hunt = typeof hunts.$inferSelect;
 export type HuntBonus = {
@@ -172,10 +172,7 @@ export async function guessList(huntId: string, target?: number | null) {
       amount: huntGuesses.amount,
       source: huntGuesses.source,
       updatedAt: huntGuesses.updatedAt,
-      kickUsername: users.kickUsername,
-      discordGlobalName: users.discordGlobalName,
-      discordUsername: users.discordUsername,
-      nameOnLeaderboards: users.nameOnLeaderboards,
+      ...personFields,
     })
     .from(huntGuesses)
     .innerJoin(users, eq(users.id, huntGuesses.userId))

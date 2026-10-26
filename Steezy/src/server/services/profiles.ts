@@ -29,20 +29,29 @@ import { discordAccountCreatedAt } from '@/lib/discord';
 import { approvedRoobetUid } from './wagers';
 import { watchTotals } from '@/server/kick/watchtime';
 
-export const handleFor = (u: Pick<User, 'kickUsername' | 'discordUsername'>) => (u.kickUsername || u.discordUsername).toLowerCase();
-export const profilePath = (u: Pick<User, 'kickUsername' | 'discordUsername'>) => `/u/${encodeURIComponent(handleFor(u))}`;
+type HandleSource = {
+  kickUsername: string | null;
+  discordUsername: string | null;
+  telegramUsername?: string | null;
+  telegramId?: string | null;
+};
 
-/** Find a member by handle; null if missing or private. Kick names win over Discord names. */
+/** Telegram accounts without a public @username get `tg<id>`. */
+export const handleFor = (u: HandleSource) =>
+  (u.kickUsername || u.discordUsername || u.telegramUsername || (u.telegramId ? `tg${u.telegramId}` : 'member')).toLowerCase();
+export const profilePath = (u: HandleSource) => `/u/${encodeURIComponent(handleFor(u))}`;
+
+/** Find a member by handle; null if missing or private. Kick names win over Discord names, Discord over Telegram. */
 export async function findByHandle(handle: string) {
   const h = handle.toLowerCase();
-  const [byKick] = await db.select().from(users).where(sql`lower(${users.kickUsername}) = ${h}`).limit(1);
+  const first = async (where: ReturnType<typeof sql>) => (await db.select().from(users).where(where).limit(1))[0];
   const user =
-    byKick ??
-    (await db
-      .select()
-      .from(users)
-      .where(and(sql`lower(${users.discordUsername}) = ${h}`, sql`${users.kickUsername} is null`))
-      .limit(1))[0];
+    (await first(sql`lower(${users.kickUsername}) = ${h}`)) ??
+    (await first(and(sql`lower(${users.discordUsername}) = ${h}`, sql`${users.kickUsername} is null`)!)) ??
+    (await first(sql`lower(${users.telegramUsername}) = ${h} and ${users.kickUsername} is null and ${users.discordUsername} is null`)) ??
+    (/^tg\d+$/.test(h)
+      ? await first(sql`${users.telegramId} = ${h.slice(2)} and ${users.kickUsername} is null and ${users.discordUsername} is null and ${users.telegramUsername} is null`)
+      : undefined);
   if (!user || !user.nameOnLeaderboards) return null;
   return user;
 }
@@ -141,7 +150,7 @@ export async function profileView(user: User) {
     bestHit,
     wager,
     linkedRoobet: Boolean(uid),
-    discordCreated: discordAccountCreatedAt(user.discordId),
+    discordCreated: user.discordId ? discordAccountCreatedAt(user.discordId) : null,
   };
 }
 

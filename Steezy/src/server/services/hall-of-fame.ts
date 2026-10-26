@@ -29,8 +29,11 @@ export async function champions(limit = 8) {
       rank: leaderboardResults.rank,
       displayName: leaderboardResults.displayName,
       prize: leaderboardResults.prize,
+      memberId: users.id,
       kickUsername: users.kickUsername,
       discordUsername: users.discordUsername,
+      telegramUsername: users.telegramUsername,
+      telegramId: users.telegramId,
       nameOnLeaderboards: users.nameOnLeaderboards,
     })
     .from(leaderboardResults)
@@ -48,7 +51,7 @@ export async function champions(limit = 8) {
         prize: r.prize,
         name: r.displayName,
         // Only link a profile when the frozen name is the member's real (unmasked) name.
-        handle: r.discordUsername && r.nameOnLeaderboards ? handleFor({ kickUsername: r.kickUsername, discordUsername: r.discordUsername }) : null,
+        handle: r.memberId && r.nameOnLeaderboards ? handleFor(r) : null,
       })),
   }));
 }
@@ -67,23 +70,36 @@ type HitDbRow = {
   username: string;
   day?: string;
   hit: { multiplier?: number; wagered?: number; payout?: number; gameTitle?: string } | null;
+  user_id: string | null;
   kick_username: string | null;
   discord_username: string | null;
   discord_global_name: string | null;
+  telegram_username: string | null;
+  telegram_name: string | null;
+  telegram_id: string | null;
   name_on_leaderboards: boolean | null;
   wager_public: boolean | null;
 };
 
 /** Same privacy rules everywhere: names only for members who show them, amounts only when public. */
 function toHit(r: HitDbRow, art: Map<string, string>): HitRow {
-  const member = r.discord_username !== null;
+  const member = r.user_id !== null;
+  const person = {
+    kickUsername: r.kick_username,
+    discordGlobalName: r.discord_global_name,
+    discordUsername: r.discord_username,
+    telegramName: r.telegram_name,
+    telegramUsername: r.telegram_username,
+    telegramId: r.telegram_id,
+    nameOnLeaderboards: true,
+  };
   const named = member && r.name_on_leaderboards;
   const showAmounts = !member || Boolean(r.wager_public);
   return {
     name: named
-      ? publicName({ kickUsername: r.kick_username, discordGlobalName: r.discord_global_name, discordUsername: r.discord_username!, nameOnLeaderboards: true })
+      ? publicName(person)
       : maskName(r.username),
-    handle: named ? handleFor({ kickUsername: r.kick_username, discordUsername: r.discord_username! }) : null,
+    handle: named ? handleFor(person) : null,
     multiplier: r.hit!.multiplier!,
     gameTitle: r.hit!.gameTitle ?? 'Unknown game',
     wagered: showAmounts ? (r.hit!.wagered ?? null) : null,
@@ -113,7 +129,8 @@ export async function clubWins(min: number, max: number | null, limit = 30): Pro
   const rows = await db.execute(sql`
     select
       d.username, d.day::text as day, d.highest_multiplier as hit,
-      u.kick_username, u.discord_username, u.discord_global_name, u.name_on_leaderboards, u.wager_public
+      u.id as user_id, u.kick_username, u.discord_username, u.discord_global_name,
+      u.telegram_username, u.telegram_name, u.telegram_id, u.name_on_leaderboards, u.wager_public
     from ${roobetDailyWager} d
     left join ${roobetLinks} l on l.roobet_uid = d.roobet_uid and l.status = 'approved'
     left join ${users} u on u.id = l.user_id
@@ -133,6 +150,9 @@ export async function records(): Promise<RecordRow[]> {
     kickUsername: users.kickUsername,
     discordUsername: users.discordUsername,
     discordGlobalName: users.discordGlobalName,
+    telegramName: users.telegramName,
+    telegramUsername: users.telegramUsername,
+    telegramId: users.telegramId,
     nameOnLeaderboards: users.nameOnLeaderboards,
   };
   const visible = and(eq(users.nameOnLeaderboards, true), eq(users.blockedFromRewards, false));
@@ -163,7 +183,7 @@ export async function records(): Promise<RecordRow[]> {
       .orderBy(sql`count(*) desc`)
       .limit(1),
     db.execute(sql`
-      select u.id, u.kick_username, u.discord_username, u.discord_global_name, count(*)::int as n
+      select u.id, u.kick_username, u.discord_username, u.discord_global_name, u.telegram_name, u.telegram_username, u.telegram_id, count(*)::int as n
       from (select user_id from ${raffleWinners} union all select user_id from ${giveawayWinners}) w
       join ${users} u on u.id = w.user_id
       where u.name_on_leaderboards and not u.blocked_from_rewards
@@ -171,7 +191,15 @@ export async function records(): Promise<RecordRow[]> {
     `),
   ]);
 
-  const toPerson = (p: { kickUsername: string | null; discordUsername: string; discordGlobalName: string | null }): PublicPerson => ({
+  type PersonRow = {
+    kickUsername: string | null;
+    discordUsername: string | null;
+    discordGlobalName: string | null;
+    telegramName: string | null;
+    telegramUsername: string | null;
+    telegramId: string | null;
+  };
+  const toPerson = (p: PersonRow): PublicPerson => ({
     name: publicName({ ...p, nameOnLeaderboards: true }),
     handle: handleFor(p),
   });
@@ -179,11 +207,27 @@ export async function records(): Promise<RecordRow[]> {
   if (watch[0]?.n) out.push({ label: 'Most watch time', person: toPerson(watch[0]), value: `${formatMinutes(watch[0].n)} watched` });
   if (streams[0]?.n) out.push({ label: 'Most streams', person: toPerson(streams[0]), value: `${streams[0].n} attended` });
   if (titles[0]?.n) out.push({ label: 'Most titles', person: toPerson(titles[0]), value: `${titles[0].n} monthly win${titles[0].n === 1 ? '' : 's'}` });
-  const d = (draws.rows as { kick_username: string | null; discord_username: string; discord_global_name: string | null; n: number }[])[0];
+  type DrawRow = {
+    kick_username: string | null;
+    discord_username: string | null;
+    discord_global_name: string | null;
+    telegram_name: string | null;
+    telegram_username: string | null;
+    telegram_id: string | null;
+    n: number;
+  };
+  const d = (draws.rows as DrawRow[])[0];
   if (d?.n) {
     out.push({
       label: 'Luckiest',
-      person: toPerson({ kickUsername: d.kick_username, discordUsername: d.discord_username, discordGlobalName: d.discord_global_name }),
+      person: toPerson({
+        kickUsername: d.kick_username,
+        discordUsername: d.discord_username,
+        discordGlobalName: d.discord_global_name,
+        telegramName: d.telegram_name,
+        telegramUsername: d.telegram_username,
+        telegramId: d.telegram_id,
+      }),
       value: `${d.n} raffle & giveaway win${d.n === 1 ? '' : 's'}`,
     });
   }

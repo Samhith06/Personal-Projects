@@ -12,6 +12,7 @@ import { db } from '@/server/db';
 import { milestoneClaims, milestones, users } from '@/server/db/schema';
 import { approvedRoobetUid, wagerTotalFor } from './wagers';
 import { audit } from './audit';
+import { accountNameSql } from './people';
 
 export type MilestoneTier = typeof milestones.$inferSelect & {
   reached: boolean;
@@ -79,7 +80,7 @@ export async function pendingMilestoneClaims() {
       id: milestoneClaims.id,
       claimedAt: milestoneClaims.claimedAt,
       userId: users.id,
-      userName: users.discordUsername,
+      userName: accountNameSql(),
       milestone: milestones.name,
       reward: milestones.reward,
     })

@@ -21,6 +21,7 @@ import {
 import { artFor, slotArt, slotKey } from '@/server/services/slot-art';
 import { openForRequests } from '@/server/services/tournaments';
 import { formatBet, formatUsd } from '@/lib/format';
+import { loginHref } from '@/lib/env';
 
 export const metadata: Metadata = {
   title: 'Bonus hunt',
@@ -151,7 +152,7 @@ export default async function HuntPage({ searchParams }: { searchParams: Promise
                     </button>
                   </form>
                 ) : (
-                  <a className="btn btn--primary" href="/api/auth/discord?returnTo=/hunts" style={{ alignSelf: 'flex-start' }}>
+                  <a className="btn btn--primary" href={loginHref('/hunts')} style={{ alignSelf: 'flex-start' }}>
                     Log in to guess
                   </a>
                 )

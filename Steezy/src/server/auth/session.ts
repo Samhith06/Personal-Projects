@@ -37,6 +37,28 @@ export async function createSession(userId: string) {
   jar.set(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: env.isProd, path: '/', maxAge: MAX_AGE });
 }
 
+/**
+ * Short-lived token proving a "link Telegram" request started on this member's
+ * own /me page — without it, anyone could link their Telegram to a signed-in victim.
+ */
+export async function signLinkState(userId: string) {
+  return new SignJWT({ sub: userId, purpose: 'telegram-link' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(ISSUER)
+    .setExpirationTime('30m')
+    .sign(secretKey());
+}
+
+export async function verifyLinkState(token: string | null, userId: string) {
+  if (!token) return false;
+  try {
+    const { payload } = await jwtVerify(token, secretKey(), { issuer: ISSUER });
+    return payload.sub === userId && payload.purpose === 'telegram-link';
+  } catch {
+    return false;
+  }
+}
+
 export async function destroySession() {
   const jar = await cookies();
   jar.delete(COOKIE);
@@ -97,5 +119,13 @@ export function roleForDiscordId(discordId: string): Role {
   if (env.ownerDiscordIds.includes(discordId)) return 'owner';
   if (env.adminDiscordIds.includes(discordId)) return 'admin';
   if (env.modDiscordIds.includes(discordId)) return 'mod';
+  return 'member';
+}
+
+/** Same rule for Telegram-only accounts (members who linked Discord get their Discord role). */
+export function roleForTelegramId(telegramId: string): Role {
+  if (env.ownerTelegramIds.includes(telegramId)) return 'owner';
+  if (env.adminTelegramIds.includes(telegramId)) return 'admin';
+  if (env.modTelegramIds.includes(telegramId)) return 'mod';
   return 'member';
 }
