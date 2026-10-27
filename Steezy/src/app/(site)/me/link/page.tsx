@@ -5,7 +5,6 @@ import { requestKickCode, submitRoobetUsername } from '@/server/actions/account'
 import { getCurrentUser } from '@/server/auth/session';
 import { latestVerification } from '@/server/kick/chat-verification';
 import { getRoobetLink } from '@/server/services/member';
-import { accountName } from '@/lib/identity';
 
 export const metadata: Metadata = { title: 'Link accounts' };
 
@@ -47,14 +46,27 @@ export default async function LinkAccountsPage({
       {params.roobet === 'submitted' ? <p className="notice notice--ok">Submitted. An admin will review it soon.</p> : null}
       {params.roobet === 'approved' ? <p className="notice notice--ok">Found under code STZY and approved.</p> : null}
 
-      <section className="card account-row">
-        <span className="account-mark account-mark--discord">D</span>
-        <div className="account-row__body">
-          <div className="account-row__name">Discord</div>
-          <div className="meta">Signed in as {accountName(user)}</div>
-        </div>
-        <span className="tag tag--accent">Connected</span>
-      </section>
+      {/* Login accounts: Discord, Telegram or both, whichever this member has. */}
+      {user.discordId ? (
+        <section className="card account-row">
+          <span className="account-mark account-mark--discord">D</span>
+          <div className="account-row__body">
+            <div className="account-row__name">Discord</div>
+            <div className="meta">Signed in as {user.discordUsername}</div>
+          </div>
+          <span className="tag tag--accent">Connected</span>
+        </section>
+      ) : null}
+      {user.telegramId ? (
+        <section className="card account-row">
+          <span className="account-mark account-mark--telegram">T</span>
+          <div className="account-row__body">
+            <div className="account-row__name">Telegram</div>
+            <div className="meta">Signed in as {user.telegramUsername ? `@${user.telegramUsername}` : user.telegramName}</div>
+          </div>
+          <span className="tag tag--accent">Connected</span>
+        </section>
+      ) : null}
 
       <section className="card stack" style={{ gap: 20 }}>
         <div className="account-row">
