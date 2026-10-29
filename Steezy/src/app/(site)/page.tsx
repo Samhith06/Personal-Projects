@@ -2,6 +2,7 @@ import { AboutSection } from '@/components/home/AboutSection';
 import { ChipBackground } from '@/components/home/ChipBackground';
 import { HomePodium } from '@/components/home/HomePodium';
 import { OfferCard } from '@/components/home/OfferCard';
+import { PayoutTracker } from '@/components/home/PayoutTracker';
 import { env } from '@/lib/env';
 import { LoginButton } from '@/components/LoginButton';
 import { getCurrentUser } from '@/server/auth/session';
@@ -9,7 +10,7 @@ import { getCurrentUser } from '@/server/auth/session';
 /**
  * Home. One casino-chip WebGL scene (ARCHITECTURE.md §5.3) runs behind both the
  * hero and the Roobet partner panel, over a static gradient that doubles as its
- * poster. Below it: this month's top 3 and the About section. Biggest wins (Kick
+ * poster. Below it: total paid out, this month's top 3 and the About section. Biggest wins (Kick
  * clips) comes with the clips work.
  */
 export default async function HomePage() {
@@ -48,6 +49,7 @@ export default async function HomePage() {
           </div>
         </section>
       </div>
+      <PayoutTracker />
       <HomePodium />
       <AboutSection />
     </>

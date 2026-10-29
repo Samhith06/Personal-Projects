@@ -3,8 +3,10 @@ import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { PayoutActions } from '@/components/admin/PayoutActions';
 import { markMilestonePaid, markPrizePaid } from '@/server/actions/admin';
 import { markGiveawayPaid, markRafflePrizePaid } from '@/server/actions/draws';
+import { savePayoutTracker } from '@/server/actions/payouts';
 import { unpaidDrawPrizes, unpaidLeaderboardPrizes } from '@/server/services/admin';
 import { pendingMilestoneClaims } from '@/server/services/milestones';
+import { payoutTotals } from '@/server/services/payout-tracker';
 import { getRoobetLink } from '@/server/services/member';
 import { formatAgo, formatUsd, ordinal } from '@/lib/format';
 
@@ -12,7 +14,12 @@ export const metadata: Metadata = { title: 'Payouts' };
 
 export default async function PayoutsPage({ searchParams }: { searchParams: FlashParams }) {
   const flash = await searchParams;
-  const [claims, prizes, draws] = await Promise.all([pendingMilestoneClaims(), unpaidLeaderboardPrizes(), unpaidDrawPrizes()]);
+  const [claims, prizes, draws, tracker] = await Promise.all([
+    pendingMilestoneClaims(),
+    unpaidLeaderboardPrizes(),
+    unpaidDrawPrizes(),
+    payoutTotals(),
+  ]);
   const claimLinks = await Promise.all(claims.map((c) => getRoobetLink(c.userId)));
 
   return (
@@ -132,6 +139,27 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Flas
             <PayoutActions kind="giveaway" id={g.drawId} place={g.position} label={`the ${g.draw} giveaway prize`} />
           </div>
         ))}
+      </section>
+
+      <section className="card">
+        <strong>Home page tracker · {formatUsd(tracker.total)} paid out</strong>
+        <p className="meta" style={{ marginTop: 8 }}>
+          Everything marked paid here counts automatically ({formatUsd(tracker.total - tracker.earlier)} so far). Add what was paid before
+          the site, and the date the count starts from.
+        </p>
+        <form action={savePayoutTracker} className="admin-row">
+          <div className="field" style={{ flex: '1 1 160px' }}>
+            <label htmlFor="tracker-earlier">Paid before the site ($)</label>
+            <input id="tracker-earlier" name="earlier" type="number" min="0" step="1" className="input" defaultValue={tracker.earlier} />
+          </div>
+          <div className="field" style={{ flex: '1 1 160px' }}>
+            <label htmlFor="tracker-since">Counting since</label>
+            <input id="tracker-since" name="since" type="date" className="input" defaultValue={tracker.since ?? ''} />
+          </div>
+          <button className="btn btn--secondary" type="submit" style={{ alignSelf: 'flex-end' }}>
+            Save
+          </button>
+        </form>
       </section>
     </div>
   );

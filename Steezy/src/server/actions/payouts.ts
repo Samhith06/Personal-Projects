@@ -6,11 +6,13 @@
  * `deniedAt`); delete removes the row. Admin only; both are audited.
  */
 import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/server/db';
 import { giveawayWinners, leaderboardResults, milestoneClaims, raffleWinners } from '@/server/db/schema';
 import { requireRole } from '@/server/auth/session';
 import { audit } from '@/server/services/audit';
+import { getPayoutTrackerSettings, savePayoutTrackerSettings } from '@/server/services/payout-tracker';
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? '').trim();
 
@@ -47,4 +49,19 @@ export async function resolvePayout(fd: FormData): Promise<void> {
     redirect('/admin/payouts?error=Unknown+payout.');
   }
   redirect(`/admin/payouts?${new URLSearchParams({ ok: deny ? 'Denied — the prize is forfeited.' : 'Deleted.' })}`);
+}
+
+/** Home page payout tracker: the amount paid before the site, and the "since" date shown with it. */
+export async function savePayoutTracker(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  const earlier = Number(str(fd, 'earlier') || 0);
+  const since = str(fd, 'since');
+  if (!Number.isFinite(earlier) || earlier < 0) redirect('/admin/payouts?error=Earlier+payouts+must+be+0+or+more.');
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) redirect('/admin/payouts?error=Pick+a+valid+date.');
+  const before = await getPayoutTrackerSettings();
+  const after = { earlier, since: since || null };
+  await savePayoutTrackerSettings(after);
+  await audit(staff.id, 'payout_tracker.update', 'settings', 'payout_tracker', before, after);
+  revalidatePath('/');
+  redirect(`/admin/payouts?${new URLSearchParams({ ok: 'Payout tracker updated.' })}`);
 }
