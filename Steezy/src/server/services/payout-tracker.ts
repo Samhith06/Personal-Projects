@@ -20,6 +20,8 @@ import {
 } from '@/server/db/schema';
 
 const KEY = 'payout_tracker';
+/** What Steezy had paid out before the site, until an admin saves a different figure. */
+const DEFAULT_EARLIER = 9000;
 
 export type PayoutTrackerSettings = {
   /** Paid out before the site tracked payouts. */
@@ -31,7 +33,7 @@ export type PayoutTrackerSettings = {
 export async function getPayoutTrackerSettings(): Promise<PayoutTrackerSettings> {
   const [row] = await db.select().from(settings).where(eq(settings.key, KEY)).limit(1);
   const value = (row?.value ?? {}) as Partial<PayoutTrackerSettings>;
-  return { earlier: Number(value.earlier) || 0, since: value.since ?? null };
+  return { earlier: value.earlier === undefined ? DEFAULT_EARLIER : Number(value.earlier) || 0, since: value.since ?? null };
 }
 
 export async function savePayoutTrackerSettings(value: PayoutTrackerSettings) {
