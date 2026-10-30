@@ -5,7 +5,7 @@
  * every read; freezing writes them to `leaderboard_results` so the final
  * placings (and who gets paid) never move afterwards.
  *
- * Names: every player is shown masked — first four letters, then `****` —
+ * Names: every player is shown masked (`Ma**ins`: first two letters, `**`, last three)
  * whether or not they linked an account here. Members still see their own
  * place through "your rank".
  */

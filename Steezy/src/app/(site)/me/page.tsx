@@ -167,7 +167,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <form action={savePrivacy} className="stack" style={{ gap: 14 }}>
           <label className="check">
             <input type="checkbox" name="nameOnLeaderboards" defaultChecked={user.nameOnLeaderboards} />
-            Show my name in the Hall of Fame and draw results, and have a public profile (otherwise masked, e.g. Matt****). The
+            Show my name in the Hall of Fame and draw results, and have a public profile (otherwise masked, e.g. Ma**ins). The
             wager leaderboard always masks names.
           </label>
           <label className="check">

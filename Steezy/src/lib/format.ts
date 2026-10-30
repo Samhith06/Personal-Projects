@@ -38,11 +38,13 @@ export const ordinal = (n: number) => {
 };
 
 /**
- * `Mattyspins` → `Matt****`: first four letters, then a fixed `****` (so the
- * length isn't revealed either). Names of four letters or fewer keep only two.
+ * `Ghostly` → `Gh**tly`: first two letters, a fixed `**` (so the length isn't
+ * revealed), then the last three. Shorter names keep less: `Matt` → `M**t`.
  */
 export function maskName(name: string) {
-  return `${name.slice(0, name.length > 4 ? 4 : 2)}****`;
+  const n = name.length;
+  const [head, tail] = n >= 6 ? [2, 3] : n >= 4 ? [1, 1] : [1, 0];
+  return `${name.slice(0, head)}**${tail ? name.slice(-tail) : ''}`;
 }
 
 /** What a board's numbers are: Roobet's weighted wager, or the raw total. */

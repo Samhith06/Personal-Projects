@@ -49,7 +49,7 @@ After changing `src/server/db/schema.ts`: `npm run db:generate` (writes a new SQ
 | Hunts in the site nav only while a hunt or tournament is live; hunt + tournament controls on the admin overview | done |
 | Mobile: every page checked at 360px (no sideways overflow); header, admin menu, milestones and hunts tuned for phones (`src/styles/mobile.css`) | done |
 | Home: top-3 podium, About section (needs Steezy's photo + social handles) | done |
-| Leaderboard names always masked: first four letters + `****` | done |
+| Leaderboard names always masked: first two letters + `**` + last three (`Ma**ins`) | done |
 | Biggest wins (Kick clips), admin users & abuse review | next |
 | Admin users/abuse review, OBS overlays, chip background | next |
 | Bonus hunts / tournaments | waiting on bonushunt.gg API docs |

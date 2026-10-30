@@ -3,7 +3,7 @@
  *
  * After each wager sync we compare the live board's top places with the order
  * we last announced (kept in `sync_state` under `leaderboard-announce:<id>`)
- * and post one message listing every climb, e.g. "Matt**** passed Jose**** and
+ * and post one message listing every climb, e.g. "Ma**ins passed Jo**ito and
  * is now 4th". The first look at a board only records the order, so a deploy
  * or a new board doesn't flood the channel. Names stay masked, as on the site.
  * Once a day it also posts the board's current top places.
@@ -23,7 +23,7 @@ type Snapshot = { order: string[]; names: string[] };
 
 const stateKey = (boardId: string) => `leaderboard-announce:${boardId}`;
 
-/** `Matt****` would turn bold in Discord; escape markdown characters. */
+/** `Ma**ins` would turn bold in Discord; escape markdown characters. */
 const md = (name: string) => name.replace(/[\\*_~`|>]/g, (c) => `\\${c}`);
 
 function joinNames(names: string[]) {

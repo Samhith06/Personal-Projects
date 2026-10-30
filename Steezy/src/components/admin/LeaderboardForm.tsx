@@ -48,7 +48,7 @@ export function LeaderboardForm({ board }: { board?: Leaderboard }) {
           <label>Prizes by place</label>
           <PrizeTable initial={board?.prizes ?? [1200, 700, 400, 250, 150, 60, 60, 60, 60, 60]} disabled={locked} />
         </div>
-        <p className="meta">Player names are always shown masked on the public board (first four letters, then ****).</p>
+        <p className="meta">Player names are always shown masked on the public board (first two letters, **, then the last three, e.g. Ma**ins).</p>
         <div>
           <button className="btn btn--primary" type="submit">
             {board ? 'Save changes' : 'Create leaderboard'}
