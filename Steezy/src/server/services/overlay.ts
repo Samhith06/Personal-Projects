@@ -1,7 +1,10 @@
 /** State the OBS draw overlay polls. Only public information: names, counts, prizes. */
+import { eq } from 'drizzle-orm';
+import { db } from '@/server/db';
+import { settings } from '@/server/db/schema';
 import { formatUsd, ordinal } from '@/lib/format';
-import { entrantNames, entryCount, getGiveawayByToken, getGiveawayWinners } from './giveaways';
-import { getRaffleByToken, getRaffleWinners, getTickets } from './raffles';
+import { currentLiveGiveaway, entrantNames, entryCount, getGiveawayByToken, getGiveawayWinners, type Giveaway } from './giveaways';
+import { getRaffleByToken, getRaffleWinners, getTickets, newOverlayToken } from './raffles';
 
 /** Names the overlay's scrolling join list can show. */
 const MAX_NAMES = 200;
@@ -23,26 +26,66 @@ export type OverlayState = {
   drawnAt: string | null;
 };
 
+/** What the permanent link shows between giveaways: nothing. */
+const IDLE: OverlayState = {
+  kind: 'giveaway',
+  title: '',
+  prizes: [],
+  status: 'idle',
+  keyword: null,
+  closesAt: null,
+  entries: 0,
+  entriesLabel: 'Entries',
+  players: 0,
+  recent: [],
+  reel: [],
+  winners: [],
+  drawnAt: null,
+};
+
+const LIVE_TOKEN_KEY = 'giveaway_live_overlay_token';
+
+async function storedLiveToken() {
+  const [row] = await db.select().from(settings).where(eq(settings.key, LIVE_TOKEN_KEY)).limit(1);
+  return (row?.value as { token?: string } | undefined)?.token ?? null;
+}
+
+/** Secret for the one OBS link that covers every giveaway. Created the first time staff need it. */
+export async function liveOverlayToken() {
+  const existing = await storedLiveToken();
+  if (existing) return existing;
+  await db.insert(settings).values({ key: LIVE_TOKEN_KEY, value: { token: newOverlayToken() } }).onConflictDoNothing();
+  return (await storedLiveToken())!;
+}
+
+async function giveawayState(g: Giveaway): Promise<OverlayState> {
+  const [count, names, winners] = await Promise.all([entryCount(g.id), entrantNames(g.id, MAX_NAMES), getGiveawayWinners(g.id)]);
+  return {
+    kind: 'giveaway',
+    title: g.prize,
+    prizes: [g.prize],
+    status: g.status,
+    keyword: g.entryKeyword,
+    closesAt: g.closesAt?.toISOString() ?? null,
+    entries: count,
+    entriesLabel: 'Entries',
+    players: count,
+    recent: names,
+    reel: names,
+    winners: winners.map((w) => ({ name: w.name, prize: g.winnersCount > 1 ? `${ordinal(w.position)} winner` : g.prize })),
+    drawnAt: g.drawnAt?.toISOString() ?? null,
+  };
+}
+
 export async function overlayState(kind: string, token: string): Promise<OverlayState | null> {
+  if (kind === 'live') {
+    if (token !== (await storedLiveToken())) return null;
+    const g = await currentLiveGiveaway();
+    return g ? giveawayState(g) : IDLE;
+  }
   if (kind === 'giveaway') {
     const g = await getGiveawayByToken(token);
-    if (!g) return null;
-    const [count, names, winners] = await Promise.all([entryCount(g.id), entrantNames(g.id, MAX_NAMES), getGiveawayWinners(g.id)]);
-    return {
-      kind: 'giveaway',
-      title: g.prize,
-      prizes: [g.prize],
-      status: g.status,
-      keyword: g.entryKeyword,
-      closesAt: g.closesAt?.toISOString() ?? null,
-      entries: count,
-      entriesLabel: 'Entries',
-      players: count,
-      recent: names,
-      reel: names,
-      winners: winners.map((w) => ({ name: w.name, prize: g.winnersCount > 1 ? `${ordinal(w.position)} winner` : g.prize })),
-      drawnAt: g.drawnAt?.toISOString() ?? null,
-    };
+    return g ? giveawayState(g) : null;
   }
   if (kind === 'raffle') {
     const r = await getRaffleByToken(token);

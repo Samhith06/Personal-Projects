@@ -6,6 +6,8 @@ import { GiveawayForm } from '@/components/admin/DrawForms';
 import { deleteGiveaway, giveawayStep, markGiveawayPaid } from '@/server/actions/draws';
 import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
 import { entrantNames, entryCount, getGiveaway, getGiveawayWinners } from '@/server/services/giveaways';
+import { liveOverlayToken } from '@/server/services/overlay';
+import { AutoRefresh } from '@/components/AutoRefresh';
 import { siteUrl } from '@/lib/env';
 import { ordinal } from '@/lib/format';
 import { CopyLink } from '@/components/admin/CopyLink';
@@ -13,8 +15,8 @@ import { CopyLink } from '@/components/admin/CopyLink';
 export const metadata: Metadata = { title: 'Giveaway' };
 
 const NEXT: Record<string, { step: string; label: string; note: string }> = {
-  draft: { step: 'open', label: 'Open giveaway', note: 'Starts taking entries and publishes the seed fingerprint.' },
-  open: { step: 'close', label: 'Close entries', note: 'Freezes the entry list. Happens automatically at the close time if one is set.' },
+  draft: { step: 'open', label: 'Open giveaway', note: 'Starts taking entries, publishes the seed fingerprint and pops up on OBS.' },
+  open: { step: 'close', label: 'Close entries', note: 'Freezes the entry list so you can draw by hand.' },
   closed: { step: 'draw', label: 'Draw winner', note: 'The overlay plays the draw and shows the winner straight away.' },
 };
 
@@ -24,11 +26,18 @@ export default async function GiveawayAdmin({ params, searchParams }: { params: 
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const g = await getGiveaway(id);
   if (!g) notFound();
-  const [count, names, winners] = await Promise.all([entryCount(id), entrantNames(id, 200), getGiveawayWinners(id)]);
+  const [count, names, winners, overlayToken] = await Promise.all([entryCount(id), entrantNames(id, 200), getGiveawayWinners(id), liveOverlayToken()]);
   const next = NEXT[g.status];
+  const timerNote =
+    g.status === 'draft' && g.timerMinutes
+      ? `Starts taking entries, publishes the seed fingerprint and pops up on OBS. The winner is drawn automatically ${g.timerMinutes} minutes later.`
+      : g.status === 'open' && g.closesAt
+        ? 'The winner is drawn automatically when the timer runs out. Only close entries to stop it early and draw by hand.'
+        : null;
 
   return (
     <div className="stack" style={{ gap: 20 }}>
+      {g.status === 'open' ? <AutoRefresh seconds={3} /> : null}
       <div>
         <Link href="/admin/giveaways" className="meta">
           ← Giveaways
@@ -43,7 +52,7 @@ export default async function GiveawayAdmin({ params, searchParams }: { params: 
       {next ? (
         <section className="card row" style={{ justifyContent: 'space-between' }}>
           <span className="meta" style={{ flex: '1 1 300px' }}>
-            {next.note}
+            {timerNote ?? next.note}
           </span>
           <form action={giveawayStep}>
             <input type="hidden" name="id" value={g.id} />
@@ -57,8 +66,8 @@ export default async function GiveawayAdmin({ params, searchParams }: { params: 
 
       <section className="card stack" style={{ gap: 8 }}>
         <strong>OBS browser source</strong>
-        <CopyLink value={siteUrl(`/overlay/giveaway/${g.overlayToken}`)} />
-        <span className="meta">1920×1080, transparent background. Keep this link private.</span>
+        <CopyLink value={siteUrl(`/overlay/live/${overlayToken}`)} />
+        <span className="meta">The same link for every giveaway: add it to OBS once at 1920×1080. Keep this link private.</span>
         {g.seedHash ? (
           <>
             <span className="meta">Seed fingerprint</span>

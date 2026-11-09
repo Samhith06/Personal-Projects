@@ -63,6 +63,7 @@ function JoinList({ names }: { names: string[] }) {
  *   open   → entry panel (keyword, timer, live count, newest joins)
  *   closed → "entries closed" panel
  *   drawn  → name reel that slows to a stop on the winner, then the winner card for 30 s, then nothing
+ * The permanent link (kind `live`) follows whichever giveaway is running and is `idle`, drawing nothing, in between.
  * `?preview=1` paints a dark stand-in for the stream so the layout is visible in a browser.
  */
 export function DrawOverlay({ kind, token, initial, preview }: { kind: string; token: string; initial: OverlayState; preview: boolean }) {
@@ -131,6 +132,13 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
     return () => clearTimeout(timer);
   }, [state.status, state.drawnAt]);
 
+  // The permanent link moves on to the next giveaway, which starts from a clean slate.
+  useEffect(() => {
+    if (state.status === 'drawn') return;
+    setRevealed(false);
+    setFinished(false);
+  }, [state.status]);
+
   // Clear the winner card WINNER_MS after it's revealed.
   useEffect(() => {
     if (state.status !== 'drawn' || !revealed || finished) return;
@@ -164,7 +172,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
               )}
               {countdown ? (
                 <div className="ov-timer">
-                  <span>Closes in</span>
+                  <span>{state.kind === 'giveaway' ? 'Draw in' : 'Closes in'}</span>
                   <b>{countdown}</b>
                 </div>
               ) : null}
@@ -228,7 +236,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
         </section>
       ) : null}
 
-      {finished ? null : (
+      {finished || state.status === 'idle' ? null : (
         <div className="ov-brand">
           <span className="ov-dot" />
           SteezySpins <span>· code</span> <i>STZY</i>

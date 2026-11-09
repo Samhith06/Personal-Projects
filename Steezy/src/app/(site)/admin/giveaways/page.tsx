@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { GiveawayForm } from '@/components/admin/DrawForms';
 import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
+import { CopyLink } from '@/components/admin/CopyLink';
 import { deleteGiveaway } from '@/server/actions/draws';
 import { entryCount, listGiveaways } from '@/server/services/giveaways';
+import { liveOverlayToken } from '@/server/services/overlay';
+import { siteUrl } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'Giveaways' };
 
@@ -40,7 +43,7 @@ function GiveawayRow({ g, entries }: { g: Row; entries: number }) {
 
 export default async function GiveawaysAdmin({ searchParams }: { searchParams: FlashParams }) {
   const flash = await searchParams;
-  const rows = await listGiveaways();
+  const [rows, overlayToken] = await Promise.all([listGiveaways(), liveOverlayToken()]);
   const counts = new Map(await Promise.all(rows.map(async (g) => [g.id, await entryCount(g.id)] as const)));
   const active = rows.filter((g) => ACTIVE.has(g.status));
   const history = rows.filter((g) => !ACTIVE.has(g.status));
@@ -49,9 +52,14 @@ export default async function GiveawaysAdmin({ searchParams }: { searchParams: F
       <div>
         <span className="kicker">Moderation</span>
         <h1 className="admin__title">Giveaways</h1>
-        <p className="meta">Draft → open (members join on the site or with the chat keyword) → closed → drawn live on the overlay.</p>
+        <p className="meta">Create it, open it, and with a timer set the winner is drawn live on the overlay when it runs out.</p>
       </div>
       <Flash {...flash} />
+      <section className="card stack" style={{ gap: 8 }}>
+        <strong>OBS browser source</strong>
+        <CopyLink value={siteUrl(`/overlay/live/${overlayToken}`)} />
+        <span className="meta">Add this once, at 1920×1080. It stays invisible until a giveaway opens, then shows the countdown and the draw. Keep this link private.</span>
+      </section>
       <section className="card stack">
         <strong>New giveaway</strong>
         <GiveawayForm />

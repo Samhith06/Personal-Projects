@@ -82,9 +82,9 @@ export function GiveawayForm({ giveaway }: { giveaway?: Giveaway }) {
             <input id="g-win" name="winnersCount" type="number" min="1" max="50" className="input" defaultValue={giveaway?.winnersCount ?? 1} />
           </div>
           <div className="field">
-            <label htmlFor="g-timer">Timer (starts when opened)</label>
+            <label htmlFor="g-timer">Auto-draw timer (starts when opened)</label>
             <select id="g-timer" name="timerMinutes" className="input" defaultValue={giveaway ? String(giveaway.timerMinutes ?? '') : '5'}>
-              <option value="">No timer, close by hand</option>
+              <option value="">No timer, draw by hand</option>
               {TIMER_MINUTES.map((m) => (
                 <option key={m} value={m}>
                   {m} minutes
