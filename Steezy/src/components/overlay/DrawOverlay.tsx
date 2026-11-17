@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { OverlayState } from '@/server/services/overlay';
 
 const POLL_MS = 2000;
@@ -24,8 +24,11 @@ function useCountdown(iso: string | null) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
-/** Rows visible in the join list before it starts scrolling. */
-const VISIBLE_ROWS = 6;
+/** Winner name size that keeps long names inside the fixed frame. */
+const winnerSize = (name: string) => (name.length <= 9 ? 104 : name.length <= 14 ? 80 : name.length <= 20 ? 60 : 46);
+
+/** Rows that fit the join list's fixed area; longer lists scroll. */
+const VISIBLE_ROWS = 7;
 /** Scroll speed: seconds per name, so long lists still crawl slowly enough to read. */
 const SECONDS_PER_NAME = 1.8;
 
@@ -34,11 +37,11 @@ const SECONDS_PER_NAME = 1.8;
  * one scrolls slowly upward in a loop (the names are rendered twice so the
  * wrap-around is seamless).
  */
-function JoinList({ names }: { names: string[] }) {
-  if (!names.length) return null;
+function JoinList({ names, waiting }: { names: string[]; waiting: string }) {
+  if (!names.length) return <div className="ov-list ov-list--empty">{waiting}</div>;
   if (names.length <= VISIBLE_ROWS) {
     return (
-      <ul className="ov-recent">
+      <ul className="ov-list ov-recent">
         {names.map((name, i) => (
           <li key={`${name}-${i}`}>{name}</li>
         ))}
@@ -46,7 +49,7 @@ function JoinList({ names }: { names: string[] }) {
     );
   }
   return (
-    <div className="ov-scroll" style={{ ['--rows' as string]: VISIBLE_ROWS } as CSSProperties}>
+    <div className="ov-list ov-scroll">
       <ul className="ov-recent ov-scroll__track" style={{ animationDuration: `${names.length * SECONDS_PER_NAME}s` }}>
         {[...names, ...names].map((name, i) => (
           <li key={i} aria-hidden={i >= names.length || undefined}>
@@ -59,7 +62,9 @@ function JoinList({ names }: { names: string[] }) {
 }
 
 /**
- * The 1920×1080 OBS browser source for a giveaway or raffle.
+ * The 1920×1080 OBS browser source for a giveaway or raffle. Every state
+ * (entries, closed, reel, winner) sits in the same fixed 720×760 frame in the
+ * middle, so the source never grows, shrinks or shifts as people join.
  *   open   → entry panel (keyword, timer, live count, newest joins)
  *   closed → "entries closed" panel
  *   drawn  → name reel that slows to a stop on the winner, then the winner card for 30 s, then nothing
@@ -153,7 +158,7 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
       {preview ? <div className="ov__stand-in">Stream gameplay · transparent in OBS</div> : null}
 
       {state.status === 'open' && !drawing ? (
-        <section className="ov-panel">
+        <section className="ov-panel ov-frame">
           <header className="ov-panel__head">
             <span className="ov-eyebrow">
               <span className="ov-dot" />
@@ -162,33 +167,44 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
             <h1>{state.title}</h1>
           </header>
           <div className="ov-panel__body">
-            <div className="ov-row">
-              {state.keyword ? (
-                <div className="ov-join">
-                  Type <b>{state.keyword}</b> in chat
-                </div>
-              ) : (
-                <div className="ov-join">{state.kind === 'raffle' ? '1 ticket per $1k wagered · code STZY' : 'Enter on SteezySpins'}</div>
-              )}
+            <div className="ov-call">
               {countdown ? (
-                <div className="ov-timer">
-                  <span>{state.kind === 'giveaway' ? 'Draw in' : 'Closes in'}</span>
-                  <b>{countdown}</b>
-                </div>
-              ) : null}
+                <>
+                  <span className="ov-call__label" suppressHydrationWarning>
+                    {state.kind === 'raffle' ? 'Raffle closes in' : countdown === '00:00' ? 'Drawing now…' : 'Giveaway draws in'}
+                  </span>
+                  {/* The server's second and the browser's can differ by one; the next tick settles it. */}
+                  <b className="ov-call__clock" suppressHydrationWarning>
+                    {countdown}
+                  </b>
+                </>
+              ) : (
+                <span className="ov-call__label">{state.kind === 'raffle' ? 'Raffle open' : 'Draw coming up soon'}</span>
+              )}
+              <span className="ov-call__how">
+                {state.keyword ? (
+                  <>
+                    Type <b>{state.keyword}</b> in the Kick chat to enter
+                  </>
+                ) : state.kind === 'raffle' ? (
+                  '1 ticket per $1k wagered · code STZY'
+                ) : (
+                  'Enter on SteezySpins.com'
+                )}
+              </span>
             </div>
-            <div className="ov-count">
+            <div className="ov-count ov-count--row">
               <span>{state.entriesLabel}</span>
               <b>{state.entries.toLocaleString('en-US')}</b>
             </div>
             {state.kind === 'raffle' && state.prizes.length > 1 ? <div className="ov-prizes">{state.prizes.join('   ·   ')}</div> : null}
-            <JoinList names={state.recent} />
+            <JoinList names={state.recent} waiting={state.keyword ? `Be the first: type ${state.keyword} in chat` : 'Waiting for the first entry…'} />
           </div>
         </section>
       ) : null}
 
       {state.status === 'closed' ? (
-        <section className="ov-panel">
+        <section className="ov-panel ov-frame">
           <header className="ov-panel__head">
             <span className="ov-eyebrow">Entries closed</span>
             <h1>{state.title}</h1>
@@ -198,13 +214,16 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
               <span>{state.entriesLabel}</span>
               <b>{state.entries.toLocaleString('en-US')}</b>
             </div>
-            <div className="ov-join">Drawing live in a moment…</div>
+            <div className="ov-call">
+              <span className="ov-call__label">Entries closed</span>
+              <b className="ov-call__clock ov-call__clock--text">Drawing in a moment…</b>
+            </div>
           </div>
         </section>
       ) : null}
 
       {drawing ? (
-        <section className="ov-center ov-reel" aria-live="polite">
+        <section className="ov-center ov-frame ov-reel" aria-live="polite">
           <span className="ov-eyebrow">
             Drawing · {state.players.toLocaleString('en-US')} {state.kind === 'raffle' ? 'players' : 'entries'}
           </span>
@@ -213,11 +232,13 @@ export function DrawOverlay({ kind, token, initial, preview }: { kind: string; t
       ) : null}
 
       {state.status === 'drawn' && revealed && !finished && !drawing ? (
-        <section className="ov-center ov-winner" aria-live="polite">
+        <section className="ov-center ov-frame ov-winner" aria-live="polite">
           <span className="ov-eyebrow">{state.winners.length > 1 ? 'Winners' : 'Winner'}</span>
           {state.winners.length ? (
             <>
-              <div className="ov-winner__name">{state.winners[0].name}</div>
+              <div className="ov-winner__name" style={{ fontSize: winnerSize(state.winners[0].name) }}>
+                {state.winners[0].name}
+              </div>
               <div className="ov-winner__prize">{state.winners[0].prize}</div>
               {state.winners.length > 1 ? (
                 <div className="ov-winner__more">
