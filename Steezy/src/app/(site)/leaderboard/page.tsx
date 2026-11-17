@@ -113,7 +113,9 @@ export default async function LeaderboardPage() {
                 {standings.slice(3, 50).map((s) => (
                   <tr key={s.rank} className={s.roobetUid === myUid ? 'is-me' : undefined}>
                     <td className="meta num">{s.rank}</td>
-                    <td>{s.displayName}</td>
+                    <td>
+                      {s.displayName} {s.boost ? <span className="boost-chip" title="Wagered during double points">{s.boost}×</span> : null}
+                    </td>
                     <td className="num" style={{ textAlign: 'right' }}>
                       {formatUsd(s.wagered)}
                     </td>
@@ -126,7 +128,7 @@ export default async function LeaderboardPage() {
             </table>
           </div>
           <p className="meta" style={{ padding: '12px 8px 6px' }}>
-            Roobet affiliate data{sync?.lastOkAt ? ` · updated ${formatAgo(sync.lastOkAt)}` : ''}. Names are shown masked for privacy.
+            Roobet affiliate data{sync?.lastOkAt ? ` · updated ${formatAgo(sync.lastOkAt)}` : ''}. Names are shown masked for privacy.{standings.some((s) => s.boost) ? ' A 2× tag means that player wagered during double points; those wagers count double above.' : ''}
           </p>
         </div>
       )}

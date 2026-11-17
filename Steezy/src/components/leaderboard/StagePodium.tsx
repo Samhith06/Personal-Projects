@@ -31,7 +31,9 @@ export function StagePodium({ top, label = 'Wagered' }: { top: Standing[]; label
               {s.displayName[0]?.toUpperCase()}
               <span className="stage__badge">{rank}</span>
             </span>
-            <span className="stage__name">{s.displayName}</span>
+            <span className="stage__name">
+              {s.displayName} {s.boost ? <span className="boost-chip" title="Wagered during double points">{s.boost}×</span> : null}
+            </span>
             <span className="stage__wager">
               <Money value={s.wagered} />
               <span>{label}</span>

@@ -5,6 +5,9 @@ import { OfferCard } from '@/components/home/OfferCard';
 import { PayoutTracker } from '@/components/home/PayoutTracker';
 import { env } from '@/lib/env';
 import { LoginButton } from '@/components/LoginButton';
+import { DoublePointsBanner } from '@/components/leaderboard/DoublePointsBanner';
+import { currentLeaderboard } from '@/server/services/leaderboards';
+import { currentBoost } from '@/server/services/wager-boosts';
 import { getCurrentUser } from '@/server/auth/session';
 
 /**
@@ -14,7 +17,11 @@ import { getCurrentUser } from '@/server/auth/session';
  * clips) comes with the clips work.
  */
 export default async function HomePage() {
-  const user = await getCurrentUser().catch(() => null);
+  const [user, boost, board] = await Promise.all([
+    getCurrentUser().catch(() => null),
+    currentBoost().catch(() => null),
+    currentLeaderboard().catch(() => null),
+  ]);
   return (
     <>
       <div className="home-stage">
@@ -23,6 +30,7 @@ export default async function HomePage() {
 
         <section className="hero">
           <div className="container hero__content">
+            {boost && board?.status === 'live' ? <DoublePointsBanner boost={boost} /> : null}
             <h1 className="hero__title">Every spin, counted together.</h1>
             <p className="hero__lede">
               The SteezySpins community hub — leaderboards, giveaways, bonus hunts and slot tournaments, tied to your Discord

@@ -304,10 +304,32 @@ export const wagerBoosts = pgTable(
     stoppedAt: ts('stopped_at'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     lastSyncedAt: ts('last_synced_at'),
+    /** Set when a weekly schedule created this window; `occurrenceKey` (`<scheduleId>:<local date>`) stops it being made twice. */
+    scheduleId: uuid('schedule_id').references(() => wagerBoostSchedules.id, { onDelete: 'set null' }),
+    occurrenceKey: text('occurrence_key'),
+    /** When the "it's on" / "it's over" posts went to the Discord #leaderboard channel. */
+    announcedStartAt: ts('announced_start_at'),
+    announcedEndAt: ts('announced_end_at'),
     createdAt: createdAt(),
   },
-  (t) => [index('wager_boosts_starts_idx').on(t.startsAt)],
+  (t) => [index('wager_boosts_starts_idx').on(t.startsAt), uniqueIndex('wager_boosts_occurrence_idx').on(t.occurrenceKey)],
 );
+
+/** A repeating double-points window, e.g. every Friday 20:00–22:00 in the admin's time zone. */
+export const wagerBoostSchedules = pgTable('wager_boost_schedules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  multiplier: numeric('multiplier', { precision: 4, scale: 2, mode: 'number' }).notNull().default(2),
+  /** 0 = Sunday … 6 = Saturday, in `timeZone`. */
+  weekday: integer('weekday').notNull(),
+  /** Minutes after local midnight. */
+  startMinute: integer('start_minute').notNull(),
+  durationMinutes: integer('duration_minutes').notNull(),
+  /** IANA zone the admin picked the time in, so DST shifts keep it at the same local time. */
+  timeZone: text('time_zone').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+});
 
 /** Each player's wager inside a boost's exact window, pulled from Roobet for just that window. */
 export const wagerBoostTotals = pgTable(

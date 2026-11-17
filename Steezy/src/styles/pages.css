@@ -2216,3 +2216,79 @@
 .boost-admin__status {
   line-height: 1.6;
 }
+
+/* Site-wide double-points strip (above the header on pages without the full banner). */
+.boost-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: linear-gradient(90deg, #2a2208, #3a2d08 50%, #2a2208);
+  border-bottom: 1px solid rgb(255 198 26 / 0.35);
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.boost-strip:hover {
+  color: var(--color-text);
+}
+
+.boost-strip b {
+  color: var(--color-roobet);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.boost-strip .num {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.boost-strip__badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-roobet);
+  color: #1a1404;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.boost-strip__cta {
+  flex: none;
+  color: var(--color-roobet);
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  /* The whole strip is the link, so the label can go on phones. */
+  .boost-strip__more,
+  .boost-strip__cta {
+    display: none;
+  }
+  .boost-strip {
+    font-size: 12px;
+    gap: 8px;
+  }
+}
+
+/* "2×" tag next to players who wagered during double points. */
+.boost-chip {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgb(255 198 26 / 0.16);
+  color: var(--color-roobet);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+
+.hero__content > .boost-banner {
+  max-width: 760px;
+}

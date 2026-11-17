@@ -74,6 +74,29 @@ export async function register() {
 
   startGiveawayAutoDraw();
   startSlotCatalogSync();
+  startDoublePointsSweep();
+}
+
+/**
+ * Double points: turns weekly schedules into windows a few hours ahead and
+ * posts "it's live" / "it's over" to the Discord #leaderboard channel within
+ * ~15 s of either moment. Next run is queued only after this one finishes.
+ */
+function startDoublePointsSweep() {
+  const SWEEP_MS = 15_000;
+  const run = async () => {
+    try {
+      const { announceBoosts, materializeSchedules } = await import('@/server/services/wager-boosts');
+      const made = await materializeSchedules();
+      if (made) console.log(`[boost] made ${made} weekly double-points window(s)`);
+      const posted = await announceBoosts();
+      if (posted) console.log(`[boost] posted ${posted} double-points update(s) to Discord`);
+    } catch (error) {
+      console.warn('[boost] double-points sweep failed', error);
+    }
+    setTimeout(run, SWEEP_MS).unref?.();
+  };
+  setTimeout(run, 5_000).unref?.();
 }
 
 /**

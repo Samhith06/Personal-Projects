@@ -85,6 +85,13 @@
       "when": 1794918606357,
       "tag": "0011_double_points",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794920585474,
+      "tag": "0012_double_points_schedules_and_posts",
+      "breakpoints": true
     }
   ]
 }

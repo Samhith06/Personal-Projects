@@ -27,6 +27,8 @@ export type Standing = {
   wagered: number;
   prize: number;
   paidAt: Date | null;
+  /** Highest double-points multiplier this player wagered under in the board (the "2×" badge), else null. */
+  boost: number | null;
 };
 
 export async function getLeaderboard(id: string) {
@@ -79,7 +81,7 @@ export async function computeStandings(board: Leaderboard): Promise<Standing[]> 
     boostBonusFor(board.startsAt, board.endsAt, board.metric as Metric),
   ]);
   const totals = bonus.size
-    ? base.map((t) => ({ ...t, total: t.total + (bonus.get(t.roobetUid) ?? 0) })).sort((a, b) => b.total - a.total)
+    ? base.map((t) => ({ ...t, total: t.total + (bonus.get(t.roobetUid)?.bonus ?? 0) })).sort((a, b) => b.total - a.total)
     : base;
   return totals
     .filter((t) => t.total > 0 && t.total >= board.minWager && !t.blocked)
@@ -92,17 +94,17 @@ export async function computeStandings(board: Leaderboard): Promise<Standing[]> 
         wagered: t.total,
         prize: board.prizes[i] ?? 0,
         paidAt: null,
+        boost: bonus.get(t.roobetUid)?.multiplier ?? null,
       };
     });
 }
 
 export async function getStandings(board: Leaderboard): Promise<Standing[]> {
   if (board.status === 'frozen' || board.status === 'published') {
-    const rows = await db
-      .select()
-      .from(leaderboardResults)
-      .where(eq(leaderboardResults.leaderboardId, board.id))
-      .orderBy(asc(leaderboardResults.rank));
+    const [rows, bonus] = await Promise.all([
+      db.select().from(leaderboardResults).where(eq(leaderboardResults.leaderboardId, board.id)).orderBy(asc(leaderboardResults.rank)),
+      boostBonusFor(board.startsAt, board.endsAt, board.metric as Metric),
+    ]);
     return rows.map((r) => ({
       rank: r.rank,
       roobetUid: r.roobetUid,
@@ -111,6 +113,7 @@ export async function getStandings(board: Leaderboard): Promise<Standing[]> {
       wagered: r.wagered,
       prize: r.prize,
       paidAt: r.paidAt,
+      boost: bonus.get(r.roobetUid)?.multiplier ?? null,
     }));
   }
   return computeStandings(board);

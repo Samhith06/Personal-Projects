@@ -8,7 +8,19 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/server/auth/session';
-import { BoostError, MULTIPLIERS, extendBoost, startBoost, startBoostNow, stopBoost } from '@/server/services/wager-boosts';
+import {
+  BoostError,
+  MULTIPLIERS,
+  WEEKDAYS,
+  createSchedule,
+  deleteSchedule,
+  extendBoost,
+  isTimeZone,
+  skipNextOccurrence,
+  startBoost,
+  startBoostNow,
+  stopBoost,
+} from '@/server/services/wager-boosts';
 
 const PATH = '/admin/leaderboards';
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? '').trim();
@@ -88,5 +100,44 @@ export async function extendDoublePoints(fd: FormData): Promise<void> {
   await attempt(async () => {
     await extendBoost(str(fd, 'id'), minutes, staff.id);
     return `Extended by ${fmtLength(minutes)}.`;
+  });
+}
+
+/* ------------------------------------------------------------ Weekly windows */
+
+export async function addWeeklyDoublePoints(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  const multiplier = Number(str(fd, 'multiplier') || 2);
+  if (!MULTIPLIERS.includes(multiplier as (typeof MULTIPLIERS)[number])) back({ error: 'Pick 1.5×, 2× or 3×.' });
+  const weekday = Number(str(fd, 'weekday'));
+  if (!(Number.isInteger(weekday) && weekday >= 0 && weekday <= 6)) back({ error: 'Pick a day.' });
+  const time = /^(\d{2}):(\d{2})$/.exec(str(fd, 'time'));
+  if (!time || Number(time[1]) > 23 || Number(time[2]) > 59) back({ error: 'Pick a start time.' });
+  const startMinute = Number(time![1]) * 60 + Number(time![2]);
+  const durationMinutes = Number(str(fd, 'duration'));
+  if (!(Number.isInteger(durationMinutes) && durationMinutes >= 15 && durationMinutes <= 24 * 60)) back({ error: 'Length must be 15 minutes to 24 hours.' });
+  // The browser sends its own IANA zone, so "Friday 8 PM" stays 8 PM for the admin through DST changes.
+  const timeZone = str(fd, 'timeZone') || 'UTC';
+  if (!isTimeZone(timeZone)) back({ error: 'Unknown time zone.' });
+
+  await attempt(async () => {
+    await createSchedule({ multiplier, weekday, startMinute, durationMinutes, timeZone, actorId: staff.id });
+    return `Weekly ${multiplier}× points added: every ${WEEKDAYS[weekday]}.`;
+  });
+}
+
+export async function removeWeeklyDoublePoints(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  await attempt(async () => {
+    await deleteSchedule(str(fd, 'id'), staff.id);
+    return 'Weekly double points removed.';
+  });
+}
+
+export async function skipNextWeeklyDoublePoints(fd: FormData): Promise<void> {
+  const staff = await requireRole('admin');
+  await attempt(async () => {
+    await skipNextOccurrence(str(fd, 'id'), staff.id);
+    return 'Skipped the next one. It comes back the week after.';
   });
 }

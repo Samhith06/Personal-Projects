@@ -1,9 +1,26 @@
 import { BoostCountdown, LocalTime } from '@/components/boost/BoostClock';
-import { extendDoublePoints, startDoublePointsNow, turnOffDoublePoints } from '@/server/actions/boosts';
-import { boostEnd, boostLabel, boostState, boostSummaries, currentBoost, recentBoosts } from '@/server/services/wager-boosts';
+import {
+  extendDoublePoints,
+  removeWeeklyDoublePoints,
+  skipNextWeeklyDoublePoints,
+  startDoublePointsNow,
+  turnOffDoublePoints,
+} from '@/server/actions/boosts';
+import {
+  WEEKDAYS,
+  boostEnd,
+  boostLabel,
+  boostState,
+  boostSummaries,
+  currentBoost,
+  listSchedules,
+  nextOccurrence,
+  recentBoosts,
+} from '@/server/services/wager-boosts';
 import { formatUsd } from '@/lib/format';
 import { ConfirmSubmit } from './ConfirmSubmit';
 import { DoublePointsForm } from './DoublePointsForm';
+import { WeeklyDoublePointsForm } from './WeeklyDoublePointsForm';
 
 const fmtSpan = (ms: number) => {
   const min = Math.round(ms / 60_000);
@@ -13,11 +30,12 @@ const fmtSpan = (ms: number) => {
 /** Admin card: the on/off switch for double points, its timer, and the last few windows. */
 export async function DoublePointsPanel() {
   const now = new Date();
-  const [boost, recent] = await Promise.all([currentBoost(now), recentBoosts(6)]);
+  const [boost, recent, schedules] = await Promise.all([currentBoost(now), recentBoosts(8), listSchedules()]);
   const summaries = await boostSummaries(recent.map((b) => b.id));
   const state = boost ? boostState(boost, now) : null;
   const end = boost ? boostEnd(boost) : null;
-  const past = recent.filter((b) => boostState(b, now) === 'ended');
+  // Ended windows that actually ran (not ones cancelled or skipped before they started).
+  const past = recent.filter((b) => boostState(b, now) === 'ended' && boostEnd(b)! > b.startsAt).slice(0, 6);
   const serverNow = now.toISOString();
 
   return (
@@ -99,6 +117,49 @@ export async function DoublePointsPanel() {
           <DoublePointsForm />
         </>
       )}
+
+      <div className="stack boost-admin__weekly" style={{ gap: 10 }}>
+        <span className="meta">Repeat weekly</span>
+        {schedules.map((s) => {
+          const next = nextOccurrence(s, now);
+          const h = Math.floor(s.startMinute / 60);
+          const m = s.startMinute % 60;
+          const at = `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+          return (
+            <div key={s.id} className="admin-row">
+              <div className="admin-row__body">
+                <span>
+                  {s.multiplier}× every {WEEKDAYS[s.weekday]} at {at}, {fmtSpan(s.durationMinutes * 60_000)}{' '}
+                  <span className="meta">({s.timeZone})</span>
+                </span>
+                <div className="meta">
+                  Next: <LocalTime at={next.start.toISOString()} />. It appears on the leaderboard 3 hours before it starts.
+                </div>
+              </div>
+              <form action={skipNextWeeklyDoublePoints}>
+                <input type="hidden" name="id" value={s.id} />
+                <ConfirmSubmit className="btn btn--secondary" message="Skip the next one? It comes back the week after.">
+                  Skip next
+                </ConfirmSubmit>
+              </form>
+              <form action={removeWeeklyDoublePoints}>
+                <input type="hidden" name="id" value={s.id} />
+                <ConfirmSubmit className="btn btn--danger" message="Stop repeating this window?">
+                  Remove
+                </ConfirmSubmit>
+              </form>
+            </div>
+          );
+        })}
+        <details>
+          <summary className="meta" style={{ cursor: 'pointer' }}>
+            + Add a weekly window (e.g. every Friday 8–10 PM)
+          </summary>
+          <div style={{ paddingTop: 12 }}>
+            <WeeklyDoublePointsForm />
+          </div>
+        </details>
+      </div>
 
       {past.length ? (
         <div className="stack" style={{ gap: 4 }}>
