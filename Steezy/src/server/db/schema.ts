@@ -289,6 +289,42 @@ export const leaderboardResults = pgTable(
   (t) => [primaryKey({ columns: [t.leaderboardId, t.rank] })],
 );
 
+/**
+ * Double points (wager boosts): while one runs, every wager under the code
+ * counts `multiplier` times on the leaderboard. `endsAt` null = runs until an
+ * admin turns it off; `stoppedAt` is when they did. Only one runs at a time.
+ */
+export const wagerBoosts = pgTable(
+  'wager_boosts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    multiplier: numeric('multiplier', { precision: 4, scale: 2, mode: 'number' }).notNull().default(2),
+    startsAt: ts('starts_at').notNull(),
+    endsAt: ts('ends_at'),
+    stoppedAt: ts('stopped_at'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    lastSyncedAt: ts('last_synced_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('wager_boosts_starts_idx').on(t.startsAt)],
+);
+
+/** Each player's wager inside a boost's exact window, pulled from Roobet for just that window. */
+export const wagerBoostTotals = pgTable(
+  'wager_boost_totals',
+  {
+    boostId: uuid('boost_id')
+      .notNull()
+      .references(() => wagerBoosts.id, { onDelete: 'cascade' }),
+    roobetUid: text('roobet_uid').notNull(),
+    username: text('username').notNull(),
+    wagered: money('wagered').notNull().default(0),
+    weightedWagered: money('weighted_wagered').notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.boostId, t.roobetUid] })],
+);
+
 export const milestones = pgTable('milestones', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),

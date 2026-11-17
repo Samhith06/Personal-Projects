@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ConfirmSubmit } from '@/components/admin/ConfirmSubmit';
+import { DoublePointsPanel } from '@/components/admin/DoublePointsPanel';
 import { Flash, type FlashParams } from '@/components/admin/Flash';
 import { LeaderboardForm } from '@/components/admin/LeaderboardForm';
 import { deleteLeaderboard, postStandingsNow } from '@/server/actions/admin';
@@ -35,6 +36,8 @@ export default async function LeaderboardsAdmin({ searchParams }: { searchParams
         <p className="meta">Draft → live → frozen (final standings locked, prizes go to Payouts) → published. Live boards freeze automatically when they end.</p>
       </div>
       <Flash {...flash} />
+
+      <DoublePointsPanel />
 
       <section className="card row" style={{ justifyContent: 'space-between' }}>
         <span className="meta" style={{ flex: '1 1 300px' }}>

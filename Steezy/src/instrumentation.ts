@@ -18,6 +18,7 @@ export async function register() {
     const { closeStaleSessions } = await import('@/server/kick/sessions');
     const { autoApprovePendingRoobet } = await import('@/server/services/admin');
     const { closeEndedRaffles } = await import('@/server/services/raffles');
+    const { syncWagerBoosts } = await import('@/server/services/wager-boosts');
     const config = roobetConfigFromEnv();
 
     // The first run after boot fills in every day of the live board; later runs re-pull yesterday and today.
@@ -29,6 +30,12 @@ export async function register() {
         if (result.ok) console.log(`[roobet] synced ${result.rows} player-days over ${result.days} days`);
         else console.warn(`[roobet] sync failed — ${result.error}`);
         if (result.ok) {
+          // Double-points windows, pulled for their exact minutes, so standings (and a freeze below) include them.
+          const boosted = await syncWagerBoosts(config).catch((error) => {
+            console.warn('[boost] double-points sync failed', error);
+            return null;
+          });
+          if (boosted?.boosts) console.log(`[boost] synced ${boosted.rows} player(s) over ${boosted.boosts} double-points window(s)`);
           const climbs = await announceLeaderboardChanges().catch((error) => {
             console.warn('[leaderboard] Discord update failed', error);
             return 0;

@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RaceCountdown } from '@/components/leaderboard/Countdown';
+import { DoublePointsBanner } from '@/components/leaderboard/DoublePointsBanner';
 import { RaceStats } from '@/components/leaderboard/RaceStats';
 import { StagePodium } from '@/components/leaderboard/StagePodium';
 import { LossBackTag, VipTransferTag } from '@/components/VipTransferTag';
 import { getCurrentUser } from '@/server/auth/session';
 import { boardTotals, currentLeaderboard, getStandings } from '@/server/services/leaderboards';
 import { syncStatus } from '@/server/services/sync-status';
+import { currentBoost } from '@/server/services/wager-boosts';
 import { approvedRoobetUid } from '@/server/services/wagers';
 import { env } from '@/lib/env';
 import { formatAgo, formatUsd, metricLabel, ordinal } from '@/lib/format';
@@ -25,7 +27,13 @@ export default async function LeaderboardPage() {
     );
   }
 
-  const [standings, user, sync, totals] = await Promise.all([getStandings(board), getCurrentUser(), syncStatus('roobet'), boardTotals(board)]);
+  const [standings, user, sync, totals, boost] = await Promise.all([
+    getStandings(board),
+    getCurrentUser(),
+    syncStatus('roobet'),
+    boardTotals(board),
+    currentBoost(),
+  ]);
   const myUid = user ? await approvedRoobetUid(user.id) : null;
   const mine = myUid ? standings.find((s) => s.roobetUid === myUid) : null;
 
@@ -38,6 +46,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="container page">
+      {boost && board.status === 'live' ? <DoublePointsBanner boost={boost} /> : null}
       <section className="race">
         <div className="race__intro">
           <img src="/brand/roobet-logo-gold.png" alt="Roobet" width={131} height={40} className="race__logo" />

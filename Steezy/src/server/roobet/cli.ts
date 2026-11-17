@@ -5,6 +5,7 @@
  *   npm run roobet:sync -- 2026-01-01   # every day since that date
  */
 import 'dotenv/config';
+import { syncWagerBoosts } from '@/server/services/wager-boosts';
 import { roobetConfigFromEnv, syncRoobetRange, syncRoobetRecent } from './sync';
 
 async function main() {
@@ -16,6 +17,7 @@ async function main() {
 
   const result = from ? await syncRoobetRange(config, new Date(`${from}T00:00:00Z`)) : await syncRoobetRecent(config);
   console.log(result);
+  if (result.ok) console.log('double points', await syncWagerBoosts(config));
   process.exit(result.ok ? 0 : 1);
 }
 

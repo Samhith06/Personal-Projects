@@ -15,6 +15,7 @@ import { leaderboardResults, leaderboards, roobetDailyWager } from '@/server/db/
 import { maskName } from '@/lib/format';
 import { dayKey, wagerTotals, type Metric } from './wagers';
 import { audit } from './audit';
+import { boostBonusFor } from './wager-boosts';
 
 export type Leaderboard = typeof leaderboards.$inferSelect;
 
@@ -68,9 +69,18 @@ export async function boardTotals(board: Leaderboard) {
   return row;
 }
 
-/** Live standings computed from wagers. Blocked members and players under the minimum are left out. */
+/**
+ * Live standings computed from wagers, plus the extra from any double-points
+ * windows in the board. Blocked members and players under the minimum are left out.
+ */
 export async function computeStandings(board: Leaderboard): Promise<Standing[]> {
-  const totals = await wagerTotals(board.startsAt, board.endsAt, board.metric as Metric);
+  const [base, bonus] = await Promise.all([
+    wagerTotals(board.startsAt, board.endsAt, board.metric as Metric),
+    boostBonusFor(board.startsAt, board.endsAt, board.metric as Metric),
+  ]);
+  const totals = bonus.size
+    ? base.map((t) => ({ ...t, total: t.total + (bonus.get(t.roobetUid) ?? 0) })).sort((a, b) => b.total - a.total)
+    : base;
   return totals
     .filter((t) => t.total > 0 && t.total >= board.minWager && !t.blocked)
     .map((t, i) => {
